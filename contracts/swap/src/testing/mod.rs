@@ -1,6 +1,7 @@
-mod config_test;
-mod integration_tests;
-mod queries_test;
-mod storage_test;
+mod config_tests;
+mod integration_logic_tests;
+mod queries_tests;
+mod storage_tests;
 mod swap_tests;
 pub mod test_utils;
+mod integration_realistic_tests;

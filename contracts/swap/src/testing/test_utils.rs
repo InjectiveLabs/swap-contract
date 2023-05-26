@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult};
+use cosmwasm_std::{Addr, Coin, coin, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128};
 use injective_std::shim::Any;
 use injective_std::types::cosmos::bank::v1beta1::{
     MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
@@ -31,6 +31,34 @@ use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
 
 pub const TEST_CONTRACT_ADDR: &str = "inj14hj2tavq8fpesdwxxcu44rty3hh90vhujaxlnz";
 pub const TEST_USER_ADDR: &str = "inj1p7z8p649xspcey7wp5e4leqf7wa39kjjj6wja8";
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum Decimals {
+    Eighteen,
+    Twelve,
+    Six,
+    Zero,
+}
+
+impl Decimals {
+    pub fn get_decimals(&self) -> usize {
+        match self {
+            Decimals::Eighteen => 18,
+            Decimals::Twelve => 12,
+            Decimals::Six => 6,
+            Decimals::Zero => 0,
+        }
+    }
+
+    pub fn get_right_padding_zeroes(&self) -> String {
+        match self {
+            Decimals::Eighteen => "000000000000000000".to_string(),
+            Decimals::Twelve => "000000000000".to_string(),
+            Decimals::Six => "000000".to_string(),
+            Decimals::Zero => "".to_string(),
+        }
+    }
+}
 
 // Helper function to create a PriceLevel
 pub fn create_price_level(p: u128, q: u128) -> PriceLevel {
@@ -165,6 +193,32 @@ pub fn launch_spot_market(
     get_spot_market_id(exchange, ticker)
 }
 
+pub fn launch_custom_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+    base: &str,
+    quote: &str,
+    min_price_tick_size: &str,
+    min_quantity_tick_size: &str,
+) -> String {
+    let ticker = format!("{}/{}", base, quote);
+    exchange
+        .instant_spot_market_launch(
+            MsgInstantSpotMarketLaunch {
+                sender: signer.address(),
+                ticker: ticker.clone(),
+                base_denom: base.to_string(),
+                quote_denom: quote.to_string(),
+                min_price_tick_size: min_price_tick_size.to_string(),
+                min_quantity_tick_size: min_quantity_tick_size.to_string(),
+            },
+            signer,
+        )
+        .unwrap();
+
+    get_spot_market_id(exchange, ticker)
+}
+
 pub fn get_spot_market_id(exchange: &Exchange<InjectiveTestApp>, ticker: String) -> String {
     let spot_markets = exchange
         .query_spot_markets(&QuerySpotMarketsRequest {
@@ -204,10 +258,124 @@ pub fn create_limit_order(
                         subaccount_id: get_default_subaccount_id_for_checked_address(
                             &Addr::unchecked(trader.address()),
                         )
-                        .to_string(),
+                            .to_string(),
                         fee_recipient: trader.address(),
                         price: format!("{}000000000000000000", price),
                         quantity: format!("{}000000000000000000", quantity),
+                    }),
+                    order_type: if order_side == OrderSide::Buy {
+                        OrderType::BuyAtomic.into()
+                    } else {
+                        OrderType::SellAtomic.into()
+                    },
+                    trigger_price: "".to_string(),
+                }),
+            },
+            trader,
+        )
+        .unwrap();
+}
+
+pub fn create_realistic_limit_order(
+    app: &InjectiveTestApp,
+    trader: &SigningAccount,
+    market_id: &str,
+    order_side: OrderSide,
+    price: &str,
+    quantity: &str,
+    base_decimals: Decimals,
+    quote_decimals: Decimals,
+) {
+    // base: 6
+    // quote: 6
+    // price: 10 -> 10
+    // -----
+    // base: 18
+    // quote: 6
+    // price: 8 -> 0.000000000008
+    let get_scaled_integer_price = |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
+        let number = raw_number.replace('_', "");
+        let required_shift_to_zero = base_decimals.get_decimals() - quote_decimals.get_decimals();
+        if required_shift_to_zero == 0 {
+            return number.to_string();
+        }
+
+        let required_shift = required_shift_to_zero - number.len();
+        if required_shift > 0 {
+            format!("0.{}{number}", "0".repeat(required_shift))
+        } else {
+            format!("0.{number}")
+        }
+    };
+
+    // get_scaled_integer_price(price, &base_decimals, &quote_decimals);
+    let get_scaled_spot_price = |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
+        let number = raw_number.replace('_', "");
+        let has_decimal_fraction = number.contains(".");
+
+        let generate_left_padding_zeroes = |number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
+            let decimals_to_pad = base_decimals.get_decimals() - quote_decimals.get_decimals() - number.len();
+            "0".repeat(decimals_to_pad)
+        };
+
+        let generate_right_padding_zeroes = |number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
+            // let decimals_to_pad = base_decimals.get_decimals() - quote_decimals.get_decimals() - number.len();
+            "0".repeat(quote_decimals.get_decimals())
+        };
+
+        if !has_decimal_fraction {
+            return format!("{}{}", number, generate_right_padding_zeroes(number.as_str(), base_decimals, quote_decimals));
+        }
+
+        let separated: Vec<&str> = number.split_terminator('.').collect();
+        if separated.len() != 2 {
+            panic!("Invalid number format");
+        }
+
+        if separated[1].len() > base_decimals.get_decimals() {
+            panic!("Decimal precision is too high");
+        }
+
+        let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
+        if is_below_zero {
+            // take only decimal fraction and pad with zeros
+            let left_zeros = generate_left_padding_zeroes(separated[1], base_decimals, quote_decimals);
+            let decimal_padded = &format!("{}{}", separated[1], left_zeros);
+            return decimal_padded.to_string();
+        }
+
+        // take integer and decimal fraction and pad with zeros
+        let clean_number = &format!("{}{}", separated[0], separated[1]);
+        let left_zeros = generate_left_padding_zeroes(clean_number, base_decimals, quote_decimals);
+        format!("{}{}", left_zeros, clean_number)
+    };
+
+    // println!("price: {}", price);
+    let mut price_to_send = get_scaled_integer_price(price, &base_decimals, &quote_decimals);
+    // println!("price_to_send_raw: {}", price_to_send);
+
+    let price_decimal_shift = &base_decimals.get_decimals() - &quote_decimals.get_decimals();
+    price_to_send = human_to_proto(price_to_send.as_str(), price_decimal_shift);
+    // println!("price_to_send: {}", price_to_send);
+    let quantity_to_send = human_to_proto(quantity, base_decimals.get_decimals());
+    // println!("quantity_to_send: {}", quantity_to_send);
+
+    let exchange = Exchange::new(app);
+
+    exchange
+        .create_spot_limit_order(
+            MsgCreateSpotLimitOrder {
+                sender: trader.address(),
+                order: Some(SpotOrder {
+                    market_id: market_id.to_string(),
+                    order_info: Some(OrderInfo {
+                        subaccount_id: get_default_subaccount_id_for_checked_address(
+                            &Addr::unchecked(trader.address()),
+                        )
+                            .to_string(),
+                        fee_recipient: trader.address(),
+                        price: price_to_send,
+                        quantity: quantity_to_send,
                     }),
                     order_type: if order_side == OrderSide::Buy {
                         OrderType::BuyAtomic.into()
@@ -239,9 +407,9 @@ pub fn init_contract_and_get_address(
         initial_balance,
         owner,
     )
-    .unwrap()
-    .data
-    .address
+        .unwrap()
+        .data
+        .address
 }
 
 pub fn init_contract_with_fee_recipient_and_get_address(
@@ -262,30 +430,30 @@ pub fn init_contract_with_fee_recipient_and_get_address(
         initial_balance,
         owner,
     )
-    .unwrap()
-    .data
-    .address
+        .unwrap()
+        .data
+        .address
 }
 
 pub fn set_route_and_assert_success(
     wasm: &Wasm<InjectiveTestApp>,
     signer: &SigningAccount,
     contr_addr: &str,
-    source_denom: &str,
+    from_denom: &str,
     to_denom: &str,
     route: Vec<MarketId>,
 ) {
     wasm.execute(
         contr_addr,
         &ExecuteMsg::SetRoute {
-            source_denom: source_denom.to_string(),
+            source_denom: from_denom.to_string(),
             target_denom: to_denom.to_string(),
             route,
         },
         &[],
         signer,
     )
-    .unwrap();
+        .unwrap();
 }
 
 pub fn must_init_account_with_funds(
@@ -303,8 +471,8 @@ pub fn query_all_bank_balances(
         address: address.to_string(),
         pagination: None,
     })
-    .unwrap()
-    .balances
+        .unwrap()
+        .balances
 }
 
 pub fn query_bank_balance(bank: &Bank<InjectiveTestApp>, denom: &str, address: &str) -> FPDecimal {
@@ -313,13 +481,13 @@ pub fn query_bank_balance(bank: &Bank<InjectiveTestApp>, denom: &str, address: &
             address: address.to_string(),
             denom: denom.to_string(),
         })
-        .unwrap()
-        .balance
-        .unwrap()
-        .amount
-        .as_str(),
+            .unwrap()
+            .balance
+            .unwrap()
+            .amount
+            .as_str(),
     )
-    .unwrap()
+        .unwrap()
 }
 
 pub fn pause_spot_market(
@@ -403,5 +571,86 @@ pub fn fund_account_with_some_inj(
         },
         from,
     )
-    .unwrap();
+        .unwrap();
+}
+
+pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> String {
+    let number = raw_number.replace('_', "");
+    let has_decimal_fraction = number.contains(".");
+    if !has_decimal_fraction {
+        return format!("{}{}", number, decimals.get_right_padding_zeroes());
+    }
+
+    let separated: Vec<&str> = number.split_terminator('.').collect();
+    let zeros_to_right_pad = decimals.get_decimals() - separated[1].len();
+    let right_zeroes = "0".repeat(zeros_to_right_pad);
+    let decimal_padded = &format!("{}{}", separated[1], right_zeroes);
+
+    let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
+    if is_below_zero {
+        // take only decimal fraction and pad with zeros
+        return decimal_padded.to_string();
+    }
+
+    // take integer and decimal fraction and pad with zeros
+    format!("{}{}", separated[0], decimal_padded)
+}
+
+fn remove_left_zeroes(raw_number: &str) -> String {
+    let mut number = raw_number.to_string();
+    while number.chars().nth(0).unwrap().to_string() == "0" {
+        number.remove(0);
+    }
+    number
+}
+
+pub fn human_to_proto(raw_number: &str, decimals: usize) -> String {
+    let number = raw_number.replace('_', "");
+    let has_decimal_fraction = number.contains(".");
+    let right_padding_zeroes = "0".repeat(decimals);
+    if !has_decimal_fraction {
+        return format!("{number}{}{}", right_padding_zeroes, Decimals::Eighteen.get_right_padding_zeroes());
+    }
+
+    let separated: Vec<&str> = number.split_terminator('.').collect();
+    let zeros_to_right_pad = Decimals::Eighteen.get_decimals() - separated[1].len();
+    let right_zeroes = "0".repeat(zeros_to_right_pad);
+
+    let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
+    let decimal_padded = format!("{}{right_zeroes}", remove_left_zeroes(separated[1]));
+    if is_below_zero {
+        // take only decimal fraction and pad with zeros
+        return decimal_padded;
+    }
+
+    // take integer pad with zeros and then the decimal fraction and also pad with zeros
+    format!("{}{}{decimal_padded}", separated[0], right_padding_zeroes)
+}
+
+pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
+    let scaled_amount = human_to_dec(human_amount, decimals);
+    let as_int: u128 = Uint128::from_str(scaled_amount.as_str()).unwrap().u128();
+    coin(as_int, denom)
+}
+
+mod tests {
+    use crate::testing::test_utils::{Decimals, human_to_dec};
+
+    #[test]
+    fn it_converts_integer_to_dec() {
+        let integer = "1";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "1000000000000000000";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(actual, expected, "failed to convert integer with 18 decimal to dec");
+
+        decimals = Decimals::Six;
+        expected = "1000000";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(actual, expected, "failed to convert integer with 6 decimal to dec");
+    }
+
+    
 }
