@@ -185,6 +185,7 @@ fn failing_multiplier_query() {
         &env,
         &MarketId::unchecked(TEST_MARKET_ID_1.to_string()),
         FPCoin::from(Coin::new(1000000000000000000u128, "eth".to_string())),
+        true, // is_simulation
     );
 
     assert!(response_1.is_err(), "should have failed");

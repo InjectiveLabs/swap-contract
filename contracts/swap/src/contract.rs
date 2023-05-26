@@ -179,7 +179,7 @@ fn execute_swap_step(
     let subaccount_id = get_default_subaccount_id_for_checked_address(contract);
 
     let estimation =
-        estimate_single_swap_execution(&deps.as_ref(), &env, &market_id, current_balance.clone())?;
+        estimate_single_swap_execution(&deps.as_ref(), &env, &market_id, current_balance.clone(), false)?;
 
     let fee_recipient = &CONFIG.load(deps.storage)?.fee_recipient;
 
