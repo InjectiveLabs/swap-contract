@@ -244,7 +244,7 @@ fn test_set_route_no_market_id() {
         result
             .unwrap_err()
             .to_string()
-            .contains("Route must have at least 1 step"),
+            .contains("Route must have at least one step"),
         "wrong error message"
     );
 
@@ -290,7 +290,7 @@ fn test_set_route_same_market_id() {
         result
             .unwrap_err()
             .to_string()
-            .contains("Route cannot begin and end with the same market"),
+            .contains("Route cannot have duplicate steps"),
         "wrong error message"
     );
 
