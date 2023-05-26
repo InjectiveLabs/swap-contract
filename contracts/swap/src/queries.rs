@@ -13,18 +13,18 @@ use crate::types::{FPCoin, StepExecutionEstimate};
 pub fn estimate_swap_result(
     deps: Deps<InjectiveQueryWrapper>,
     env: Env,
-    from_denom: String,
+    source_denom: String,
     quantity: FPDecimal,
     to_denom: String,
 ) -> StdResult<FPDecimal> {
     if quantity.is_zero() || quantity.is_negative() {
         return Err(StdError::generic_err("from_quantity must be positive"));
     }
-    let route = read_swap_route(deps.storage, &from_denom, &to_denom)?;
-    let steps = route.steps_from(&from_denom);
+    let route = read_swap_route(deps.storage, &source_denom, &to_denom)?;
+    let steps = route.steps_from(&source_denom);
     let mut current_swap = FPCoin {
         amount: quantity,
-        denom: from_denom,
+        denom: source_denom,
     };
     for step in steps {
         let cur_swap = current_swap.clone();
@@ -65,25 +65,29 @@ pub fn estimate_single_swap_execution(
         market.base_denom,
         market.quote_denom,
     ));
+
     let config = CONFIG.load(deps.storage)?;
     let is_self_relayer = config.fee_recipient == env.contract.address;
+
     let fee_multiplier = querier
         .query_market_atomic_execution_fee_multiplier(market_id)?
         .multiplier;
     let fee_percent = market.taker_fee_rate
         * fee_multiplier
         * (FPDecimal::one() - effective_fee_discount_rate(&market, is_self_relayer));
+
     deps.api.debug(&format!(
-        "market.taker_fee_rate: {}, multiplier: {}, final Fee percent: {}",
+        "market.taker_fee_rate: {}, multiplier: {}, final fee percent: {}",
         market.taker_fee_rate, fee_multiplier, fee_percent,
     ));
+
     let is_buy = if balance_in.denom == market.quote_denom {
         true
     } else if balance_in.denom == market.base_denom {
         false
     } else {
         return Err(StdError::generic_err(
-            "Invalid swap denom - neither base or quote",
+            "Invalid swap denom - neither base nor quote",
         ));
     };
     deps.api.debug(&format!("Is buy: {}", is_buy));

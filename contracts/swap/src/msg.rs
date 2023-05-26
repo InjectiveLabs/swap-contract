@@ -25,13 +25,13 @@ pub enum ExecuteMsg {
         min_quantity: FPDecimal,
     },
     SetRoute {
-        denom_1: String,
-        denom_2: String,
+        source_denom: String,
+        target_denom: String,
         route: Vec<MarketId>,
     },
     DeleteRoute {
-        denom_1: String,
-        denom_2: String,
+        source_denom: String,
+        target_denom: String,
     },
     UpdateConfig {
         admin: Option<Addr>,
@@ -47,12 +47,12 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetRoute {
-        denom_1: String,
-        denom_2: String,
+        source_denom: String,
+        target_denom: String,
     },
     GetExecutionQuantity {
         from_quantity: FPDecimal,
-        from_denom: String,
+        source_denom: String,
         to_denom: String,
     },
 }

@@ -20,8 +20,8 @@ fn store_and_read_swap_route() {
             MarketId::unchecked(TEST_MARKET_ID_1),
             MarketId::unchecked(TEST_MARKET_ID_2),
         ],
-        denom_1: base_denom.to_string(),
-        denom_2: quote_denom.to_string(),
+        source_denom: base_denom.to_string(),
+        target_denom: quote_denom.to_string(),
     };
 
     store_swap_route(deps.as_mut().storage, &route).unwrap();
@@ -48,8 +48,8 @@ fn update_and_read_swap_route() {
             MarketId::unchecked(TEST_MARKET_ID_1),
             MarketId::unchecked(TEST_MARKET_ID_2),
         ],
-        denom_1: base_denom.to_string(),
-        denom_2: quote_denom.to_string(),
+        source_denom: base_denom.to_string(),
+        target_denom: quote_denom.to_string(),
     };
 
     store_swap_route(deps.as_mut().storage, &route).unwrap();
@@ -62,8 +62,8 @@ fn update_and_read_swap_route() {
             MarketId::unchecked(TEST_MARKET_ID_1),
             MarketId::unchecked(TEST_MARKET_ID_3),
         ],
-        denom_1: base_denom.to_string(),
-        denom_2: quote_denom.to_string(),
+        source_denom: base_denom.to_string(),
+        target_denom: quote_denom.to_string(),
     };
 
     store_swap_route(deps.as_mut().storage, &updated_route).unwrap();
@@ -113,11 +113,11 @@ fn test_set_route_as_owner() {
     let stored_route = read_swap_route(&deps.storage, &base_denom, &quote_denom).unwrap();
     assert_eq!(stored_route.steps, route, "route was not set correctly");
     assert_eq!(
-        stored_route.denom_1, base_denom,
+        stored_route.source_denom, base_denom,
         "route was not set correctly"
     );
     assert_eq!(
-        stored_route.denom_2, quote_denom,
+        stored_route.target_denom, quote_denom,
         "route was not set correctly"
     );
 }
@@ -160,12 +160,12 @@ fn test_set_route_single_step_route() {
     let stored_route = read_swap_route(&deps.storage, &base_denom, &quote_denom).unwrap();
     assert_eq!(stored_route.steps, route, "route was not stored correctly");
     assert_eq!(
-        stored_route.denom_1, base_denom,
-        "denom_1 was not stored correctly"
+        stored_route.source_denom, base_denom,
+        "source_denom was not stored correctly"
     );
     assert_eq!(
-        stored_route.denom_2, quote_denom,
-        "denom_2 was not stored correctly"
+        stored_route.target_denom, quote_denom,
+        "target_denom was not stored correctly"
     );
 }
 

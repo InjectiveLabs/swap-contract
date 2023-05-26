@@ -1392,8 +1392,8 @@ dependencies = [
 
 [[package]]
 name = "injective-test-tube"
-version = "1.1.0"
-source = "git+https://github.com/InjectiveLabs/test-tube.git?tag=v1.1.0#644d6f303fc6eaff9308ad13c645dc182a37bf71"
+version = "1.1.1"
+source = "git+https://github.com/InjectiveLabs/test-tube.git?branch=dev#a93ecbe4a6f57cf987af20a70fd11b486d22e338"
 dependencies = [
  "base64",
  "bindgen",

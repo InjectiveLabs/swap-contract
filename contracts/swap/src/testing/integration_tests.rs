@@ -120,7 +120,7 @@ fn happy_path_two_hops_swap() {
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
-                from_denom: ETH.to_string(),
+                source_denom: ETH.to_string(),
                 to_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
             },
@@ -269,7 +269,7 @@ fn happy_path_two_hops_single_price_level_swap() {
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
-                from_denom: ETH.to_string(),
+                source_denom: ETH.to_string(),
                 to_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(3u128),
             },
@@ -435,7 +435,7 @@ fn happy_path_three_hops_quote_conversion_swap() {
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
-                from_denom: ETH.to_string(),
+                source_denom: ETH.to_string(),
                 to_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
             },
@@ -560,7 +560,7 @@ fn happy_path_simple_sell_swap() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: USDT.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
@@ -739,7 +739,7 @@ fn happy_path_simple_buy_swap() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: USDT.to_string(),
+            source_denom: USDT.to_string(),
             to_denom: ETH.to_string(),
             from_quantity: FPDecimal::from(swapper_usdt),
         },
@@ -919,7 +919,7 @@ fn happy_path_external_fee_receiver() {
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
-                from_denom: ETH.to_string(),
+                source_denom: ETH.to_string(),
                 to_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
             },
@@ -1082,7 +1082,7 @@ fn not_enough_buffer() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
@@ -1427,7 +1427,7 @@ fn zero_minimum_amount_to_receive() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(0u128),
         },
@@ -1719,7 +1719,7 @@ fn not_enough_orders_to_satisfy_min_quantity() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
@@ -2001,7 +2001,7 @@ fn no_known_route_exists() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
@@ -2123,7 +2123,7 @@ fn route_exists_but_market_does_not() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
@@ -2241,7 +2241,7 @@ fn paused_market() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
@@ -2391,7 +2391,7 @@ fn insufficient_gas() {
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
-            from_denom: ETH.to_string(),
+            source_denom: ETH.to_string(),
             to_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },

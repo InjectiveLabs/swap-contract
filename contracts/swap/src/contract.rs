@@ -55,13 +55,14 @@ pub fn execute(
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     match msg {
         ExecuteMsg::SetRoute {
-            denom_1,
-            denom_2,
+            source_denom,
+            target_denom,
             route,
-        } => set_route(deps, &info.sender, denom_1, denom_2, route),
-        ExecuteMsg::DeleteRoute { denom_1, denom_2 } => {
-            delete_route(deps, &info.sender, denom_1, denom_2)
-        }
+        } => set_route(deps, &info.sender, source_denom, target_denom, route),
+        ExecuteMsg::DeleteRoute {
+            source_denom,
+            target_denom,
+        } => delete_route(deps, &info.sender, source_denom, target_denom),
         ExecuteMsg::Swap {
             target_denom,
             min_quantity,
@@ -80,12 +81,13 @@ pub fn execute(
 pub fn set_route(
     deps: DepsMut<InjectiveQueryWrapper>,
     sender: &Addr,
-    denom_1: String,
-    denom_2: String,
+    source_denom: String,
+    target_denom: String,
     route: Vec<MarketId>,
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     verify_sender_is_admin(deps.as_ref(), sender)?;
-    if denom_1 == denom_2 {
+
+    if source_denom == target_denom {
         return Err(ContractError::CustomError {
             val: "Cannot set a route with the same denom being source and target".to_string(),
         });
@@ -93,9 +95,10 @@ pub fn set_route(
 
     if route.is_empty() {
         return Err(ContractError::CustomError {
-            val: "Route must have at least 1 step".to_string(),
+            val: "Route must have at least one step".to_string(),
         });
     }
+
     if route
         .clone()
         .into_iter()
@@ -110,21 +113,24 @@ pub fn set_route(
 
     let route = SwapRoute {
         steps: route,
-        denom_1,
-        denom_2,
+        source_denom,
+        target_denom,
     };
     store_swap_route(deps.storage, &route)?;
+
     Ok(Response::new().add_attribute("method", "set_route"))
 }
 
 pub fn delete_route(
     deps: DepsMut<InjectiveQueryWrapper>,
     sender: &Addr,
-    denom_1: String,
-    denom_2: String,
+    source_denom: String,
+    target_denom: String,
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     verify_sender_is_admin(deps.as_ref(), sender)?;
-    remove_swap_route(deps.storage, &denom_1, &denom_2);
+
+    remove_swap_route(deps.storage, &source_denom, &target_denom);
+
     Ok(Response::new().add_attribute("method", "delete_route"))
 }
 
@@ -137,7 +143,7 @@ pub fn start_swap_flow(
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     if info.funds.len() != 1 {
         return Err(ContractError::CustomError {
-            val: "Only 1 denom can be passed in funds".to_string(),
+            val: "Only one denom can be passed in funds".to_string(),
         });
     }
     if min_target_quantity.is_negative() || min_target_quantity.is_zero() {
@@ -145,13 +151,13 @@ pub fn start_swap_flow(
             val: "Min target quantity must be positive!".to_string(),
         });
     }
-    let coin_provided = info.funds[0].clone();
-    let from_denom = coin_provided.denom;
-    let target_denom = target_denom;
-    let route = read_swap_route(deps.storage, &from_denom, &target_denom)?;
-    let steps = route.steps_from(&from_denom);
 
-    let current_balance: FPCoin = info.funds.first().unwrap().clone().into();
+    let coin_provided = info.funds[0].clone();
+    let source_denom = coin_provided.denom.clone();
+    let route = read_swap_route(deps.storage, &source_denom, &target_denom)?;
+    let steps = route.steps_from(&source_denom);
+
+    let current_balance: FPCoin = coin_provided.into();
     let swap_operation = CurrentSwapOperation {
         sender_address: info.sender,
         swap_steps: steps,
@@ -373,18 +379,21 @@ fn withdraw_support_funds(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetRoute { denom_1, denom_2 } => Ok(to_binary(&read_swap_route(
+        QueryMsg::GetRoute {
+            source_denom,
+            target_denom,
+        } => Ok(to_binary(&read_swap_route(
             deps.storage,
-            &denom_1,
-            &denom_2,
+            &source_denom,
+            &target_denom,
         )?)?),
         QueryMsg::GetExecutionQuantity {
             from_quantity,
-            from_denom,
+            source_denom,
             to_denom,
         } => {
             let target_quantity =
-                estimate_swap_result(deps, env, from_denom, from_quantity, to_denom)?;
+                estimate_swap_result(deps, env, source_denom, from_quantity, to_denom)?;
             Ok(to_binary(&target_quantity)?)
         }
     }

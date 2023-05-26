@@ -271,15 +271,15 @@ pub fn set_route_and_assert_success(
     wasm: &Wasm<InjectiveTestApp>,
     signer: &SigningAccount,
     contr_addr: &str,
-    from_denom: &str,
+    source_denom: &str,
     to_denom: &str,
     route: Vec<MarketId>,
 ) {
     wasm.execute(
         contr_addr,
         &ExecuteMsg::SetRoute {
-            denom_1: from_denom.to_string(),
-            denom_2: to_denom.to_string(),
+            source_denom: source_denom.to_string(),
+            target_denom: to_denom.to_string(),
             route,
         },
         &[],

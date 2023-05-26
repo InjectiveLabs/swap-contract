@@ -67,13 +67,13 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct SwapRoute {
     pub steps: Vec<MarketId>,
-    pub denom_1: String,
-    pub denom_2: String,
+    pub source_denom: String,
+    pub target_denom: String,
 }
 
 impl SwapRoute {
     pub fn steps_from(&self, denom: &str) -> Vec<MarketId> {
-        if self.denom_1 == denom {
+        if self.source_denom == denom {
             self.steps.clone()
         } else {
             let mut mut_steps = self.steps.clone();
