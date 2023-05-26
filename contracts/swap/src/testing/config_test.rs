@@ -1,15 +1,13 @@
-use cosmwasm_std::{Addr, coins};
 use cosmwasm_std::testing::{mock_env, mock_info};
+use cosmwasm_std::{coins, Addr};
 
-use injective_cosmwasm::{
-    inj_mock_deps, MarketId, OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2, TEST_MARKET_ID_3,
-};
+use injective_cosmwasm::{inj_mock_deps, OwnedDepsExt};
 
-use crate::contract::{delete_route, execute, set_route};
+use crate::contract::execute;
 use crate::msg::{ExecuteMsg, FeeRecipient};
-use crate::state::{read_swap_route, store_swap_route, CONFIG};
+use crate::state::CONFIG;
 use crate::testing::test_utils::{TEST_CONTRACT_ADDR, TEST_USER_ADDR};
-use crate::types::{Config, SwapRoute};
+use crate::types::Config;
 
 #[test]
 pub fn admin_can_update_config() {
@@ -39,8 +37,7 @@ pub fn admin_can_update_config() {
     let config = CONFIG.load(deps.as_mut_deps().storage).unwrap();
     assert_eq!(config.admin, new_admin, "admin was not updated");
     assert_eq!(
-        config.fee_recipient,
-        new_fee_recipient,
+        config.fee_recipient, new_fee_recipient,
         "fee_recipient was not updated"
     );
 }
@@ -63,8 +60,8 @@ pub fn non_admin_cannot_update_config() {
     let info = mock_info("non_admin", &coins(12, "eth"));
 
     let msg = ExecuteMsg::UpdateConfig {
-        admin: Some(new_admin.clone()),
-        fee_recipient: Some(FeeRecipient::Address(new_fee_recipient.clone())),
+        admin: Some(new_admin),
+        fee_recipient: Some(FeeRecipient::Address(new_fee_recipient)),
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg);

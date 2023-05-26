@@ -1205,7 +1205,13 @@ fn no_funds_passed() {
         &swapper,
     );
     assert!(execute_result.is_err(), "execute should fail");
-    assert!(execute_result.unwrap_err().to_string().contains("Only 1 denom can be passed in funds"), "execute should fail");
+    assert!(
+        execute_result
+            .unwrap_err()
+            .to_string()
+            .contains("Only 1 denom can be passed in funds"),
+        "execute should fail"
+    );
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());

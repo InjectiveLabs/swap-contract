@@ -101,13 +101,25 @@ fn test_set_route_as_owner() {
     assert!(result.is_ok(), "result was not ok");
 
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method", "method attribute was not set");
-    assert_eq!(response.attributes[0].value, "set_route", "method attribute was not set");
+    assert_eq!(
+        response.attributes[0].key, "method",
+        "method attribute was not set"
+    );
+    assert_eq!(
+        response.attributes[0].value, "set_route",
+        "method attribute was not set"
+    );
 
     let stored_route = read_swap_route(&deps.storage, &base_denom, &quote_denom).unwrap();
     assert_eq!(stored_route.steps, route, "route was not set correctly");
-    assert_eq!(stored_route.denom_1, base_denom, "route was not set correctly");
-    assert_eq!(stored_route.denom_2, quote_denom, "route was not set correctly");
+    assert_eq!(
+        stored_route.denom_1, base_denom,
+        "route was not set correctly"
+    );
+    assert_eq!(
+        stored_route.denom_2, quote_denom,
+        "route was not set correctly"
+    );
 }
 
 #[test]
@@ -181,7 +193,7 @@ fn test_set_route_same_denom() {
         &Addr::unchecked(TEST_USER_ADDR),
         base_denom.clone(),
         quote_denom.clone(),
-        route.clone(),
+        route,
     );
 
     assert!(
@@ -224,7 +236,7 @@ fn test_set_route_no_market_id() {
         &Addr::unchecked(TEST_USER_ADDR),
         base_denom.clone(),
         quote_denom.clone(),
-        route.clone(),
+        route,
     );
 
     assert!(result.is_err(), "Could set a route without any steps");
@@ -267,7 +279,7 @@ fn test_set_route_same_market_id() {
         &Addr::unchecked(TEST_USER_ADDR),
         base_denom.clone(),
         quote_denom.clone(),
-        route.clone(),
+        route,
     );
 
     assert!(

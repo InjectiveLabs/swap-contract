@@ -26,8 +26,6 @@ use crate::state::{
 };
 use crate::types::{Config, CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapRoute};
 
-// use injective_protobuf::proto::tx;
-
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:atomic-order-example";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -98,7 +96,13 @@ pub fn set_route(
             val: "Route must have at least 1 step".to_string(),
         });
     }
-    if route.clone().into_iter().collect::<HashSet<MarketId>>().len() < route.len() {
+    if route
+        .clone()
+        .into_iter()
+        .collect::<HashSet<MarketId>>()
+        .len()
+        < route.len()
+    {
         return Err(ContractError::CustomError {
             val: "Route cannot have duplicate steps!".to_string(),
         });
@@ -215,7 +219,7 @@ pub fn reply(
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     match msg.id {
         ATOMIC_ORDER_REPLY_ID => handle_atomic_order_reply(deps, env, msg),
-        _ => Err(ContractError::UnrecognisedReply(msg.id)),
+        _ => Err(ContractError::UnrecognizedReply(msg.id)),
     }
 }
 
@@ -275,7 +279,7 @@ fn handle_atomic_order_reply(
         execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance)
             .map_err(ContractError::Std)
     } else {
-        // last step, finalise and send back funds to a caller
+        // last step, finalize and send back funds to a caller
         if new_balance.amount < swap.min_target_quantity {
             return Err(ContractError::MinExpectedSwapAmountNotReached(
                 swap.min_target_quantity,
