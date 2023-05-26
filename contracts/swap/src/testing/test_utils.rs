@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{Addr, Coin, coin, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128};
+use cosmwasm_std::{
+    coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128,
+};
 use injective_std::shim::Any;
 use injective_std::types::cosmos::bank::v1beta1::{
     MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
@@ -258,7 +260,7 @@ pub fn create_limit_order(
                         subaccount_id: get_default_subaccount_id_for_checked_address(
                             &Addr::unchecked(trader.address()),
                         )
-                            .to_string(),
+                        .to_string(),
                         fee_recipient: trader.address(),
                         price: format!("{}000000000000000000", price),
                         quantity: format!("{}000000000000000000", quantity),
@@ -276,6 +278,39 @@ pub fn create_limit_order(
         .unwrap();
 }
 
+pub fn scale_price_quantity_for_market(
+    price: &str,
+    quantity: &str,
+    base_decimals: &Decimals,
+    quote_decimals: &Decimals,
+) -> (String, String) {
+    let get_scaled_above_zero_price =
+        |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
+            let number = raw_number.replace('_', "");
+            let required_shift_to_zero =
+                base_decimals.get_decimals() - quote_decimals.get_decimals();
+            if required_shift_to_zero == 0 {
+                return number.to_string();
+            }
+
+            let required_shift = required_shift_to_zero - number.len();
+            if required_shift > 0 {
+                format!("0.{}{number}", "0".repeat(required_shift))
+            } else {
+                format!("0.{number}")
+            }
+        };
+
+    let mut price_to_send = get_scaled_above_zero_price(price, &base_decimals, &quote_decimals);
+    println!("price_to_send: {}", price_to_send);
+    let price_decimal_shift = &base_decimals.get_decimals() - &quote_decimals.get_decimals();
+    println!("price_decimal_shift: {}", price_decimal_shift);
+    price_to_send = human_to_proto(price_to_send.as_str(), price_decimal_shift);
+    let quantity_to_send = human_to_proto(quantity, base_decimals.get_decimals());
+
+    (price_to_send, quantity_to_send)
+}
+
 pub fn create_realistic_limit_order(
     app: &InjectiveTestApp,
     trader: &SigningAccount,
@@ -286,82 +321,10 @@ pub fn create_realistic_limit_order(
     base_decimals: Decimals,
     quote_decimals: Decimals,
 ) {
-    // base: 6
-    // quote: 6
-    // price: 10 -> 10
-    // -----
-    // base: 18
-    // quote: 6
-    // price: 8 -> 0.000000000008
-    let get_scaled_integer_price = |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
-        let number = raw_number.replace('_', "");
-        let required_shift_to_zero = base_decimals.get_decimals() - quote_decimals.get_decimals();
-        if required_shift_to_zero == 0 {
-            return number.to_string();
-        }
-
-        let required_shift = required_shift_to_zero - number.len();
-        if required_shift > 0 {
-            format!("0.{}{number}", "0".repeat(required_shift))
-        } else {
-            format!("0.{number}")
-        }
-    };
-
-    // get_scaled_integer_price(price, &base_decimals, &quote_decimals);
-    let get_scaled_spot_price = |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
-        let number = raw_number.replace('_', "");
-        let has_decimal_fraction = number.contains(".");
-
-        let generate_left_padding_zeroes = |number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
-            let decimals_to_pad = base_decimals.get_decimals() - quote_decimals.get_decimals() - number.len();
-            "0".repeat(decimals_to_pad)
-        };
-
-        let generate_right_padding_zeroes = |number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
-            // let decimals_to_pad = base_decimals.get_decimals() - quote_decimals.get_decimals() - number.len();
-            "0".repeat(quote_decimals.get_decimals())
-        };
-
-        if !has_decimal_fraction {
-            return format!("{}{}", number, generate_right_padding_zeroes(number.as_str(), base_decimals, quote_decimals));
-        }
-
-        let separated: Vec<&str> = number.split_terminator('.').collect();
-        if separated.len() != 2 {
-            panic!("Invalid number format");
-        }
-
-        if separated[1].len() > base_decimals.get_decimals() {
-            panic!("Decimal precision is too high");
-        }
-
-        let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-        if is_below_zero {
-            // take only decimal fraction and pad with zeros
-            let left_zeros = generate_left_padding_zeroes(separated[1], base_decimals, quote_decimals);
-            let decimal_padded = &format!("{}{}", separated[1], left_zeros);
-            return decimal_padded.to_string();
-        }
-
-        // take integer and decimal fraction and pad with zeros
-        let clean_number = &format!("{}{}", separated[0], separated[1]);
-        let left_zeros = generate_left_padding_zeroes(clean_number, base_decimals, quote_decimals);
-        format!("{}{}", left_zeros, clean_number)
-    };
-
-    // println!("price: {}", price);
-    let mut price_to_send = get_scaled_integer_price(price, &base_decimals, &quote_decimals);
-    // println!("price_to_send_raw: {}", price_to_send);
-
-    let price_decimal_shift = &base_decimals.get_decimals() - &quote_decimals.get_decimals();
-    price_to_send = human_to_proto(price_to_send.as_str(), price_decimal_shift);
-    // println!("price_to_send: {}", price_to_send);
-    let quantity_to_send = human_to_proto(quantity, base_decimals.get_decimals());
-    // println!("quantity_to_send: {}", quantity_to_send);
+    let (price_to_send, quantity_to_send) =
+        scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
 
     let exchange = Exchange::new(app);
-
     exchange
         .create_spot_limit_order(
             MsgCreateSpotLimitOrder {
@@ -372,7 +335,7 @@ pub fn create_realistic_limit_order(
                         subaccount_id: get_default_subaccount_id_for_checked_address(
                             &Addr::unchecked(trader.address()),
                         )
-                            .to_string(),
+                        .to_string(),
                         fee_recipient: trader.address(),
                         price: price_to_send,
                         quantity: quantity_to_send,
@@ -407,9 +370,9 @@ pub fn init_contract_and_get_address(
         initial_balance,
         owner,
     )
-        .unwrap()
-        .data
-        .address
+    .unwrap()
+    .data
+    .address
 }
 
 pub fn init_contract_with_fee_recipient_and_get_address(
@@ -430,9 +393,9 @@ pub fn init_contract_with_fee_recipient_and_get_address(
         initial_balance,
         owner,
     )
-        .unwrap()
-        .data
-        .address
+    .unwrap()
+    .data
+    .address
 }
 
 pub fn set_route_and_assert_success(
@@ -453,7 +416,7 @@ pub fn set_route_and_assert_success(
         &[],
         signer,
     )
-        .unwrap();
+    .unwrap();
 }
 
 pub fn must_init_account_with_funds(
@@ -471,8 +434,8 @@ pub fn query_all_bank_balances(
         address: address.to_string(),
         pagination: None,
     })
-        .unwrap()
-        .balances
+    .unwrap()
+    .balances
 }
 
 pub fn query_bank_balance(bank: &Bank<InjectiveTestApp>, denom: &str, address: &str) -> FPDecimal {
@@ -481,13 +444,13 @@ pub fn query_bank_balance(bank: &Bank<InjectiveTestApp>, denom: &str, address: &
             address: address.to_string(),
             denom: denom.to_string(),
         })
-            .unwrap()
-            .balance
-            .unwrap()
-            .amount
-            .as_str(),
-    )
         .unwrap()
+        .balance
+        .unwrap()
+        .amount
+        .as_str(),
+    )
+    .unwrap()
 }
 
 pub fn pause_spot_market(
@@ -571,7 +534,7 @@ pub fn fund_account_with_some_inj(
         },
         from,
     )
-        .unwrap();
+    .unwrap();
 }
 
 pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> String {
@@ -583,13 +546,17 @@ pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> String {
 
     let separated: Vec<&str> = number.split_terminator('.').collect();
     let zeros_to_right_pad = decimals.get_decimals() - separated[1].len();
+    if zeros_to_right_pad < 0 {
+        panic!("Too many decimal places")
+    }
+
     let right_zeroes = "0".repeat(zeros_to_right_pad);
     let decimal_padded = &format!("{}{}", separated[1], right_zeroes);
 
     let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
     if is_below_zero {
         // take only decimal fraction and pad with zeros
-        return decimal_padded.to_string();
+        return remove_left_zeroes(decimal_padded);
     }
 
     // take integer and decimal fraction and pad with zeros
@@ -609,7 +576,11 @@ pub fn human_to_proto(raw_number: &str, decimals: usize) -> String {
     let has_decimal_fraction = number.contains(".");
     let right_padding_zeroes = "0".repeat(decimals);
     if !has_decimal_fraction {
-        return format!("{number}{}{}", right_padding_zeroes, Decimals::Eighteen.get_right_padding_zeroes());
+        return format!(
+            "{number}{}{}",
+            right_padding_zeroes,
+            Decimals::Eighteen.get_right_padding_zeroes()
+        );
     }
 
     let separated: Vec<&str> = number.split_terminator('.').collect();
@@ -617,14 +588,18 @@ pub fn human_to_proto(raw_number: &str, decimals: usize) -> String {
     let right_zeroes = "0".repeat(zeros_to_right_pad);
 
     let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-    let decimal_padded = format!("{}{right_zeroes}", remove_left_zeroes(separated[1]));
     if is_below_zero {
         // take only decimal fraction and pad with zeros
-        return decimal_padded;
+        return format!("{}{right_zeroes}", remove_left_zeroes(separated[1]));
     }
 
     // take integer pad with zeros and then the decimal fraction and also pad with zeros
-    format!("{}{}{decimal_padded}", separated[0], right_padding_zeroes)
+    format!(
+        "{}{}{}",
+        separated[0],
+        right_padding_zeroes,
+        format!("{}{right_zeroes}", separated[1])
+    )
 }
 
 pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
@@ -634,7 +609,7 @@ pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
 }
 
 mod tests {
-    use crate::testing::test_utils::{Decimals, human_to_dec};
+    use crate::testing::test_utils::{human_to_dec, human_to_proto, Decimals, scale_price_quantity_for_market};
 
     #[test]
     fn it_converts_integer_to_dec() {
@@ -643,14 +618,341 @@ mod tests {
         let mut expected = "1000000000000000000";
 
         let actual = human_to_dec(integer, &decimals);
-        assert_eq!(actual, expected, "failed to convert integer with 18 decimal to dec");
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to dec"
+        );
 
         decimals = Decimals::Six;
         expected = "1000000";
 
         let actual = human_to_dec(integer, &decimals);
-        assert_eq!(actual, expected, "failed to convert integer with 6 decimal to dec");
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 6 decimal to dec"
+        );
     }
 
-    
+    #[test]
+    fn it_converts_decimals_above_zero_to_dec() {
+        let integer = "1.1";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "1100000000000000000";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to dec"
+        );
+
+        decimals = Decimals::Six;
+        expected = "1100000";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 6 decimal to dec"
+        );
+    }
+
+    #[test]
+    fn it_converts_decimals_above_zero_with_max_precision_limit_of_18_to_dec() {
+        let integer = "1.000000000000000001";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "1000000000000000001";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to dec"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_panics_converting_decimals_above_zero_with_above_precision_limit_of_18_to_dec() {
+        let integer = "1.0000000000000000001";
+        let mut decimals = Decimals::Eighteen;
+
+        human_to_dec(integer, &decimals);
+    }
+
+    #[test]
+    fn it_converts_decimals_above_zero_with_max_precision_limit_of_6_to_dec() {
+        let integer = "1.000001";
+        let mut decimals = Decimals::Six;
+        let mut expected = "1000001";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to dec"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_panics_converting_decimals_above_zero_with_above_precision_limit_of_6_to_dec() {
+        let integer = "1.0000001";
+        let mut decimals = Decimals::Six;
+
+        human_to_dec(integer, &decimals);
+    }
+
+    #[test]
+    fn it_converts_decimals_below_zero_to_dec() {
+        let integer = "0.1123";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "112300000000000000";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to dec"
+        );
+
+        decimals = Decimals::Six;
+        expected = "112300";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 6 decimal to dec"
+        );
+    }
+
+    #[test]
+    fn it_converts_decimals_below_zero_with_max_precision_limit_of_18_to_dec() {
+        let integer = "0.000000000000000001";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "1";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to dec"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_panics_converting_decimals_below_zero_with_above_precision_limit_of_18_to_dec() {
+        let integer = "0.0000000000000000001";
+        let mut decimals = Decimals::Eighteen;
+
+        human_to_dec(integer, &decimals);
+    }
+
+    #[test]
+    fn it_converts_decimals_below_zero_with_max_precision_limit_of_6_to_dec() {
+        let integer = "0.000001";
+        let mut decimals = Decimals::Six;
+        let mut expected = "1";
+
+        let actual = human_to_dec(integer, &decimals);
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to dec"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_panics_converting_decimals_below_zero_with_above_precision_limit_of_6_to_dec() {
+        let integer = "0.0000001";
+        let mut decimals = Decimals::Six;
+
+        human_to_dec(integer, &decimals);
+    }
+
+    #[test]
+    fn it_converts_integer_to_proto() {
+        let integer = "1";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "1000000000000000000000000000000000000";
+
+        let actual = human_to_proto(integer, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 18 decimal to proto"
+        );
+
+        decimals = Decimals::Six;
+        expected = "1000000000000000000000000";
+
+        let actual = human_to_proto(integer, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert integer with 6 decimal to proto"
+        );
+    }
+
+    #[test]
+    fn it_converts_decimal_above_zero__to_proto() {
+        let number = "1.1";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "1000000000000000000100000000000000000";
+
+        let actual = human_to_proto(number, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 18 decimal to proto"
+        );
+
+        decimals = Decimals::Six;
+        expected = "1000000100000000000000000";
+
+        let actual = human_to_proto(number, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 6 decimal to proto"
+        );
+    }
+
+    #[test]
+    fn it_converts_decimal_below_zero_to_proto() {
+        let number = "0.1";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "100000000000000000";
+
+        let actual = human_to_proto(number, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 18 decimal to proto"
+        );
+
+        decimals = Decimals::Six;
+        expected = "100000000000000000";
+
+        let actual = human_to_proto(number, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 6 decimal to proto"
+        );
+    }
+
+    #[test]
+    fn it_converts_decimal_below_zero_with_18_decimals_with_max_precision_to_proto() {
+        let number = "0.000000000000000001";
+        let mut decimals = Decimals::Eighteen;
+        let mut expected = "1";
+
+        let actual = human_to_proto(number, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 18 decimal to proto"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_panics_when_converting_decimal_below_zero_with_18_decimals_with_too_high_precision_to_proto(
+    ) {
+        let number = "0.0000000000000000001";
+        let mut decimals = Decimals::Eighteen;
+
+        human_to_proto(number, decimals.get_decimals());
+    }
+
+    #[test]
+    fn it_converts_decimal_below_zero_with_6_decimals_with_max_precision_to_proto() {
+        let number = "0.000001";
+        let mut decimals = Decimals::Six;
+        let mut expected = "1000000000000";
+
+        let actual = human_to_proto(number, decimals.get_decimals());
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 6 decimal to proto"
+        );
+    }
+
+    #[test]
+    fn it_converts_decimal_above_zero_with_0_precision_to_proto() {
+        let number = "1.000001";
+        let expected = "1000001000000000000";
+
+        let actual = human_to_proto(number, 0);
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 0 decimal to proto"
+        );
+    }
+
+    #[test]
+    fn it_converts_decimal_below_zero_with_0_precision_to_proto() {
+        let number = "0.000001";
+        let expected = "1000000000000";
+
+        let actual = human_to_proto(number, 0);
+        assert_eq!(
+            actual, expected,
+            "failed to convert decimal with 0 decimal to proto"
+        );
+    }
+
+    #[test]
+    fn it_scales_integer_values_correctly_for_inj_udst() {
+        let price = "1";
+        let quantity = "1";
+
+        let base_decimals = Decimals::Eighteen;
+        let quote_decimals = Decimals::Six;
+
+        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+
+        // 1 => 1 * 10^6 - 10^18 => 0.000000000001000000 * 10^18 => 1000000
+        assert_eq!(scaled_price, "1000000", "price was scaled incorrectly");
+        // 1 => 1(10^18).(10^18) => 1000000000000000000000000000000000000
+        assert_eq!(scaled_quantity, "1000000000000000000000000000000000000", "quantity was scaled incorrectly");
+    }
+
+    //TODO fix the function for decimals
+    #[test]
+    fn it_scales_decimal_values_correctly_for_inj_udst() {
+        let price = "8.782";
+        let quantity = "1.12";
+
+        let base_decimals = Decimals::Eighteen;
+        let quote_decimals = Decimals::Six;
+
+        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+
+        // 0.000000000008782000 * 10^18 = 8782000
+        assert_eq!(scaled_price, "8782000", "price was scaled incorrectly");
+        assert_eq!(scaled_quantity, "1120000000000000000000000000000000000", "quantity was scaled incorrectly");
+    }
+
+    #[test]
+    fn it_scales_integer_values_correctly_for_atom_udst() {
+        let price = "1";
+        let quantity = "1";
+
+        let base_decimals = Decimals::Six;
+        let quote_decimals = Decimals::Six;
+
+        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+
+        // 1 => 1.(10^18) => 1000000000000000000
+        assert_eq!(scaled_price, "1000000000000000000", "price was scaled incorrectly");
+        // 1 => 1(10^6).(10^18) => 1000000000000000000000000
+        assert_eq!(scaled_quantity, "1000000000000000000000000", "quantity was scaled incorrectly");
+    }
+
+    //TODO fix the function for decimals
+    #[test]
+    fn it_scales_decimal_values_correctly_for_atom_udst() {
+        let price = "1.129";
+        let quantity = "1.62";
+
+        let base_decimals = Decimals::Six;
+        let quote_decimals = Decimals::Six;
+
+        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+
+        // 1.129 => 1.129(10^15) => 1129000000000000000
+        assert_eq!(scaled_price, "1129000000000000000", "price was scaled incorrectly");
+        // 1.62 => 1.62(10^4)(10^18) => 1000000000000000000000000
+        assert_eq!(scaled_quantity, "1620000000000000000000000", "quantity was scaled incorrectly");
+    }
 }

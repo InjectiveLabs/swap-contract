@@ -28,7 +28,7 @@ pub fn estimate_swap_result(
     };
     for step in steps {
         let cur_swap = current_swap.clone();
-        let swap_estimate = estimate_single_swap_execution(&deps, &env, &step, current_swap)?;
+        let swap_estimate = estimate_single_swap_execution(&deps, &env, &step, current_swap, true)?;
         let new_amount = swap_estimate.result_quantity;
         println!(
             "Exchanged {}{} into {}{}",
@@ -50,6 +50,7 @@ pub fn estimate_single_swap_execution(
     env: &Env,
     market_id: &MarketId,
     balance_in: FPCoin,
+    is_simulation: bool,
 ) -> StdResult<StepExecutionEstimate> {
     let querier = InjectiveQuerier::new(&deps.querier);
 
@@ -99,6 +100,7 @@ pub fn estimate_single_swap_execution(
             &market,
             balance_in.amount,
             fee_percent,
+            is_simulation
         )?
     } else {
         estimate_execution_sell(deps, &querier, market_id, balance_in.amount, fee_percent)?
@@ -127,6 +129,7 @@ fn estimate_execution_buy(
     market: &SpotMarket,
     amount: FPDecimal,
     fee: FPDecimal,
+    is_simulation: bool,
 ) -> StdResult<(FPDecimal, FPDecimal)> {
     let inj_querier = InjectiveQuerier::new(&deps.querier);
     let available_funds = amount / (FPDecimal::one() + fee); // keep reserve for fee
@@ -149,15 +152,15 @@ fn estimate_execution_buy(
     let worst_price = worst_price(&top_orders);
 
     // check if user funds + contract funds are enough to create order
-
     let required_funds = worst_price * expected_quantity;
-    let funds_in_contract = deps
+    let funds_in_contract: FPDecimal = deps
         .querier
         .query_balance(contract_address, &market.quote_denom)
         .expect("query own balance should not fail")
         .amount
         .into();
-    if required_funds > funds_in_contract {
+    // in execution mode funds_in_contract already contain user funds so we don't want to count them double
+    if required_funds > funds_in_contract + if is_simulation { available_funds } else  { FPDecimal::zero()}  {
         Err(StdError::generic_err("Swap amount too high"))
     } else {
         Ok((expected_quantity, worst_price))
