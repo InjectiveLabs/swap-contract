@@ -6,7 +6,7 @@ use injective_std::types::injective::exchange::v1beta1::{
 };
 
 use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::testing::test_utils::{create_limit_order, create_realistic_limit_order, dec_to_proto, fund_account_with_some_inj, human_to_dec, init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address, init_default_validator_account, launch_custom_spot_market, launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, SOL, USDC, USDT, init_rich_account};
+use crate::testing::test_utils::{create_realistic_limit_order, dec_to_proto, human_to_dec, init_contract_and_get_address, init_default_validator_account, launch_custom_spot_market, must_init_account_with_funds, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, USDT, init_rich_account};
 
 #[test]
 fn happy_path_two_hops_swap_realistic_scales() {
@@ -266,7 +266,7 @@ fn happy_path_two_hops_swap_realistic_values() {
     );
 
     let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100", USDT, Decimals::Six)]);
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("54", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,

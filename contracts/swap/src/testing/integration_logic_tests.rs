@@ -2,15 +2,14 @@ use cosmwasm_std::{coin, Addr};
 
 use injective_test_tube::RunnerError::{ExecuteError, QueryError};
 use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult,
-    SigningAccount, Wasm,
+    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult, Wasm,
 };
 
 use injective_math::{round_to_min_tick, FPDecimal};
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    create_limit_order, fund_account_with_some_inj, init_contract_and_get_address,
+    create_limit_order, init_contract_and_get_address,
     init_contract_with_fee_recipient_and_get_address, init_default_signer_account,
     init_default_validator_account, init_rich_account, launch_spot_market,
     must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance,

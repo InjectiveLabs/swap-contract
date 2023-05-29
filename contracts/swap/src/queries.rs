@@ -1,13 +1,12 @@
 use cosmwasm_std::{Addr, Deps, Env, StdError, StdResult};
-
 use injective_cosmwasm::{
     InjectiveQuerier, InjectiveQueryWrapper, MarketId, OrderSide, PriceLevel, SpotMarket,
 };
-use injective_math::utils::round_to_min_tick;
 use injective_math::FPDecimal;
+use injective_math::utils::round_to_min_tick;
 
 use crate::helpers::{counter_denom, Scaled};
-use crate::state::{read_swap_route, CONFIG};
+use crate::state::{CONFIG, read_swap_route};
 use crate::types::{FPCoin, StepExecutionEstimate};
 
 pub fn estimate_swap_result(
@@ -152,7 +151,7 @@ fn estimate_execution_buy(
     let worst_price = worst_price(&top_orders);
 
     // check if user funds + contract funds are enough to create order
-    let required_funds = worst_price * expected_quantity;
+    let required_funds = worst_price * expected_quantity * (FPDecimal::one() + fee);
     let funds_in_contract: FPDecimal = deps
         .querier
         .query_balance(contract_address, &market.quote_denom)
@@ -160,21 +159,17 @@ fn estimate_execution_buy(
         .amount
         .into();
 
+    let funds_for_margin = match is_simulation {
+        false => funds_in_contract, // / in execution mode funds_in_contract already contain user funds so we don't want to count them double
+        true => funds_in_contract + available_funds,
+    };
     deps.api.debug(&format!(
-        "estimate_execution_buy: required_funds: {}, funds_in_contract: {}, available_funds: {}: diff: {}",
-        required_funds, funds_in_contract, available_funds, funds_in_contract - required_funds
+        "estimate_execution_buy: required_funds: {}, funds_in_contract: {}, available_funds: {}: diff: {}, funds_for_margin: {}",
+        required_funds, funds_in_contract, available_funds, funds_in_contract - required_funds, funds_for_margin
     ));
 
-    // in execution mode funds_in_contract already contain user funds so we don't want to count them double
-    if required_funds
-        > funds_in_contract
-            + if is_simulation {
-                available_funds
-            } else {
-                FPDecimal::zero()
-            }
-    {
-        Err(StdError::generic_err("Swap amount too high"))
+    if required_funds > funds_for_margin {
+        Err(StdError::generic_err(format!("Swap amount too high, required funds: {}, available funds: {}", required_funds, funds_for_margin)))
     } else {
         Ok((expected_quantity, worst_price))
     }
@@ -291,8 +286,9 @@ fn effective_fee_discount_rate(market: &SpotMarket, is_self_relayer: bool) -> FP
 
 #[cfg(test)]
 mod tests {
-    use crate::testing::test_utils::create_price_level;
     use injective_cosmwasm::inj_mock_deps;
+
+    use crate::testing::test_utils::create_price_level;
 
     use super::*;
 
