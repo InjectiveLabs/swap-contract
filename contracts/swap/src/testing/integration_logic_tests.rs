@@ -986,9 +986,9 @@ fn not_enough_buffer() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after swap"
+        "source balance changes after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "wrong to balance after swap");
+    assert_eq!(to_balance, FPDecimal::zero(), "target balance changes after failed swap");
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
@@ -1064,9 +1064,9 @@ fn no_funds_passed() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after swap"
+        "source balance changes after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "wrong to balance after swap");
+    assert_eq!(to_balance, FPDecimal::zero(), "target balance changes after failed swap");
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
 
@@ -1400,12 +1400,12 @@ fn negative_minimum_amount_to_receive() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after failed swap"
+        "source balance changed after failed swap"
     );
     assert_eq!(
         to_balance,
         FPDecimal::zero(),
-        "wrong to balance after failed swap"
+        "target balance changed after failed swap"
     );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
@@ -1530,9 +1530,9 @@ fn not_enough_orders_to_satisfy_min_quantity() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after swap"
+        "source balance changed after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "wrong to balance after swap");
+    assert_eq!(to_balance, FPDecimal::zero(), "target balance changed after failed swap");
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
@@ -1641,12 +1641,12 @@ fn min_quantity_cannot_be_reached() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after failed swap"
+        "source balance changed after failed swap"
     );
     assert_eq!(
         to_balance,
         FPDecimal::zero(),
-        "wrong to balance after failed swap"
+        "target balance changed after failed swap"
     );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
@@ -1764,9 +1764,9 @@ fn no_known_route_exists() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after swap"
+        "target balance changes after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "wrong to balance after swap");
+    assert_eq!(to_balance, FPDecimal::zero(), "source balance changes after failed swap");
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
@@ -1780,7 +1780,6 @@ fn no_known_route_exists() {
     );
 }
 
-//TODO better error if market doesn't exist?
 #[test]
 fn route_exists_but_market_does_not() {
     let app = InjectiveTestApp::new();
@@ -1887,12 +1886,12 @@ fn route_exists_but_market_does_not() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after failed swap"
+        "source balance changed after failed swap"
     );
     assert_eq!(
         to_balance,
         FPDecimal::zero(),
-        "wrong to balance after failed swap"
+        "target balance changed after failed swap"
     );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
@@ -1990,12 +1989,12 @@ fn paused_market() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after failed swap"
+        "source balance changed after failed swap"
     );
     assert_eq!(
         to_balance,
         FPDecimal::zero(),
-        "wrong to balance after failed swap"
+        "target balance changed after failed swap"
     );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
@@ -2115,12 +2114,12 @@ fn insufficient_gas() {
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
-        "wrong from balance after failed swap"
+        "source balance changed after failed swap"
     );
     assert_eq!(
         to_balance,
         FPDecimal::zero(),
-        "wrong to balance after failed swap"
+        "target balance changed after failed swap"
     );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
