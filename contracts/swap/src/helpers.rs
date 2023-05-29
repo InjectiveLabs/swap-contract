@@ -46,10 +46,9 @@ pub fn dec_scale_factor() -> FPDecimal {
     // FPDecimal::from(1000000000000000000_i128)
 }
 
-
 #[test]
-fn test_descale () {
-    let val  = FPDecimal::must_from_str("1000000000000000000");
+fn test_descale() {
+    let val = FPDecimal::must_from_str("1000000000000000000");
     let descaled = val.scaled(-18);
     assert_eq!(descaled, FPDecimal::from(1u128));
     let scaled = descaled.scaled(18);

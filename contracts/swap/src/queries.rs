@@ -100,7 +100,7 @@ pub fn estimate_single_swap_execution(
             &market,
             balance_in.amount,
             fee_percent,
-            is_simulation
+            is_simulation,
         )?
     } else {
         estimate_execution_sell(deps, &querier, market_id, balance_in.amount, fee_percent)?
@@ -160,7 +160,14 @@ fn estimate_execution_buy(
         .amount
         .into();
     // in execution mode funds_in_contract already contain user funds so we don't want to count them double
-    if required_funds > funds_in_contract + if is_simulation { available_funds } else  { FPDecimal::zero() }  {
+    if required_funds
+        > funds_in_contract
+            + if is_simulation {
+                available_funds
+            } else {
+                FPDecimal::zero()
+            }
+    {
         Err(StdError::generic_err("Swap amount too high"))
     } else {
         Ok((expected_quantity, worst_price))
@@ -216,14 +223,15 @@ pub fn find_minimum_orders(
         let value = calc(level);
         deps.api.debug(&format!(
             "Adding level {}x{} value: {}, sum so far: {sum}",
-            level.p.clone().scaled(12),
-            level.q.clone().scaled(-18),
+            level.p.scaled(12),
+            level.q.scaled(-18),
             value.scaled(-18),
         ));
-        let order_to_add =  if sum + value > total {
+        let order_to_add = if sum + value > total {
             let excess = value + sum - total;
             deps.api.debug(&format!(
-                "Value: {value}, excess value: {excess}, sum so far: {}", sum.scaled(-18)
+                "Value: {value}, excess value: {excess}, sum so far: {}",
+                sum.scaled(-18)
             ));
             PriceLevel {
                 p: level.p,

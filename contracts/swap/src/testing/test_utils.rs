@@ -20,6 +20,7 @@ use injective_test_tube::{
     Account, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
 };
 
+use crate::helpers::Scaled;
 use injective_cosmwasm::{
     create_mock_spot_market, create_orderbook_response_handler, create_spot_multi_market_handler,
     get_default_subaccount_id_for_checked_address, inj_mock_deps, HandlesMarketIdQuery,
@@ -28,7 +29,6 @@ use injective_cosmwasm::{
 };
 use injective_math::FPDecimal;
 use prost::Message;
-use crate::helpers::Scaled;
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
 
@@ -289,9 +289,10 @@ pub fn scale_price_quantity_for_market(
     let price_dec = FPDecimal::must_from_str(price.replace('_', "").as_str());
     let quantity_dec = FPDecimal::must_from_str(quantity.replace('_', "").as_str());
 
-    let scaled_price = price_dec.scaled(quote_decimals.get_decimals() - base_decimals.get_decimals());
+    let scaled_price =
+        price_dec.scaled(quote_decimals.get_decimals() - base_decimals.get_decimals());
     let scaled_quantity = quantity_dec.scaled(base_decimals.get_decimals());
-    (dec_to_proto(scaled_price), dec_to_proto(scaled_quantity) )
+    (dec_to_proto(scaled_price), dec_to_proto(scaled_quantity))
     //
     //
     // let get_scaled_above_zero_price =
@@ -339,7 +340,10 @@ pub fn create_realistic_limit_order(
 ) {
     let (price_to_send, quantity_to_send) =
         scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
-    println!("price_to_send: {}, quantity_to_send: {}", price_to_send, quantity_to_send);
+    println!(
+        "price_to_send: {}, quantity_to_send: {}",
+        price_to_send, quantity_to_send
+    );
 
     let exchange = Exchange::new(app);
     exchange
@@ -591,7 +595,9 @@ fn remove_left_zeroes(raw_number: &str) -> String {
 }
 
 pub fn human_to_proto(raw_number: &str, decimals: i32) -> String {
-   FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(18+decimals).to_string()
+    FPDecimal::must_from_str(&raw_number.replace('_', ""))
+        .scaled(18 + decimals)
+        .to_string()
 
     // let number = raw_number.replace('_', "");
     // let has_decimal_fraction = number.contains(".");
@@ -630,8 +636,10 @@ pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
 }
 
 mod tests {
+    use crate::testing::test_utils::{
+        human_to_dec, human_to_proto, scale_price_quantity_for_market, Decimals,
+    };
     use injective_math::FPDecimal;
-    use crate::testing::test_utils::{human_to_dec, human_to_proto, Decimals, scale_price_quantity_for_market};
 
     #[test]
     fn it_converts_integer_to_dec() {
@@ -921,12 +929,16 @@ mod tests {
         let base_decimals = Decimals::Eighteen;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) =
+            scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
 
         // 1 => 1 * 10^6 - 10^18 => 0.000000000001000000 * 10^18 => 1000000
         assert_eq!(scaled_price, "1000000", "price was scaled incorrectly");
         // 1 => 1(10^18).(10^18) => 1000000000000000000000000000000000000
-        assert_eq!(scaled_quantity, "1000000000000000000000000000000000000", "quantity was scaled incorrectly");
+        assert_eq!(
+            scaled_quantity, "1000000000000000000000000000000000000",
+            "quantity was scaled incorrectly"
+        );
     }
 
     #[test]
@@ -937,11 +949,15 @@ mod tests {
         let base_decimals = Decimals::Eighteen;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) =
+            scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
 
         // 0.000000000008782000 * 10^18 = 8782000
         assert_eq!(scaled_price, "8782000", "price was scaled incorrectly");
-        assert_eq!(scaled_quantity, "1120000000000000000000000000000000000", "quantity was scaled incorrectly");
+        assert_eq!(
+            scaled_quantity, "1120000000000000000000000000000000000",
+            "quantity was scaled incorrectly"
+        );
     }
 
     #[test]
@@ -952,12 +968,19 @@ mod tests {
         let base_decimals = Decimals::Six;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) =
+            scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
 
         // 1 => 1.(10^18) => 1000000000000000000
-        assert_eq!(scaled_price, "1000000000000000000", "price was scaled incorrectly");
+        assert_eq!(
+            scaled_price, "1000000000000000000",
+            "price was scaled incorrectly"
+        );
         // 1 => 1(10^6).(10^18) => 1000000000000000000000000
-        assert_eq!(scaled_quantity, "1000000000000000000000000", "quantity was scaled incorrectly");
+        assert_eq!(
+            scaled_quantity, "1000000000000000000000000",
+            "quantity was scaled incorrectly"
+        );
     }
 
     #[test]
@@ -968,11 +991,18 @@ mod tests {
         let base_decimals = Decimals::Six;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) =
+            scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
 
         // 1.129 => 1.129(10^15) => 1129000000000000000
-        assert_eq!(scaled_price, "1129000000000000000", "price was scaled incorrectly");
+        assert_eq!(
+            scaled_price, "1129000000000000000",
+            "price was scaled incorrectly"
+        );
         // 1.62 => 1.62(10^4)(10^18) => 1000000000000000000000000
-        assert_eq!(scaled_quantity, "1620000000000000000000000", "quantity was scaled incorrectly");
+        assert_eq!(
+            scaled_quantity, "1620000000000000000000000",
+            "quantity was scaled incorrectly"
+        );
     }
 }

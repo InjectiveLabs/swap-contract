@@ -149,7 +149,7 @@ fn happy_path_two_hops_swap() {
         &[coin(12, ETH)],
         &swapper,
     )
-        .unwrap();
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
@@ -296,7 +296,7 @@ fn happy_path_two_hops_single_price_level_swap() {
         &[coin(3, ETH)],
         &swapper,
     )
-        .unwrap();
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
@@ -464,7 +464,7 @@ fn happy_path_three_hops_quote_conversion_swap() {
         &[coin(12, ETH)],
         &swapper,
     )
-        .unwrap();
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
@@ -570,10 +570,10 @@ fn happy_path_simple_sell_swap() {
         + FPDecimal::from(192000u128) * FPDecimal::from(3u128);
     let expected_query_result = orders_nominal_total_value
         * (FPDecimal::one()
-        - FPDecimal::must_from_str(&format!(
-        "{}",
-        DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
-    )));
+            - FPDecimal::must_from_str(&format!(
+                "{}",
+                DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
+            )));
     assert_eq!(
         query_result.unwrap(),
         expected_query_result,
@@ -596,7 +596,7 @@ fn happy_path_simple_sell_swap() {
         &[coin(12, ETH)],
         &swapper,
     )
-        .unwrap();
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, USDT, swapper.address().as_str());
@@ -715,13 +715,13 @@ fn happy_path_simple_buy_swap() {
     // calculate how much ETH we can buy with USDT we have
     let available_usdt_after_fee = FPDecimal::from(swapper_usdt)
         / (FPDecimal::one()
-        + FPDecimal::must_from_str(&format!(
-        "{}",
-        DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
-    )));
+            + FPDecimal::must_from_str(&format!(
+                "{}",
+                DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
+            )));
     let usdt_left_for_most_expensive_order = available_usdt_after_fee
         - (FPDecimal::from(195_000u128) * FPDecimal::from(4u128)
-        + FPDecimal::from(192_000u128) * FPDecimal::from(3u128));
+            + FPDecimal::from(192_000u128) * FPDecimal::from(3u128));
     let most_expensive_order_quantity =
         usdt_left_for_most_expensive_order / FPDecimal::from(201000u128);
     let expected_quantity =
@@ -766,7 +766,7 @@ fn happy_path_simple_buy_swap() {
         &[coin(swapper_usdt, USDT)],
         &swapper,
     )
-        .unwrap();
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, USDT, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
@@ -883,9 +883,9 @@ fn happy_path_external_fee_receiver() {
         + FPDecimal::from(192000u128) * FPDecimal::from(3u128);
     let relayer_sell_fee = buy_orders_nominal_total_value
         * FPDecimal::must_from_str(&format!(
-        "{}",
-        DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_RELAYER_SHARE
-    ));
+            "{}",
+            DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_RELAYER_SHARE
+        ));
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -900,9 +900,9 @@ fn happy_path_external_fee_receiver() {
         + FPDecimal::from(830u128) * expected_nominal_buy_most_expensive_match_quantity;
     let relayer_buy_fee = sell_orders_nominal_total_value
         * FPDecimal::must_from_str(&format!(
-        "{}",
-        DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_RELAYER_SHARE
-    ));
+            "{}",
+            DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_RELAYER_SHARE
+        ));
     let expected_fee_for_fee_recipient = relayer_buy_fee + relayer_sell_fee;
 
     app.increase_time(1);
@@ -947,7 +947,7 @@ fn happy_path_external_fee_receiver() {
         &[coin(12, ETH)],
         &swapper,
     )
-        .unwrap();
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
@@ -1233,7 +1233,7 @@ fn no_funds_passed() {
 }
 
 #[test]
-fn multiple_fund_denmos_passed() {
+fn multiple_fund_denoms_passed() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -2475,7 +2475,7 @@ fn admin_can_withdraw_all_funds_from_contract_to_his_address() {
         &contr_addr,
         &ExecuteMsg::WithdrawSupportFunds {
             coins: initial_contract_balance.to_vec(),
-            target_address: Addr::unchecked(&owner.address()),
+            target_address: Addr::unchecked(owner.address()),
         },
         &[],
         &owner,
@@ -2536,7 +2536,7 @@ fn admin_can_withdraw_all_funds_from_contract_to_other_address() {
         &contr_addr,
         &ExecuteMsg::WithdrawSupportFunds {
             coins: initial_contract_balance.to_vec(),
-            target_address: Addr::unchecked(&random_dude.address()),
+            target_address: Addr::unchecked(random_dude.address()),
         },
         &[],
         &owner,
@@ -2597,7 +2597,7 @@ fn non_admin_cannot_withdraw_jack_shit_from_contract() {
         &contr_addr,
         &ExecuteMsg::WithdrawSupportFunds {
             coins: initial_contract_balance.to_vec(),
-            target_address: Addr::unchecked(&owner.address()),
+            target_address: Addr::unchecked(owner.address()),
         },
         &[],
         &random_dude,
