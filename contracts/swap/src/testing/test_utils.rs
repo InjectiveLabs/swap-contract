@@ -518,7 +518,7 @@ pub fn init_default_validator_account(app: &InjectiveTestApp) -> SigningAccount 
 }
 
 pub fn init_default_signer_account(app: &InjectiveTestApp) -> SigningAccount {
-    must_init_account_with_funds(&app, &[str_coin("100_000", INJ, Decimals::Eighteen)])
+    must_init_account_with_funds(app, &[str_coin("100_000", INJ, Decimals::Eighteen)])
 }
 
 pub fn init_rich_account(app: &InjectiveTestApp) -> SigningAccount {
