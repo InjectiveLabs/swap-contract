@@ -13,11 +13,13 @@ use injective_cosmwasm::{
 use injective_math::FPDecimal;
 use injective_protobuf::proto::tx::{MsgCreateSpotMarketOrderResponse, SpotMarketOrderResults};
 
-use crate::contract::{reply, set_route, start_swap_flow, ATOMIC_ORDER_REPLY_ID};
+use crate::contract::{reply, ATOMIC_ORDER_REPLY_ID};
 use crate::helpers::{get_message_data, i32_to_dec};
 
+use crate::admin::set_route;
 use crate::queries::estimate_single_swap_execution;
 use crate::state::CONFIG;
+use crate::swap::start_swap_flow;
 use crate::testing::test_utils::{
     mock_deps_eth_inj, MultiplierQueryBehaviour, TEST_CONTRACT_ADDR, TEST_USER_ADDR,
 };

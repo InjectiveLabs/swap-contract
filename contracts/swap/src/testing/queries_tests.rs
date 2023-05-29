@@ -3,10 +3,11 @@ use std::str::FromStr;
 use cosmwasm_std::testing::{mock_env, mock_info};
 use cosmwasm_std::{coin, Addr};
 
+use crate::admin::set_route;
+use crate::contract::instantiate;
 use injective_cosmwasm::{OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 use injective_math::FPDecimal;
 
-use crate::contract::{instantiate, set_route};
 use crate::msg::{FeeRecipient, InstantiateMsg};
 use crate::queries::estimate_swap_result;
 use crate::testing::test_utils::{mock_deps_eth_inj, MultiplierQueryBehaviour, TEST_USER_ADDR};

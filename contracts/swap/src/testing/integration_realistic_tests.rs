@@ -1,27 +1,12 @@
-use cosmwasm_std::{coin, Addr};
+use injective_test_tube::{Account, Bank, Exchange, InjectiveTestApp, Module, Wasm};
 
-use injective_test_tube::RunnerError::{ExecuteError, QueryError};
-use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult, Wasm,
+use injective_math::FPDecimal;
+use injective_std::types::injective::exchange::v1beta1::{
+    QuerySubaccountDepositsRequest, Subaccount,
 };
 
-use injective_math::{round_to_min_tick, FPDecimal};
-use injective_std::types::injective::exchange::v1beta1::{QuerySubaccountDepositsRequest, Subaccount};
-
 use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::testing::test_utils::{create_limit_order, create_realistic_limit_order, fund_account_with_some_inj, init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address, launch_custom_spot_market, launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, human_to_dec, dec_to_proto};
-
-const ETH: &str = "eth";
-const ATOM: &str = "atom";
-const SOL: &str = "sol";
-const USDT: &str = "usdt";
-const USDC: &str = "usdc";
-const INJ: &str = "inj";
-
-const DEFAULT_TAKER_FEE: f64 = 0.001;
-const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
-const DEFAULT_SELF_RELAYING_FEE_PART: f64 = 0.6;
-const DEFAULT_RELAYER_SHARE: f64 = 1.0 - DEFAULT_SELF_RELAYING_FEE_PART;
+use crate::testing::test_utils::{create_limit_order, fund_account_with_some_inj, init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address, launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, SOL, USDC, USDT, str_coin, Decimals, launch_custom_spot_market, dec_to_proto, create_realistic_limit_order, human_to_dec};
 
 #[test]
 fn happy_path_two_hops_swap_realistic_scales() {
@@ -45,11 +30,22 @@ fn happy_path_two_hops_swap_realistic_scales() {
         ],
     );
 
-    let spot_market_1_id =
-        launch_custom_spot_market(&exchange, &owner, ETH, USDT, dec_to_proto( FPDecimal::must_from_str("0.000000000000001")).as_str(), dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str());
-    let spot_market_2_id =
-        launch_custom_spot_market(&exchange, &owner, ATOM, USDT, dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(), dec_to_proto(FPDecimal::must_from_str("1000")).as_str());
-
+    let spot_market_1_id = launch_custom_spot_market(
+        &exchange,
+        &owner,
+        ETH,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+    );
+    let spot_market_2_id = launch_custom_spot_market(
+        &exchange,
+        &owner,
+        ATOM,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
+    );
 
     let contr_addr =
         init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, &Decimals::Six)]);
@@ -215,7 +211,8 @@ fn happy_path_two_hops_swap_realistic_scales() {
         },
         &[str_coin("12", ETH, &Decimals::Eighteen)],
         &swapper,
-    ).unwrap();
+    )
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
@@ -230,10 +227,16 @@ fn happy_path_two_hops_swap_realistic_scales() {
         "swapper did not receive expected amount"
     );
 
-    let subacc_deps = exchange.query_subaccount_deposits(&QuerySubaccountDepositsRequest{ subaccount_id: "".to_string(), subaccount: Some(Subaccount { trader: contr_addr.to_string(), subaccount_nonce: 0 }) });
+    let subacc_deps = exchange.query_subaccount_deposits(&QuerySubaccountDepositsRequest {
+        subaccount_id: "".to_string(),
+        subaccount: Some(Subaccount {
+            trader: contr_addr.to_string(),
+            subaccount_nonce: 0,
+        }),
+    });
     println!("subacc deps: {:?}", subacc_deps);
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
-    println!("contract balances after: {:?}", contract_balances_after)  ;
+    println!("contract balances after: {:?}", contract_balances_after);
     assert_eq!(
         contract_balances_after.len(),
         1,
@@ -242,14 +245,18 @@ fn happy_path_two_hops_swap_realistic_scales() {
 
     let atom_amount_below_min_tick_size = FPDecimal::must_from_str("0.000685");
     let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("830", &Decimals::Six);
-    let fee_refund = dust_value * FPDecimal::must_from_str(&format!(
-        "{}",
-        DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART));
+    let fee_refund = dust_value
+        * FPDecimal::must_from_str(&format!(
+            "{}",
+            DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
+        ));
 
     dust_value += fee_refund;
 
-    let expected_contract_usdt_balance = FPDecimal::must_from_str(contract_balances_before[0].amount.as_str()) + dust_value;
-    let actual_contract_balance = FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+    let expected_contract_usdt_balance =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str()) + dust_value;
+    let actual_contract_balance =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
     let contract_balance_diff = expected_contract_usdt_balance.abs_diff(&actual_contract_balance);
 
     assert!(
@@ -280,11 +287,22 @@ fn happy_path_two_hops_swap_realistic_values() {
         ],
     );
 
-    let spot_market_1_id =
-        launch_custom_spot_market(&exchange, &owner, ETH, USDT, dec_to_proto( FPDecimal::must_from_str("0.000000000000001")).as_str(), dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str());
-    let spot_market_2_id =
-        launch_custom_spot_market(&exchange, &owner, ATOM, USDT, dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(), dec_to_proto(FPDecimal::must_from_str("1000")).as_str());
-
+    let spot_market_1_id = launch_custom_spot_market(
+        &exchange,
+        &owner,
+        ETH,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+    );
+    let spot_market_2_id = launch_custom_spot_market(
+        &exchange,
+        &owner,
+        ATOM,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
+    );
 
     let contr_addr =
         init_contract_and_get_address(&wasm, &owner, &[str_coin("100", USDT, &Decimals::Six)]);
@@ -454,7 +472,8 @@ fn happy_path_two_hops_swap_realistic_values() {
         },
         &[str_coin(eth_to_swap, ETH, &Decimals::Eighteen)],
         &swapper,
-    ).unwrap();
+    )
+    .unwrap();
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
@@ -469,7 +488,13 @@ fn happy_path_two_hops_swap_realistic_values() {
         "swapper did not receive expected amount"
     );
 
-    let subacc_deps = exchange.query_subaccount_deposits(&QuerySubaccountDepositsRequest{ subaccount_id: "".to_string(), subaccount: Some(Subaccount { trader: contr_addr.to_string(), subaccount_nonce: 0 }) });
+    let subacc_deps = exchange.query_subaccount_deposits(&QuerySubaccountDepositsRequest {
+        subaccount_id: "".to_string(),
+        subaccount: Some(Subaccount {
+            trader: contr_addr.to_string(),
+            subaccount_nonce: 0,
+        }),
+    });
     println!("subacc deps: {:?}", subacc_deps);
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
 
@@ -482,14 +507,18 @@ fn happy_path_two_hops_swap_realistic_values() {
     let atom_amount_below_min_tick_size = FPDecimal::must_from_str("0.0005463");
     let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("8.89", &Decimals::Six);
 
-    let fee_refund = dust_value * FPDecimal::must_from_str(&format!(
-        "{}",
-        DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART));
+    let fee_refund = dust_value
+        * FPDecimal::must_from_str(&format!(
+            "{}",
+            DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
+        ));
 
     dust_value += fee_refund;
 
-    let expected_contract_usdt_balance = FPDecimal::must_from_str(contract_balances_before[0].amount.as_str()) + dust_value;
-    let actual_contract_balance = FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+    let expected_contract_usdt_balance =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str()) + dust_value;
+    let actual_contract_balance =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
     let contract_balance_diff = expected_contract_usdt_balance - actual_contract_balance;
 
     // here the actual difference is 0.000067 USDT, which we attribute differences between decimal precision of Rust/Go and Google Sheets
