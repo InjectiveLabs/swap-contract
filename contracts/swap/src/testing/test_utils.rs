@@ -554,8 +554,8 @@ pub fn fund_account_with_some_inj(
     .unwrap();
 }
 
-pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> String {
-    FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(decimals.get_decimals()).to_string()
+pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> FPDecimal {
+    FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(decimals.get_decimals())
     //
     // let number = raw_number.replace('_', "");
     // let has_decimal_fraction = number.contains(".");
@@ -625,18 +625,19 @@ pub fn human_to_proto(raw_number: &str, decimals: i32) -> String {
 
 pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
     let scaled_amount = human_to_dec(human_amount, decimals);
-    let as_int: u128 = Uint128::from_str(scaled_amount.as_str()).unwrap().u128();
+    let as_int: u128 = scaled_amount.into();
     coin(as_int, denom)
 }
 
 mod tests {
+    use injective_math::FPDecimal;
     use crate::testing::test_utils::{human_to_dec, human_to_proto, Decimals, scale_price_quantity_for_market};
 
     #[test]
     fn it_converts_integer_to_dec() {
         let integer = "1";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "1000000000000000000";
+        let mut expected = FPDecimal::must_from_str("1000000000000000000");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -645,7 +646,7 @@ mod tests {
         );
 
         decimals = Decimals::Six;
-        expected = "1000000";
+        expected = FPDecimal::must_from_str("1000000");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -658,7 +659,7 @@ mod tests {
     fn it_converts_decimals_above_zero_to_dec() {
         let integer = "1.1";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "1100000000000000000";
+        let mut expected = FPDecimal::must_from_str("1100000000000000000");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -667,7 +668,7 @@ mod tests {
         );
 
         decimals = Decimals::Six;
-        expected = "1100000";
+        expected = FPDecimal::must_from_str("1100000");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -680,7 +681,7 @@ mod tests {
     fn it_converts_decimals_above_zero_with_max_precision_limit_of_18_to_dec() {
         let integer = "1.000000000000000001";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "1000000000000000001";
+        let mut expected = FPDecimal::must_from_str("1000000000000000001");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -702,7 +703,7 @@ mod tests {
     fn it_converts_decimals_above_zero_with_max_precision_limit_of_6_to_dec() {
         let integer = "1.000001";
         let mut decimals = Decimals::Six;
-        let mut expected = "1000001";
+        let mut expected = FPDecimal::must_from_str("1000001");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -724,7 +725,7 @@ mod tests {
     fn it_converts_decimals_below_zero_to_dec() {
         let integer = "0.1123";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "112300000000000000";
+        let mut expected = FPDecimal::must_from_str("112300000000000000");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -733,7 +734,7 @@ mod tests {
         );
 
         decimals = Decimals::Six;
-        expected = "112300";
+        expected = FPDecimal::must_from_str("112300");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -746,7 +747,7 @@ mod tests {
     fn it_converts_decimals_below_zero_with_max_precision_limit_of_18_to_dec() {
         let integer = "0.000000000000000001";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "1";
+        let mut expected = FPDecimal::must_from_str("1");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -768,7 +769,7 @@ mod tests {
     fn it_converts_decimals_below_zero_with_max_precision_limit_of_6_to_dec() {
         let integer = "0.000001";
         let mut decimals = Decimals::Six;
-        let mut expected = "1";
+        let mut expected = FPDecimal::must_from_str("1");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -812,7 +813,7 @@ mod tests {
     fn it_converts_decimal_above_zero__to_proto() {
         let number = "1.1";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "1000000000000000000100000000000000000";
+        let mut expected = "11000000000000000000000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -821,7 +822,7 @@ mod tests {
         );
 
         decimals = Decimals::Six;
-        expected = "1000000100000000000000000";
+        expected = "110000000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -834,7 +835,7 @@ mod tests {
     fn it_converts_decimal_below_zero_to_proto() {
         let number = "0.1";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "100000000000000000";
+        let mut expected = "10000000000000000000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(

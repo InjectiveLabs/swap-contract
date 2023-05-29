@@ -220,7 +220,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::must_from_str(human_to_dec("2893.888685", &Decimals::Six).as_str()),
+        human_to_dec("2893.888685", &Decimals::Six),
         "swapper did not receive expected amount"
     );
 
