@@ -213,8 +213,8 @@ pub fn launch_custom_spot_market(
                 ticker: ticker.clone(),
                 base_denom: base.to_string(),
                 quote_denom: quote.to_string(),
-                min_price_tick_size: min_price_tick_size.to_string(),
-                min_quantity_tick_size: min_quantity_tick_size.to_string(),
+                min_price_tick_size: human_to_proto(min_price_tick_size, 0),
+                min_quantity_tick_size: human_to_proto(min_quantity_tick_size, 0),
             },
             signer,
         )
@@ -293,35 +293,6 @@ pub fn scale_price_quantity_for_market(
         price_dec.scaled(quote_decimals.get_decimals() - base_decimals.get_decimals());
     let scaled_quantity = quantity_dec.scaled(base_decimals.get_decimals());
     (dec_to_proto(scaled_price), dec_to_proto(scaled_quantity))
-    //
-    //
-    // let get_scaled_above_zero_price =
-    //     |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
-    //         let dec = FPDecimal::must_from_str(number.replace('_', "").as_str());
-    //
-    //
-    //         let required_shift_to_zero =
-    //             base_decimals.get_decimals() - quote_decimals.get_decimals();
-    //         if required_shift_to_zero == 0 {
-    //             return number.to_string();
-    //         }
-    //
-    //         let required_shift = required_shift_to_zero - number.len();
-    //         if required_shift > 0 {
-    //             format!("0.{}{number}", "0".repeat(required_shift))
-    //         } else {
-    //             format!("0.{number}")
-    //         }
-    //     };
-    //
-    // let mut price_to_send = get_scaled_above_zero_price(price, &base_decimals, &quote_decimals);
-    // // println!("price_to_send: {}", price_to_send);
-    // let price_decimal_shift = &base_decimals.get_decimals() - &quote_decimals.get_decimals();
-    // // println!("price_decimal_shift: {}", price_decimal_shift);
-    // price_to_send = human_to_proto(price_to_send.as_str(), price_decimal_shift);
-    // let quantity_to_send = human_to_proto(quantity, base_decimals.get_decimals());
-    //
-    // (price_to_send, quantity_to_send)
 }
 
 pub fn dec_to_proto(val: FPDecimal) -> String {
@@ -598,35 +569,6 @@ pub fn human_to_proto(raw_number: &str, decimals: i32) -> String {
     FPDecimal::must_from_str(&raw_number.replace('_', ""))
         .scaled(18 + decimals)
         .to_string()
-
-    // let number = raw_number.replace('_', "");
-    // let has_decimal_fraction = number.contains(".");
-    // let right_padding_zeroes = "0".repeat(decimals);
-    // if !has_decimal_fraction {
-    //     return format!(
-    //         "{number}{}{}",
-    //         right_padding_zeroes,
-    //         Decimals::Eighteen.get_right_padding_zeroes()
-    //     );
-    // }
-    //
-    // let separated: Vec<&str> = number.split_terminator('.').collect();
-    // let zeros_to_right_pad = Decimals::Eighteen.get_decimals() - separated[1].len();
-    // let right_zeroes = "0".repeat(zeros_to_right_pad);
-    //
-    // let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-    // if is_below_zero {
-    //     // take only decimal fraction and pad with zeros
-    //     return format!("{}{right_zeroes}", remove_left_zeroes(separated[1]));
-    // }
-    //
-    // // take integer pad with zeros and then the decimal fraction and also pad with zeros
-    // format!(
-    //     "{}{}{}",
-    //     separated[0],
-    //     right_padding_zeroes,
-    //     format!("{}{right_zeroes}", separated[1])
-    // )
 }
 
 pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
@@ -710,7 +652,7 @@ mod tests {
     #[test]
     fn it_converts_decimals_above_zero_with_max_precision_limit_of_6_to_dec() {
         let integer = "1.000001";
-        let mut decimals = Decimals::Six;
+        let  decimals = Decimals::Six;
         let mut expected = FPDecimal::must_from_str("1000001");
 
         let actual = human_to_dec(integer, &decimals);

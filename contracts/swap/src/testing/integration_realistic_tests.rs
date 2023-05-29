@@ -55,9 +55,9 @@ fn happy_path_two_hops_swap_realistic_scales() {
 
     // set the market
     let spot_market_1_id =
-        launch_custom_spot_market(&exchange, &owner, ETH, USDT, "1000", "1000000000000000");
+        launch_custom_spot_market(&exchange, &owner, ETH, USDT, "0.000000000000001000", "1000000000000000");
     let spot_market_2_id =
-        launch_custom_spot_market(&exchange, &owner, ATOM, USDT, "1000000000000000", "1000");
+        launch_custom_spot_market(&exchange, &owner, ATOM, USDT, "0.001000000000000000", "1000.000000000000000000");
 
     let contr_addr =
         init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, &Decimals::Six)]);
@@ -229,7 +229,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     );
     assert_eq!(
         to_balance,
-        human_to_dec("2893.888685", &Decimals::Six),
+        human_to_dec("2893.888", &Decimals::Six),
         "swapper did not receive expected amount"
     );
 
