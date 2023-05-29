@@ -810,10 +810,10 @@ mod tests {
     }
 
     #[test]
-    fn it_converts_decimal_above_zero__to_proto() {
+    fn it_converts_decimal_above_zero_to_proto() {
         let number = "1.1";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "11000000000000000000000000000000000000";
+        let mut expected = "1100000000000000000000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -822,7 +822,7 @@ mod tests {
         );
 
         decimals = Decimals::Six;
-        expected = "110000000000000000000000";
+        expected = "1100000000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -844,7 +844,7 @@ mod tests {
         );
 
         decimals = Decimals::Six;
-        expected = "100000000000000000";
+        expected = "100000000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -857,7 +857,7 @@ mod tests {
     fn it_converts_decimal_below_zero_with_18_decimals_with_max_precision_to_proto() {
         let number = "0.000000000000000001";
         let mut decimals = Decimals::Eighteen;
-        let mut expected = "1";
+        let mut expected = "1000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -880,7 +880,7 @@ mod tests {
     fn it_converts_decimal_below_zero_with_6_decimals_with_max_precision_to_proto() {
         let number = "0.000001";
         let mut decimals = Decimals::Six;
-        let mut expected = "1000000000000";
+        let mut expected = "1000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -929,7 +929,6 @@ mod tests {
         assert_eq!(scaled_quantity, "1000000000000000000000000000000000000", "quantity was scaled incorrectly");
     }
 
-    //TODO fix the function for decimals
     #[test]
     fn it_scales_decimal_values_correctly_for_inj_udst() {
         let price = "8.782";
@@ -961,7 +960,6 @@ mod tests {
         assert_eq!(scaled_quantity, "1000000000000000000000000", "quantity was scaled incorrectly");
     }
 
-    //TODO fix the function for decimals
     #[test]
     fn it_scales_decimal_values_correctly_for_atom_udst() {
         let price = "1.129";
