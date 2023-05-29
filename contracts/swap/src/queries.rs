@@ -160,7 +160,7 @@ fn estimate_execution_buy(
         .amount
         .into();
     // in execution mode funds_in_contract already contain user funds so we don't want to count them double
-    if required_funds > funds_in_contract + if is_simulation { available_funds } else  { FPDecimal::zero()}  {
+    if required_funds > funds_in_contract + if is_simulation { available_funds } else  { FPDecimal::zero() }  {
         Err(StdError::generic_err("Swap amount too high"))
     } else {
         Ok((expected_quantity, worst_price))
