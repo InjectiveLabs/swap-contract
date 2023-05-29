@@ -292,35 +292,6 @@ pub fn scale_price_quantity_for_market(
     let scaled_price = price_dec.scaled(quote_decimals.get_decimals() - base_decimals.get_decimals());
     let scaled_quantity = quantity_dec.scaled(base_decimals.get_decimals());
     (dec_to_proto(scaled_price), dec_to_proto(scaled_quantity) )
-    //
-    //
-    // let get_scaled_above_zero_price =
-    //     |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
-    //         let dec = FPDecimal::must_from_str(number.replace('_', "").as_str());
-    //
-    //
-    //         let required_shift_to_zero =
-    //             base_decimals.get_decimals() - quote_decimals.get_decimals();
-    //         if required_shift_to_zero == 0 {
-    //             return number.to_string();
-    //         }
-    //
-    //         let required_shift = required_shift_to_zero - number.len();
-    //         if required_shift > 0 {
-    //             format!("0.{}{number}", "0".repeat(required_shift))
-    //         } else {
-    //             format!("0.{number}")
-    //         }
-    //     };
-    //
-    // let mut price_to_send = get_scaled_above_zero_price(price, &base_decimals, &quote_decimals);
-    // // println!("price_to_send: {}", price_to_send);
-    // let price_decimal_shift = &base_decimals.get_decimals() - &quote_decimals.get_decimals();
-    // // println!("price_decimal_shift: {}", price_decimal_shift);
-    // price_to_send = human_to_proto(price_to_send.as_str(), price_decimal_shift);
-    // let quantity_to_send = human_to_proto(quantity, base_decimals.get_decimals());
-    //
-    // (price_to_send, quantity_to_send)
 }
 
 pub fn dec_to_proto(val: FPDecimal) -> String {
@@ -556,71 +527,10 @@ pub fn fund_account_with_some_inj(
 
 pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> FPDecimal {
     FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(decimals.get_decimals())
-    //
-    // let number = raw_number.replace('_', "");
-    // let has_decimal_fraction = number.contains(".");
-    // if !has_decimal_fraction {
-    //     return format!("{}{}", number, decimals.get_right_padding_zeroes());
-    // }
-    //
-    // let separated: Vec<&str> = number.split_terminator('.').collect();
-    // let zeros_to_right_pad = decimals.get_decimals() - separated[1].len();
-    // if zeros_to_right_pad < 0 {
-    //     panic!("Too many decimal places")
-    // }
-    //
-    // let right_zeroes = "0".repeat(zeros_to_right_pad);
-    // let decimal_padded = &format!("{}{}", separated[1], right_zeroes);
-    //
-    // let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-    // if is_below_zero {
-    //     // take only decimal fraction and pad with zeros
-    //     return remove_left_zeroes(decimal_padded);
-    // }
-    //
-    // // take integer and decimal fraction and pad with zeros
-    // format!("{}{}", separated[0], decimal_padded)
-}
-
-fn remove_left_zeroes(raw_number: &str) -> String {
-    let mut number = raw_number.to_string();
-    while number.chars().nth(0).unwrap().to_string() == "0" {
-        number.remove(0);
-    }
-    number
 }
 
 pub fn human_to_proto(raw_number: &str, decimals: i32) -> String {
    FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(18+decimals).to_string()
-
-    // let number = raw_number.replace('_', "");
-    // let has_decimal_fraction = number.contains(".");
-    // let right_padding_zeroes = "0".repeat(decimals);
-    // if !has_decimal_fraction {
-    //     return format!(
-    //         "{number}{}{}",
-    //         right_padding_zeroes,
-    //         Decimals::Eighteen.get_right_padding_zeroes()
-    //     );
-    // }
-    //
-    // let separated: Vec<&str> = number.split_terminator('.').collect();
-    // let zeros_to_right_pad = Decimals::Eighteen.get_decimals() - separated[1].len();
-    // let right_zeroes = "0".repeat(zeros_to_right_pad);
-    //
-    // let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-    // if is_below_zero {
-    //     // take only decimal fraction and pad with zeros
-    //     return format!("{}{right_zeroes}", remove_left_zeroes(separated[1]));
-    // }
-    //
-    // // take integer pad with zeros and then the decimal fraction and also pad with zeros
-    // format!(
-    //     "{}{}{}",
-    //     separated[0],
-    //     right_padding_zeroes,
-    //     format!("{}{right_zeroes}", separated[1])
-    // )
 }
 
 pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
@@ -690,15 +600,6 @@ mod tests {
         );
     }
 
-    // #[test]
-    // #[should_panic]
-    // fn it_panics_converting_decimals_above_zero_with_above_precision_limit_of_18_to_dec() {
-    //     let integer = "1.0000000000000000001";
-    //     let mut decimals = Decimals::Eighteen;
-    //
-    //     human_to_dec(integer, &decimals);
-    // }
-
     #[test]
     fn it_converts_decimals_above_zero_with_max_precision_limit_of_6_to_dec() {
         let integer = "1.000001";
@@ -711,15 +612,6 @@ mod tests {
             "failed to convert integer with 18 decimal to dec"
         );
     }
-
-    // #[test]
-    // #[should_panic]
-    // fn it_panics_converting_decimals_above_zero_with_above_precision_limit_of_6_to_dec() {
-    //     let integer = "1.0000001";
-    //     let mut decimals = Decimals::Six;
-    //
-    //     human_to_dec(integer, &decimals);
-    // }
 
     #[test]
     fn it_converts_decimals_below_zero_to_dec() {
@@ -756,15 +648,6 @@ mod tests {
         );
     }
 
-    // #[test]
-    // #[should_panic]
-    // fn it_panics_converting_decimals_below_zero_with_above_precision_limit_of_18_to_dec() {
-    //     let integer = "0.0000000000000000001";
-    //     let mut decimals = Decimals::Eighteen;
-    //
-    //     human_to_dec(integer, &decimals);
-    // }
-
     #[test]
     fn it_converts_decimals_below_zero_with_max_precision_limit_of_6_to_dec() {
         let integer = "0.000001";
@@ -777,15 +660,6 @@ mod tests {
             "failed to convert integer with 18 decimal to dec"
         );
     }
-
-    // #[test]
-    // #[should_panic]
-    // fn it_panics_converting_decimals_below_zero_with_above_precision_limit_of_6_to_dec() {
-    //     let integer = "0.0000001";
-    //     let mut decimals = Decimals::Six;
-    //
-    //     human_to_dec(integer, &decimals);
-    // }
 
     #[test]
     fn it_converts_integer_to_proto() {

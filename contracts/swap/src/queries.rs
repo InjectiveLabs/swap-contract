@@ -159,6 +159,12 @@ fn estimate_execution_buy(
         .expect("query own balance should not fail")
         .amount
         .into();
+
+    deps.api.debug(&format!(
+        "estimate_execution_buy: required_funds: {}, funds_in_contract: {}, available_funds: {}: diff: {}",
+        required_funds, funds_in_contract, available_funds, funds_in_contract - required_funds
+    ));
+
     // in execution mode funds_in_contract already contain user funds so we don't want to count them double
     if required_funds > funds_in_contract + if is_simulation { available_funds } else  { FPDecimal::zero()}  {
         Err(StdError::generic_err("Swap amount too high"))

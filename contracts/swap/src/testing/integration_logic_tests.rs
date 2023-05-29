@@ -441,6 +441,7 @@ fn happy_path_three_hops_quote_conversion_swap() {
             },
         )
         .unwrap();
+
     // expected amount is a bit lower, even though 1 USDT = 1 USDC, because of the fees
     assert_eq!(
         query_result,
