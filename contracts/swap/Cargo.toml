@@ -39,6 +39,7 @@ serde = { version = "1.0.137", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.31" }
 injective-cosmwasm = { version = "0.1.101" }
 injective-math = { version = "0.1.16" }
+num-traits = "0.2.15"
 protobuf = { version = "2", features = ["with-bytes"] }
 injective-protobuf = { version = "0.1", git = "https://github.com/InjectiveLabs/cw-injective", branch = "dev" }
 

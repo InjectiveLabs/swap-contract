@@ -28,6 +28,7 @@ use injective_cosmwasm::{
 };
 use injective_math::FPDecimal;
 use prost::Message;
+use crate::helpers::Scaled;
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
 
@@ -35,15 +36,16 @@ pub const TEST_CONTRACT_ADDR: &str = "inj14hj2tavq8fpesdwxxcu44rty3hh90vhujaxlnz
 pub const TEST_USER_ADDR: &str = "inj1p7z8p649xspcey7wp5e4leqf7wa39kjjj6wja8";
 
 #[derive(PartialEq, Eq, Debug)]
+#[repr(i32)]
 pub enum Decimals {
-    Eighteen,
-    Twelve,
-    Six,
-    Zero,
+    Eighteen = 18,
+    Twelve = 12,
+    Six = 6,
+    Zero = 0,
 }
 
 impl Decimals {
-    pub fn get_decimals(&self) -> usize {
+    pub fn get_decimals(&self) -> i32 {
         match self {
             Decimals::Eighteen => 18,
             Decimals::Twelve => 12,
@@ -284,31 +286,45 @@ pub fn scale_price_quantity_for_market(
     base_decimals: &Decimals,
     quote_decimals: &Decimals,
 ) -> (String, String) {
-    let get_scaled_above_zero_price =
-        |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
-            let number = raw_number.replace('_', "");
-            let required_shift_to_zero =
-                base_decimals.get_decimals() - quote_decimals.get_decimals();
-            if required_shift_to_zero == 0 {
-                return number.to_string();
-            }
+    let price_dec = FPDecimal::must_from_str(price.replace('_', "").as_str());
+    let quantity_dec = FPDecimal::must_from_str(quantity.replace('_', "").as_str());
 
-            let required_shift = required_shift_to_zero - number.len();
-            if required_shift > 0 {
-                format!("0.{}{number}", "0".repeat(required_shift))
-            } else {
-                format!("0.{number}")
-            }
-        };
+    let scaled_price = price_dec.scaled(quote_decimals.get_decimals() - base_decimals.get_decimals());
+    let scaled_quantity = quantity_dec.scaled(base_decimals.get_decimals());
+    (dec_to_proto(scaled_price), dec_to_proto(scaled_quantity) )
+    //
+    //
+    // let get_scaled_above_zero_price =
+    //     |raw_number: &str, base_decimals: &Decimals, quote_decimals: &Decimals| -> String {
+    //         let dec = FPDecimal::must_from_str(number.replace('_', "").as_str());
+    //
+    //
+    //         let required_shift_to_zero =
+    //             base_decimals.get_decimals() - quote_decimals.get_decimals();
+    //         if required_shift_to_zero == 0 {
+    //             return number.to_string();
+    //         }
+    //
+    //         let required_shift = required_shift_to_zero - number.len();
+    //         if required_shift > 0 {
+    //             format!("0.{}{number}", "0".repeat(required_shift))
+    //         } else {
+    //             format!("0.{number}")
+    //         }
+    //     };
+    //
+    // let mut price_to_send = get_scaled_above_zero_price(price, &base_decimals, &quote_decimals);
+    // // println!("price_to_send: {}", price_to_send);
+    // let price_decimal_shift = &base_decimals.get_decimals() - &quote_decimals.get_decimals();
+    // // println!("price_decimal_shift: {}", price_decimal_shift);
+    // price_to_send = human_to_proto(price_to_send.as_str(), price_decimal_shift);
+    // let quantity_to_send = human_to_proto(quantity, base_decimals.get_decimals());
+    //
+    // (price_to_send, quantity_to_send)
+}
 
-    let mut price_to_send = get_scaled_above_zero_price(price, &base_decimals, &quote_decimals);
-    println!("price_to_send: {}", price_to_send);
-    let price_decimal_shift = &base_decimals.get_decimals() - &quote_decimals.get_decimals();
-    println!("price_decimal_shift: {}", price_decimal_shift);
-    price_to_send = human_to_proto(price_to_send.as_str(), price_decimal_shift);
-    let quantity_to_send = human_to_proto(quantity, base_decimals.get_decimals());
-
-    (price_to_send, quantity_to_send)
+pub fn dec_to_proto(val: FPDecimal) -> String {
+    val.scaled(18).to_string()
 }
 
 pub fn create_realistic_limit_order(
@@ -323,6 +339,7 @@ pub fn create_realistic_limit_order(
 ) {
     let (price_to_send, quantity_to_send) =
         scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+    println!("price_to_send: {}, quantity_to_send: {}", price_to_send, quantity_to_send);
 
     let exchange = Exchange::new(app);
     exchange
@@ -538,29 +555,31 @@ pub fn fund_account_with_some_inj(
 }
 
 pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> String {
-    let number = raw_number.replace('_', "");
-    let has_decimal_fraction = number.contains(".");
-    if !has_decimal_fraction {
-        return format!("{}{}", number, decimals.get_right_padding_zeroes());
-    }
-
-    let separated: Vec<&str> = number.split_terminator('.').collect();
-    let zeros_to_right_pad = decimals.get_decimals() - separated[1].len();
-    if zeros_to_right_pad < 0 {
-        panic!("Too many decimal places")
-    }
-
-    let right_zeroes = "0".repeat(zeros_to_right_pad);
-    let decimal_padded = &format!("{}{}", separated[1], right_zeroes);
-
-    let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-    if is_below_zero {
-        // take only decimal fraction and pad with zeros
-        return remove_left_zeroes(decimal_padded);
-    }
-
-    // take integer and decimal fraction and pad with zeros
-    format!("{}{}", separated[0], decimal_padded)
+    FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(decimals.get_decimals()).to_string()
+    //
+    // let number = raw_number.replace('_', "");
+    // let has_decimal_fraction = number.contains(".");
+    // if !has_decimal_fraction {
+    //     return format!("{}{}", number, decimals.get_right_padding_zeroes());
+    // }
+    //
+    // let separated: Vec<&str> = number.split_terminator('.').collect();
+    // let zeros_to_right_pad = decimals.get_decimals() - separated[1].len();
+    // if zeros_to_right_pad < 0 {
+    //     panic!("Too many decimal places")
+    // }
+    //
+    // let right_zeroes = "0".repeat(zeros_to_right_pad);
+    // let decimal_padded = &format!("{}{}", separated[1], right_zeroes);
+    //
+    // let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
+    // if is_below_zero {
+    //     // take only decimal fraction and pad with zeros
+    //     return remove_left_zeroes(decimal_padded);
+    // }
+    //
+    // // take integer and decimal fraction and pad with zeros
+    // format!("{}{}", separated[0], decimal_padded)
 }
 
 fn remove_left_zeroes(raw_number: &str) -> String {
@@ -571,35 +590,37 @@ fn remove_left_zeroes(raw_number: &str) -> String {
     number
 }
 
-pub fn human_to_proto(raw_number: &str, decimals: usize) -> String {
-    let number = raw_number.replace('_', "");
-    let has_decimal_fraction = number.contains(".");
-    let right_padding_zeroes = "0".repeat(decimals);
-    if !has_decimal_fraction {
-        return format!(
-            "{number}{}{}",
-            right_padding_zeroes,
-            Decimals::Eighteen.get_right_padding_zeroes()
-        );
-    }
+pub fn human_to_proto(raw_number: &str, decimals: i32) -> String {
+   FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(18+decimals).to_string()
 
-    let separated: Vec<&str> = number.split_terminator('.').collect();
-    let zeros_to_right_pad = Decimals::Eighteen.get_decimals() - separated[1].len();
-    let right_zeroes = "0".repeat(zeros_to_right_pad);
-
-    let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-    if is_below_zero {
-        // take only decimal fraction and pad with zeros
-        return format!("{}{right_zeroes}", remove_left_zeroes(separated[1]));
-    }
-
-    // take integer pad with zeros and then the decimal fraction and also pad with zeros
-    format!(
-        "{}{}{}",
-        separated[0],
-        right_padding_zeroes,
-        format!("{}{right_zeroes}", separated[1])
-    )
+    // let number = raw_number.replace('_', "");
+    // let has_decimal_fraction = number.contains(".");
+    // let right_padding_zeroes = "0".repeat(decimals);
+    // if !has_decimal_fraction {
+    //     return format!(
+    //         "{number}{}{}",
+    //         right_padding_zeroes,
+    //         Decimals::Eighteen.get_right_padding_zeroes()
+    //     );
+    // }
+    //
+    // let separated: Vec<&str> = number.split_terminator('.').collect();
+    // let zeros_to_right_pad = Decimals::Eighteen.get_decimals() - separated[1].len();
+    // let right_zeroes = "0".repeat(zeros_to_right_pad);
+    //
+    // let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
+    // if is_below_zero {
+    //     // take only decimal fraction and pad with zeros
+    //     return format!("{}{right_zeroes}", remove_left_zeroes(separated[1]));
+    // }
+    //
+    // // take integer pad with zeros and then the decimal fraction and also pad with zeros
+    // format!(
+    //     "{}{}{}",
+    //     separated[0],
+    //     right_padding_zeroes,
+    //     format!("{}{right_zeroes}", separated[1])
+    // )
 }
 
 pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {

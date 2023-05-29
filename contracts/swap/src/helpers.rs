@@ -2,6 +2,7 @@ use cosmwasm_std::{CosmosMsg, StdError, StdResult, SubMsg};
 
 use injective_cosmwasm::{InjectiveMsgWrapper, SpotMarket};
 use injective_math::FPDecimal;
+use num_traits::pow::Pow;
 
 pub fn i32_to_dec(source: i32) -> FPDecimal {
     FPDecimal::from(i128::from(source))
@@ -30,6 +31,27 @@ pub fn counter_denom<'a>(market: &'a SpotMarket, denom: &str) -> StdResult<&'a s
     }
 }
 
+pub trait Scaled {
+    fn scaled(self, digits: i32) -> Self;
+}
+
+impl Scaled for FPDecimal {
+    fn scaled(self, digits: i32) -> Self {
+        self.to_owned() * FPDecimal::from(10i128).pow(FPDecimal::from(digits as i128))
+    }
+}
+
 pub fn dec_scale_factor() -> FPDecimal {
-    FPDecimal::from(1000000000000000000_i128)
+    FPDecimal::one().scaled(18)
+    // FPDecimal::from(1000000000000000000_i128)
+}
+
+
+#[test]
+fn test_descale () {
+    let val  = FPDecimal::must_from_str("1000000000000000000");
+    let descaled = val.scaled(-18);
+    assert_eq!(descaled, FPDecimal::from(1u128));
+    let scaled = descaled.scaled(18);
+    assert_eq!(scaled, val);
 }

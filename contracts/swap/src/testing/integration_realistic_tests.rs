@@ -6,6 +6,7 @@ use injective_test_tube::{
 };
 
 use injective_math::{round_to_min_tick, FPDecimal};
+use injective_std::types::injective::exchange::v1beta1::{QuerySubaccountDepositsRequest, Subaccount};
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{create_limit_order, create_realistic_limit_order, fund_account_with_some_inj, init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address, launch_custom_spot_market, launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, human_to_dec};
@@ -223,6 +224,8 @@ fn happy_path_two_hops_swap_realistic_scales() {
         "swapper did not receive expected amount"
     );
 
+    let subacc_deps = exchange.query_subaccount_deposits(&QuerySubaccountDepositsRequest{ subaccount_id: "".to_string(), subaccount: Some(Subaccount { trader: contr_addr.to_string(), subaccount_nonce: 0 }) });
+    println!("subacc deps: {:?}", subacc_deps);
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
         contract_balances_after.len(),

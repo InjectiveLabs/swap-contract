@@ -6,7 +6,7 @@ use injective_cosmwasm::{
 use injective_math::utils::round_to_min_tick;
 use injective_math::FPDecimal;
 
-use crate::helpers::counter_denom;
+use crate::helpers::{counter_denom, Scaled};
 use crate::state::{read_swap_route, CONFIG};
 use crate::types::{FPCoin, StepExecutionEstimate};
 
@@ -215,14 +215,15 @@ pub fn find_minimum_orders(
     for level in levels {
         let value = calc(level);
         deps.api.debug(&format!(
-            "Adding level {}x{} value: {value}, sum so far: {sum}",
-            level.p.clone(),
-            level.q.clone()
+            "Adding level {}x{} value: {}, sum so far: {sum}",
+            level.p.clone().scaled(12),
+            level.q.clone().scaled(-18),
+            value.scaled(-18),
         ));
-        let order_to_add = if sum + value > total {
+        let order_to_add =  if sum + value > total {
             let excess = value + sum - total;
             deps.api.debug(&format!(
-                "Value: {value}, excess value: {excess}, sum so far: {sum}"
+                "Value: {value}, excess value: {excess}, sum so far: {}", sum.scaled(-18)
             ));
             PriceLevel {
                 p: level.p,
