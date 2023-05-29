@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{
-    coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult,
-};
+use cosmwasm_std::{coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult};
 use injective_std::shim::Any;
 use injective_std::types::cosmos::bank::v1beta1::{
     MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
@@ -47,7 +45,7 @@ pub const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
 pub const DEFAULT_SELF_RELAYING_FEE_PART: f64 = 0.6;
 pub const DEFAULT_RELAYER_SHARE: f64 = 1.0 - DEFAULT_SELF_RELAYING_FEE_PART;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 #[repr(i32)]
 pub enum Decimals {
     Eighteen = 18,
@@ -514,6 +512,28 @@ pub fn pass_spot_market_params_update_proposal(
     assert!(vote_response.is_ok(), "failed to vote on proposal");
 }
 
+pub fn init_default_validator_account(app: &InjectiveTestApp) -> SigningAccount {
+    app.get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap()
+}
+
+pub fn init_default_signer_account(app: &InjectiveTestApp) -> SigningAccount {
+    must_init_account_with_funds(&app, &[str_coin("100_000", INJ, Decimals::Eighteen)])
+}
+
+pub fn init_rich_account(app: &InjectiveTestApp) -> SigningAccount {
+    must_init_account_with_funds(
+        app,
+        &[
+            str_coin("100_000", ETH, Decimals::Eighteen),
+            str_coin("100_000", ATOM, Decimals::Six),
+            str_coin("100_000_000", USDT, Decimals::Six),
+            str_coin("100_000_000", USDC, Decimals::Six),
+            str_coin("100_000", INJ, Decimals::Eighteen),
+        ],
+    )
+}
+
 pub fn fund_account_with_some_inj(
     bank: &Bank<InjectiveTestApp>,
     from: &SigningAccount,
@@ -533,7 +553,7 @@ pub fn fund_account_with_some_inj(
     .unwrap();
 }
 
-pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> FPDecimal {
+pub fn human_to_dec(raw_number: &str, decimals: Decimals) -> FPDecimal {
     FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(decimals.get_decimals())
 }
 
@@ -543,7 +563,7 @@ pub fn human_to_proto(raw_number: &str, decimals: i32) -> String {
         .to_string()
 }
 
-pub fn str_coin(human_amount: &str, denom: &str, decimals: &Decimals) -> Coin {
+pub fn str_coin(human_amount: &str, denom: &str, decimals: Decimals) -> Coin {
     let scaled_amount = human_to_dec(human_amount, decimals);
     let as_int: u128 = scaled_amount.into();
     coin(as_int, denom)
@@ -561,7 +581,7 @@ mod tests {
         let mut decimals = Decimals::Eighteen;
         let mut expected = FPDecimal::must_from_str("1000000000000000000");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 18 decimal to dec"
@@ -570,7 +590,7 @@ mod tests {
         decimals = Decimals::Six;
         expected = FPDecimal::must_from_str("1000000");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 6 decimal to dec"
@@ -583,7 +603,7 @@ mod tests {
         let mut decimals = Decimals::Eighteen;
         let mut expected = FPDecimal::must_from_str("1100000000000000000");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 18 decimal to dec"
@@ -592,7 +612,7 @@ mod tests {
         decimals = Decimals::Six;
         expected = FPDecimal::must_from_str("1100000");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 6 decimal to dec"
@@ -605,7 +625,7 @@ mod tests {
         let decimals = Decimals::Eighteen;
         let expected = FPDecimal::must_from_str("1000000000000000001");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 18 decimal to dec"
@@ -618,7 +638,7 @@ mod tests {
         let decimals = Decimals::Six;
         let expected = FPDecimal::must_from_str("1000001");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 18 decimal to dec"
@@ -631,7 +651,7 @@ mod tests {
         let mut decimals = Decimals::Eighteen;
         let mut expected = FPDecimal::must_from_str("112300000000000000");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 18 decimal to dec"
@@ -640,7 +660,7 @@ mod tests {
         decimals = Decimals::Six;
         expected = FPDecimal::must_from_str("112300");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 6 decimal to dec"
@@ -653,7 +673,7 @@ mod tests {
         let decimals = Decimals::Eighteen;
         let expected = FPDecimal::must_from_str("1");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 18 decimal to dec"
@@ -666,7 +686,7 @@ mod tests {
         let decimals = Decimals::Six;
         let expected = FPDecimal::must_from_str("1");
 
-        let actual = human_to_dec(integer, &decimals);
+        let actual = human_to_dec(integer, decimals);
         assert_eq!(
             actual, expected,
             "failed to convert integer with 18 decimal to dec"

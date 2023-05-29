@@ -1,14 +1,8 @@
-
 use std::str::FromStr;
 
-
-use cosmwasm_std::{
-    BankMsg, DepsMut, Env, MessageInfo, Reply, Response,
-    StdResult, SubMsg,
-};
+use cosmwasm_std::{BankMsg, DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg};
 
 use protobuf::Message;
-
 
 use crate::contract::ATOMIC_ORDER_REPLY_ID;
 use injective_cosmwasm::{
@@ -21,10 +15,8 @@ use injective_protobuf::proto::tx;
 use crate::error::ContractError;
 use crate::helpers::dec_scale_factor;
 
-use crate::queries::{estimate_single_swap_execution};
-use crate::state::{
-    read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE,
-};
+use crate::queries::estimate_single_swap_execution;
+use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE};
 use crate::types::{CurrentSwapOperation, CurrentSwapStep, FPCoin};
 
 pub fn start_swap_flow(

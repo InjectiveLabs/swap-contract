@@ -6,7 +6,7 @@ use injective_std::types::injective::exchange::v1beta1::{
 };
 
 use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::testing::test_utils::{create_limit_order, fund_account_with_some_inj, init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address, launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, SOL, USDC, USDT, str_coin, Decimals, launch_custom_spot_market, dec_to_proto, create_realistic_limit_order, human_to_dec};
+use crate::testing::test_utils::{create_limit_order, create_realistic_limit_order, dec_to_proto, fund_account_with_some_inj, human_to_dec, init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address, init_default_validator_account, launch_custom_spot_market, launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, SOL, USDC, USDT, init_rich_account};
 
 #[test]
 fn happy_path_two_hops_swap_realistic_scales() {
@@ -15,18 +15,15 @@ fn happy_path_two_hops_swap_realistic_scales() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, &Decimals::Eighteen)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let _validator = init_default_validator_account(&app);
     let owner = must_init_account_with_funds(
         &app,
         &[
-            str_coin("1", ETH, &Decimals::Eighteen),
-            str_coin("1", ATOM, &Decimals::Six),
-            str_coin("1_000_000", USDT, &Decimals::Six),
-            str_coin("100_000", INJ, &Decimals::Eighteen),
+            str_coin("1", ETH, Decimals::Eighteen),
+            str_coin("1", ATOM, Decimals::Six),
+            str_coin("1_000_000", USDT, Decimals::Six),
+            str_coin("100_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -48,7 +45,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     );
 
     let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, &Decimals::Six)]);
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -61,35 +58,9 @@ fn happy_path_two_hops_swap_realistic_scales() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("10_000", ETH, &Decimals::Eighteen),
-            str_coin("10_000_000", USDT, &Decimals::Six),
-            str_coin("1_000_000", ATOM, &Decimals::Six),
-            str_coin("1", INJ, &Decimals::Eighteen),
-        ],
-    );
-
-    let trader2 = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("10_000", ETH, &Decimals::Eighteen),
-            str_coin("10_000_000", USDT, &Decimals::Six),
-            str_coin("1_000_000", ATOM, &Decimals::Six),
-            str_coin("1", INJ, &Decimals::Eighteen),
-        ],
-    );
-
-    let trader3 = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("10_000", ETH, &Decimals::Eighteen),
-            str_coin("10_000_000", USDT, &Decimals::Six),
-            str_coin("1_000_000", ATOM, &Decimals::Six),
-            str_coin("1", INJ, &Decimals::Eighteen),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
     create_realistic_limit_order(
         &app,
@@ -173,8 +144,8 @@ fn happy_path_two_hops_swap_realistic_scales() {
     let swapper = must_init_account_with_funds(
         &app,
         &[
-            str_coin("12", ETH, &Decimals::Eighteen),
-            str_coin("5", INJ, &Decimals::Eighteen),
+            str_coin("12", ETH, Decimals::Eighteen),
+            str_coin("5", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -184,14 +155,14 @@ fn happy_path_two_hops_swap_realistic_scales() {
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
                 to_denom: ATOM.to_string(),
-                from_quantity: human_to_dec("12", &Decimals::Eighteen),
+                from_quantity: human_to_dec("12", Decimals::Eighteen),
             },
         )
         .unwrap();
 
     assert_eq!(
         query_result,
-        human_to_dec("2893.888", &Decimals::Six),
+        human_to_dec("2893.888", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
 
@@ -201,7 +172,6 @@ fn happy_path_two_hops_swap_realistic_scales() {
         1,
         "wrong number of denoms in contract balances"
     );
-    println!("contract balances before: {:?}", contract_balances_before);
 
     wasm.execute(
         &contr_addr,
@@ -209,7 +179,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
             target_denom: ATOM.to_string(),
             min_quantity: FPDecimal::from(2800u128),
         },
-        &[str_coin("12", ETH, &Decimals::Eighteen)],
+        &[str_coin("12", ETH, Decimals::Eighteen)],
         &swapper,
     )
     .unwrap();
@@ -223,7 +193,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     );
     assert_eq!(
         to_balance,
-        human_to_dec("2893.888", &Decimals::Six),
+        human_to_dec("2893.888", Decimals::Six),
         "swapper did not receive expected amount"
     );
 
@@ -234,9 +204,8 @@ fn happy_path_two_hops_swap_realistic_scales() {
             subaccount_nonce: 0,
         }),
     });
-    println!("subacc deps: {:?}", subacc_deps);
+
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
-    println!("contract balances after: {:?}", contract_balances_after);
     assert_eq!(
         contract_balances_after.len(),
         1,
@@ -244,7 +213,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     );
 
     let atom_amount_below_min_tick_size = FPDecimal::must_from_str("0.000685");
-    let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("830", &Decimals::Six);
+    let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("830", Decimals::Six);
     let fee_refund = dust_value
         * FPDecimal::must_from_str(&format!(
             "{}",
@@ -260,7 +229,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     let contract_balance_diff = expected_contract_usdt_balance.abs_diff(&actual_contract_balance);
 
     assert!(
-        human_to_dec("0.001", &Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
+        human_to_dec("0.001", Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
         "contract balance has changed too much after swap"
     );
 }
@@ -272,7 +241,7 @@ fn happy_path_two_hops_swap_realistic_values() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, &Decimals::Eighteen)]);
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
 
     let _validator = app
         .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
@@ -280,10 +249,10 @@ fn happy_path_two_hops_swap_realistic_values() {
     let owner = must_init_account_with_funds(
         &app,
         &[
-            str_coin("1", ETH, &Decimals::Eighteen),
-            str_coin("1", ATOM, &Decimals::Six),
-            str_coin("1_000", USDT, &Decimals::Six),
-            str_coin("10_000", INJ, &Decimals::Eighteen),
+            str_coin("1", ETH, Decimals::Eighteen),
+            str_coin("1", ATOM, Decimals::Six),
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -305,7 +274,7 @@ fn happy_path_two_hops_swap_realistic_values() {
     );
 
     let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100", USDT, &Decimals::Six)]);
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -318,35 +287,9 @@ fn happy_path_two_hops_swap_realistic_values() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("10_000", ETH, &Decimals::Eighteen),
-            str_coin("10_000_000", USDT, &Decimals::Six),
-            str_coin("1_000_000", ATOM, &Decimals::Six),
-            str_coin("1", INJ, &Decimals::Eighteen),
-        ],
-    );
-
-    let trader2 = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("10_000", ETH, &Decimals::Eighteen),
-            str_coin("10_000_000", USDT, &Decimals::Six),
-            str_coin("1_000_000", ATOM, &Decimals::Six),
-            str_coin("1", INJ, &Decimals::Eighteen),
-        ],
-    );
-
-    let trader3 = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("10_000", ETH, &Decimals::Eighteen),
-            str_coin("10_000_000", USDT, &Decimals::Six),
-            str_coin("1_000_000", ATOM, &Decimals::Six),
-            str_coin("1", INJ, &Decimals::Eighteen),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
     // ETH-USDT orders
     create_realistic_limit_order(
@@ -434,8 +377,8 @@ fn happy_path_two_hops_swap_realistic_values() {
     let swapper = must_init_account_with_funds(
         &app,
         &[
-            str_coin(eth_to_swap, ETH, &Decimals::Eighteen),
-            str_coin("1", INJ, &Decimals::Eighteen),
+            str_coin(eth_to_swap, ETH, Decimals::Eighteen),
+            str_coin("1", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -445,14 +388,14 @@ fn happy_path_two_hops_swap_realistic_values() {
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
                 to_denom: ATOM.to_string(),
-                from_quantity: human_to_dec(eth_to_swap, &Decimals::Eighteen),
+                from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),
             },
         )
         .unwrap();
 
     assert_eq!(
         query_result,
-        human_to_dec("906.262", &Decimals::Six),
+        human_to_dec("906.262", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
 
@@ -462,7 +405,6 @@ fn happy_path_two_hops_swap_realistic_values() {
         1,
         "wrong number of denoms in contract balances"
     );
-    println!("contract balances before: {:?}", contract_balances_before);
 
     wasm.execute(
         &contr_addr,
@@ -470,7 +412,7 @@ fn happy_path_two_hops_swap_realistic_values() {
             target_denom: ATOM.to_string(),
             min_quantity: FPDecimal::from(906u128),
         },
-        &[str_coin(eth_to_swap, ETH, &Decimals::Eighteen)],
+        &[str_coin(eth_to_swap, ETH, Decimals::Eighteen)],
         &swapper,
     )
     .unwrap();
@@ -484,7 +426,7 @@ fn happy_path_two_hops_swap_realistic_values() {
     );
     assert_eq!(
         to_balance,
-        human_to_dec("906.262", &Decimals::Six),
+        human_to_dec("906.262", Decimals::Six),
         "swapper did not receive expected amount"
     );
 
@@ -495,9 +437,8 @@ fn happy_path_two_hops_swap_realistic_values() {
             subaccount_nonce: 0,
         }),
     });
-    println!("subacc deps: {:?}", subacc_deps);
-    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
 
+    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
         contract_balances_after.len(),
         1,
@@ -505,7 +446,7 @@ fn happy_path_two_hops_swap_realistic_values() {
     );
 
     let atom_amount_below_min_tick_size = FPDecimal::must_from_str("0.0005463");
-    let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("8.89", &Decimals::Six);
+    let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("8.89", Decimals::Six);
 
     let fee_refund = dust_value
         * FPDecimal::must_from_str(&format!(
@@ -523,7 +464,7 @@ fn happy_path_two_hops_swap_realistic_values() {
 
     // here the actual difference is 0.000067 USDT, which we attribute differences between decimal precision of Rust/Go and Google Sheets
     assert!(
-        human_to_dec("0.0001", &Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
+        human_to_dec("0.0001", Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
         "contract balance has changed too much after swap"
     );
 }

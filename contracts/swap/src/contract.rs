@@ -1,31 +1,20 @@
-
-
-
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
-    StdResult,
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
 };
 use cw2::set_contract_version;
 use protobuf::Message;
 
 use crate::admin::{delete_route, save_config, set_route, update_config, withdraw_support_funds};
-use injective_cosmwasm::{
-    InjectiveMsgWrapper, InjectiveQueryWrapper,
-};
-
-
+use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper};
 
 use crate::error::ContractError;
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::queries::{estimate_swap_result};
-use crate::state::{
-    read_swap_route,
-};
+use crate::queries::estimate_swap_result;
+use crate::state::read_swap_route;
 use crate::swap::{handle_atomic_order_reply, start_swap_flow};
-
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:atomic-order-example";

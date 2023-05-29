@@ -2,7 +2,8 @@ use cosmwasm_std::{coin, Addr};
 
 use injective_test_tube::RunnerError::{ExecuteError, QueryError};
 use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult, Wasm,
+    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult,
+    SigningAccount, Wasm,
 };
 
 use injective_math::{round_to_min_tick, FPDecimal};
@@ -10,9 +11,10 @@ use injective_math::{round_to_min_tick, FPDecimal};
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
     create_limit_order, fund_account_with_some_inj, init_contract_and_get_address,
-    init_contract_with_fee_recipient_and_get_address, launch_spot_market,
+    init_contract_with_fee_recipient_and_get_address, init_default_signer_account,
+    init_default_validator_account, init_rich_account, launch_spot_market,
     must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance,
-    set_route_and_assert_success, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
+    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
     DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, SOL, USDC,
     USDT,
 };
@@ -24,27 +26,15 @@ fn happy_path_two_hops_swap() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    // set the market
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -57,39 +47,34 @@ fn happy_path_two_hops_swap() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -100,10 +85,7 @@ fn happy_path_two_hops_swap() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: FPDecimal = wasm
@@ -116,6 +98,7 @@ fn happy_path_two_hops_swap() {
             },
         )
         .unwrap();
+
     assert_eq!(
         query_result,
         FPDecimal::must_from_str("2893.888"),
@@ -128,7 +111,6 @@ fn happy_path_two_hops_swap() {
         1,
         "wrong number of denoms in contract balances"
     );
-    println!("contract balances before: {:?}", contract_balances_before);
 
     wasm.execute(
         &contr_addr,
@@ -173,26 +155,15 @@ fn happy_path_two_hops_single_price_level_swap() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -205,39 +176,34 @@ fn happy_path_two_hops_single_price_level_swap() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -248,10 +214,7 @@ fn happy_path_two_hops_single_price_level_swap() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(3, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(3, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let expected_atom_estimate_quantity = FPDecimal::must_from_str("751.492");
@@ -320,32 +283,16 @@ fn happy_path_three_hops_quote_conversion_swap() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000, USDC),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDC);
     let spot_market_3_id = launch_spot_market(&exchange, &owner, USDC, USDT);
 
-    let contr_addr = init_contract_and_get_address(
-        &wasm,
-        &owner,
-        &[coin(10_000_000_000, USDC), coin(10_000_000_000, USDT)],
-    );
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -359,41 +306,35 @@ fn happy_path_three_hops_quote_conversion_swap() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    let trader2 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    let trader3 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-            coin(10_000_000_000_000_000_000_000_000, USDC),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
     //ETH-USDT
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     //ATOM-USDC
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
@@ -415,10 +356,7 @@ fn happy_path_three_hops_quote_conversion_swap() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: FPDecimal = wasm
@@ -489,24 +427,14 @@ fn happy_path_simple_sell_swap() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -516,36 +444,39 @@ fn happy_path_simple_sell_swap() {
         vec![spot_market_1_id.as_str().into()],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     app.increase_time(1);
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
@@ -556,15 +487,18 @@ fn happy_path_simple_sell_swap() {
             from_quantity: FPDecimal::from(12u128),
         },
     );
-    let orders_nominal_total_value = FPDecimal::from(201000u128) * FPDecimal::from(5u128)
-        + FPDecimal::from(195000u128) * FPDecimal::from(4u128)
-        + FPDecimal::from(192000u128) * FPDecimal::from(3u128);
+
+    // calculate how much can be USDT can be bought for 12 ETH without fees
+    let orders_nominal_total_value = FPDecimal::from(201_000u128) * FPDecimal::from(5u128)
+        + FPDecimal::from(195_000u128) * FPDecimal::from(4u128)
+        + FPDecimal::from(192_000u128) * FPDecimal::from(3u128);
     let expected_query_result = orders_nominal_total_value
         * (FPDecimal::one()
             - FPDecimal::must_from_str(&format!(
                 "{}",
                 DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
             )));
+
     assert_eq!(
         query_result.unwrap(),
         expected_query_result,
@@ -622,24 +556,14 @@ fn happy_path_simple_buy_swap() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(100_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -649,23 +573,8 @@ fn happy_path_simple_buy_swap() {
         vec![spot_market_1_id.as_str().into()],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    let trader2 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
 
     create_limit_order(
         &app,
@@ -699,7 +608,7 @@ fn happy_path_simple_buy_swap() {
         &app,
         &[
             coin(swapper_usdt, USDT),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
+            str_coin("500_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -714,7 +623,7 @@ fn happy_path_simple_buy_swap() {
         - (FPDecimal::from(195_000u128) * FPDecimal::from(4u128)
             + FPDecimal::from(192_000u128) * FPDecimal::from(3u128));
     let most_expensive_order_quantity =
-        usdt_left_for_most_expensive_order / FPDecimal::from(201000u128);
+        usdt_left_for_most_expensive_order / FPDecimal::from(201_000u128);
     let expected_quantity =
         most_expensive_order_quantity + (FPDecimal::from(4u128) + FPDecimal::from(3u128));
 
@@ -797,21 +706,9 @@ fn happy_path_external_fee_receiver() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
@@ -820,7 +717,7 @@ fn happy_path_external_fee_receiver() {
     let contr_addr = init_contract_with_fee_recipient_and_get_address(
         &wasm,
         &owner,
-        &[coin(10_000_000_000, USDT)],
+        &[str_coin("10_000", USDT, Decimals::Six)],
         &fee_recipient,
     );
     set_route_and_assert_success(
@@ -835,43 +732,39 @@ fn happy_path_external_fee_receiver() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
+
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
     );
 
-    let trader2 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    let trader3 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
-
-    let buy_orders_nominal_total_value = FPDecimal::from(201000u128) * FPDecimal::from(5u128)
-        + FPDecimal::from(195000u128) * FPDecimal::from(4u128)
-        + FPDecimal::from(192000u128) * FPDecimal::from(3u128);
+    // calculate relayer's share of the fee based on assumptions that all orders are matched
+    let buy_orders_nominal_total_value = FPDecimal::from(201_000u128) * FPDecimal::from(5u128)
+        + FPDecimal::from(195_000u128) * FPDecimal::from(4u128)
+        + FPDecimal::from(192_000u128) * FPDecimal::from(3u128);
     let relayer_sell_fee = buy_orders_nominal_total_value
         * FPDecimal::must_from_str(&format!(
             "{}",
@@ -883,6 +776,7 @@ fn happy_path_external_fee_receiver() {
     create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
 
+    // calculate relayer's share of the fee based on assumptions that some of orders are matched
     let expected_nominal_buy_most_expensive_match_quantity =
         FPDecimal::must_from_str("488.2222155454736648");
     let sell_orders_nominal_total_value = FPDecimal::from(800u128) * FPDecimal::from(800u128)
@@ -900,10 +794,7 @@ fn happy_path_external_fee_receiver() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: FPDecimal = wasm
@@ -916,6 +807,7 @@ fn happy_path_external_fee_receiver() {
             },
         )
         .unwrap();
+
     assert_eq!(
         query_result,
         FPDecimal::must_from_str("2888.222"),
@@ -988,27 +880,15 @@ fn not_enough_buffer() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.into(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000, USDT)]);
-
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1021,39 +901,34 @@ fn not_enough_buffer() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -1064,10 +939,7 @@ fn not_enough_buffer() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
@@ -1092,7 +964,6 @@ fn not_enough_buffer() {
         1,
         "wrong number of denoms in contract balances"
     );
-    println!("contract balances before: {:?}", contract_balances_before);
 
     let execute_result = wasm.execute(
         &contr_addr,
@@ -1138,27 +1009,15 @@ fn no_funds_passed() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.into(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
-
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1173,10 +1032,7 @@ fn no_funds_passed() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, contr_addr.as_str());
@@ -1195,7 +1051,7 @@ fn no_funds_passed() {
         &[],
         &swapper,
     );
-    let expected_error = RunnerError::ExecuteError { msg: "failed to execute message; message index: 0: Custom Error: \"Only 1 denom can be passed in funds\": execute wasm contract failed".to_string() };
+    let expected_error = RunnerError::ExecuteError { msg: "failed to execute message; message index: 0: Custom Error: \"Only one denom can be passed in funds\": execute wasm contract failed".to_string() };
     assert_eq!(
         execute_result.unwrap_err(),
         expected_error,
@@ -1204,6 +1060,7 @@ fn no_funds_passed() {
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
+
     assert_eq!(
         from_balance,
         FPDecimal::from(12u128),
@@ -1212,6 +1069,7 @@ fn no_funds_passed() {
     assert_eq!(to_balance, FPDecimal::zero(), "wrong to balance after swap");
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
+
     assert_eq!(
         contract_balances_after.len(),
         1,
@@ -1230,27 +1088,15 @@ fn multiple_fund_denoms_passed() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.into(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
-
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1271,7 +1117,7 @@ fn multiple_fund_denoms_passed() {
         &[
             coin(eth_balance, ETH),
             coin(atom_balance, ATOM),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
+            str_coin("500_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -1295,7 +1141,7 @@ fn multiple_fund_denoms_passed() {
         execute_result
             .unwrap_err()
             .to_string()
-            .contains("Only 1 denom can be passed in funds"),
+            .contains("Only one denom can be passed in funds"),
         "wrong error message"
     );
 
@@ -1331,27 +1177,15 @@ fn zero_minimum_amount_to_receive() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.into(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
-
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1364,39 +1198,34 @@ fn zero_minimum_amount_to_receive() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -1407,10 +1236,7 @@ fn zero_minimum_amount_to_receive() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
@@ -1485,27 +1311,15 @@ fn negative_minimum_amount_to_receive() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.into(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
-
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1527,45 +1341,37 @@ fn negative_minimum_amount_to_receive() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let trader1 = must_init_account_with_funds(
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
+
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -1588,7 +1394,6 @@ fn negative_minimum_amount_to_receive() {
         execute_result.is_err(),
         "swap with negative minimum amount to receive did not fail"
     );
-    println!("error: {:?}", execute_result.err().unwrap());
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
@@ -1622,27 +1427,15 @@ fn not_enough_orders_to_satisfy_min_quantity() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    // set the market
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1655,39 +1448,34 @@ fn not_enough_orders_to_satisfy_min_quantity() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -1698,10 +1486,7 @@ fn not_enough_orders_to_satisfy_min_quantity() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
@@ -1768,27 +1553,16 @@ fn min_quantity_cannot_be_reached() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     // set the market
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1801,39 +1575,34 @@ fn min_quantity_cannot_be_reached() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -1844,10 +1613,7 @@ fn min_quantity_cannot_be_reached() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -1902,27 +1668,15 @@ fn no_known_route_exists() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
-
-    // set the market
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1935,39 +1689,34 @@ fn no_known_route_exists() {
         ],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -1978,10 +1727,7 @@ fn no_known_route_exists() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
@@ -2042,26 +1788,15 @@ fn route_exists_but_market_does_not() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = "0x01edfab47f124748dc89998eb33144af734484ba07099014594321729a0ca16b";
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -2071,38 +1806,39 @@ fn route_exists_but_market_does_not() {
         vec![spot_market_1_id.as_str().into(), spot_market_2_id.into()],
     );
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     app.increase_time(1);
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
@@ -2179,29 +1915,17 @@ fn paused_market() {
     let bank = Bank::new(&app);
     let gov = Gov::new(&app);
 
-    let signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    fund_account_with_some_inj(&bank, &signer, &validator);
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let signer = init_default_signer_account(&app);
+    let validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
     pause_spot_market(&gov, spot_market_1_id.as_str(), &signer, &validator);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -2216,10 +1940,7 @@ fn paused_market() {
 
     let swapper = must_init_account_with_funds(
         &app,
-        &[
-            coin(12, ETH),
-            coin(5_000_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
@@ -2296,27 +2017,15 @@ fn insufficient_gas() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let signer =
-        must_init_account_with_funds(&app, &[coin(1_000_000_000_000_000_000_000_000, INJ)]);
-
-    let validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    fund_account_with_some_inj(&bank, &signer, &validator);
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            coin(1_000_000_000_000_000_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, ATOM),
-            coin(1_000_000_000_000, USDT),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, &[coin(10_000_000_000, USDT)]);
+    let contr_addr =
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -2331,39 +2040,34 @@ fn insufficient_gas() {
 
     let swapper = must_init_account_with_funds(&app, &[coin(12, ETH), coin(10, INJ)]);
 
-    let trader1 = must_init_account_with_funds(
-        &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
-    );
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
 
-    let trader2 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
     );
-
-    let trader3 = must_init_account_with_funds(
+    create_limit_order(
         &app,
-        &[
-            coin(10_000_000_000_000_000_000_000_000, ETH),
-            coin(123_456_000_000_000_000_000_000_000_000, USDT),
-            coin(9_999_000_000_000_000_000_000_000_000, ATOM),
-            coin(10_000_000_000_000_000_000_000_000, INJ),
-        ],
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
     );
-
-    create_limit_order(&app, &trader1, &spot_market_1_id, OrderSide::Buy, 201000, 5);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 195000, 4);
-    create_limit_order(&app, &trader2, &spot_market_1_id, OrderSide::Buy, 192000, 3);
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -2437,17 +2141,19 @@ fn admin_can_withdraw_all_funds_from_contract_to_his_address() {
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
 
+    let usdt_to_witdhraw = str_coin("10_000", USDT, Decimals::Six);
+    let eth_to_withdraw = str_coin("0.00062", ETH, Decimals::Eighteen);
+
     let owner = must_init_account_with_funds(
         &app,
         &[
-            coin(62_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-            coin(10_000_000_000, USDT),
+            eth_to_withdraw.clone(),
+            str_coin("1", INJ, Decimals::Eighteen),
+            usdt_to_witdhraw.clone(),
         ],
     );
 
-    let initial_contract_balance = &[coin(62_000_000_000, ETH), coin(10_000_000_000, USDT)];
-
+    let initial_contract_balance = &[eth_to_withdraw, usdt_to_witdhraw];
     let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -2496,17 +2202,19 @@ fn admin_can_withdraw_all_funds_from_contract_to_other_address() {
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
 
+    let usdt_to_witdhraw = str_coin("10_000", USDT, Decimals::Six);
+    let eth_to_withdraw = str_coin("0.00062", ETH, Decimals::Eighteen);
+
     let owner = must_init_account_with_funds(
         &app,
         &[
-            coin(62_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-            coin(10_000_000_000, USDT),
+            eth_to_withdraw.clone(),
+            str_coin("1", INJ, Decimals::Eighteen),
+            usdt_to_witdhraw.clone(),
         ],
     );
 
-    let initial_contract_balance = &[coin(62_000_000_000, ETH), coin(10_000_000_000, USDT)];
-
+    let initial_contract_balance = &[eth_to_withdraw, usdt_to_witdhraw];
     let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -2557,17 +2265,19 @@ fn non_admin_cannot_withdraw_jack_shit_from_contract() {
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
 
+    let usdt_to_witdhraw = str_coin("10_000", USDT, Decimals::Six);
+    let eth_to_withdraw = str_coin("0.00062", ETH, Decimals::Eighteen);
+
     let owner = must_init_account_with_funds(
         &app,
         &[
-            coin(62_000_000_000, ETH),
-            coin(1_000_000_000_000_000_000_000_000, INJ),
-            coin(10_000_000_000, USDT),
+            eth_to_withdraw.clone(),
+            str_coin("1", INJ, Decimals::Eighteen),
+            usdt_to_witdhraw.clone(),
         ],
     );
 
-    let initial_contract_balance = &[coin(62_000_000_000, ETH), coin(10_000_000_000, USDT)];
-
+    let initial_contract_balance = &[eth_to_withdraw, usdt_to_witdhraw];
     let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
