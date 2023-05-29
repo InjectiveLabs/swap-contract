@@ -1,10 +1,10 @@
-use std::collections::HashSet;
+use crate::msg::FeeRecipient;
+use crate::state::{remove_swap_route, store_swap_route, CONFIG};
+use crate::types::{Config, SwapRoute};
+use crate::ContractError;
 use cosmwasm_std::{Addr, BankMsg, Coin, Deps, DepsMut, Env, Response, StdResult};
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper, MarketId};
-use crate::ContractError;
-use crate::msg::FeeRecipient;
-use crate::state::{CONFIG, remove_swap_route, store_swap_route};
-use crate::types::{Config, SwapRoute};
+use std::collections::HashSet;
 
 pub fn save_config(
     deps: DepsMut<InjectiveQueryWrapper>,
@@ -74,7 +74,6 @@ pub fn withdraw_support_funds(
         .add_attribute("target_address", target_address.to_string());
     Ok(response)
 }
-
 
 pub fn set_route(
     deps: DepsMut<InjectiveQueryWrapper>,

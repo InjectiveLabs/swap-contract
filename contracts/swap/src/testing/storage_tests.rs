@@ -1,9 +1,9 @@
 use cosmwasm_std::Addr;
 
+use crate::admin::{delete_route, set_route};
 use injective_cosmwasm::{
     inj_mock_deps, MarketId, OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2, TEST_MARKET_ID_3,
 };
-use crate::admin::{delete_route, set_route};
 
 use crate::state::{read_swap_route, store_swap_route, CONFIG};
 use crate::testing::test_utils::{TEST_CONTRACT_ADDR, TEST_USER_ADDR};

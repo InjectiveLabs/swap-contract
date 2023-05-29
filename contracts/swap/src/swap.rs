@@ -1,32 +1,31 @@
-use std::collections::HashSet;
+
 use std::str::FromStr;
 
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
+
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+    BankMsg, DepsMut, Env, MessageInfo, Reply, Response,
     StdResult, SubMsg,
 };
-use cw2::set_contract_version;
+
 use protobuf::Message;
 
+
+use crate::contract::ATOMIC_ORDER_REPLY_ID;
 use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address,
-    InjectiveMsgWrapper, InjectiveQueryWrapper, MarketId, OrderType, SpotOrder,
+    InjectiveMsgWrapper, InjectiveQueryWrapper, OrderType, SpotOrder,
 };
 use injective_math::FPDecimal;
 use injective_protobuf::proto::tx;
-use crate::admin::{delete_route, save_config, set_route, update_config, withdraw_support_funds};
-use crate::contract::ATOMIC_ORDER_REPLY_ID;
 
 use crate::error::ContractError;
 use crate::helpers::dec_scale_factor;
-use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg, QueryMsg};
-use crate::queries::{estimate_single_swap_execution, estimate_swap_result};
+
+use crate::queries::{estimate_single_swap_execution};
 use crate::state::{
-    read_swap_route, remove_swap_route, store_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE,
+    read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE,
 };
-use crate::types::{Config, CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapRoute};
+use crate::types::{CurrentSwapOperation, CurrentSwapStep, FPCoin};
 
 pub fn start_swap_flow(
     deps: DepsMut<InjectiveQueryWrapper>,
@@ -116,7 +115,6 @@ pub fn execute_swap_step(
     Ok(response)
 }
 
-
 pub fn handle_atomic_order_reply(
     deps: DepsMut<InjectiveQueryWrapper>,
     env: Env,
@@ -135,10 +133,10 @@ pub fn handle_atomic_order_reply(
             })?
             .as_slice(),
     )
-        .map_err(|err| ContractError::ReplyParseFailure {
-            id,
-            err: err.to_string(),
-        })?;
+    .map_err(|err| ContractError::ReplyParseFailure {
+        id,
+        err: err.to_string(),
+    })?;
 
     // unwrap results into trade_data
     let trade_data = match order_response.results.into_option() {
@@ -147,7 +145,7 @@ pub fn handle_atomic_order_reply(
             val: "No trade data in order response".to_string(),
         }),
     }?;
-    let quantity = FPDecimal::from_str(&trade_data.quantity)? / dec_scale_factor;  // need to remove protobuf scale factor to get real values
+    let quantity = FPDecimal::from_str(&trade_data.quantity)? / dec_scale_factor; // need to remove protobuf scale factor to get real values
     let avg_price = FPDecimal::from_str(&trade_data.price)? / dec_scale_factor;
     let fee = FPDecimal::from_str(&trade_data.fee)? / dec_scale_factor;
     deps.api.debug(&format!(
@@ -194,4 +192,3 @@ pub fn handle_atomic_order_reply(
         Ok(response)
     }
 }
-

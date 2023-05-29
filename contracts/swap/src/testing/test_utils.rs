@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
-    coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128,
+    coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult,
 };
 use injective_std::shim::Any;
 use injective_std::types::cosmos::bank::v1beta1::{
@@ -51,15 +51,6 @@ impl Decimals {
             Decimals::Twelve => 12,
             Decimals::Six => 6,
             Decimals::Zero => 0,
-        }
-    }
-
-    pub fn get_right_padding_zeroes(&self) -> String {
-        match self {
-            Decimals::Eighteen => "000000000000000000".to_string(),
-            Decimals::Twelve => "000000000000".to_string(),
-            Decimals::Six => "000000".to_string(),
-            Decimals::Zero => "".to_string(),
         }
     }
 }
@@ -299,6 +290,7 @@ pub fn dec_to_proto(val: FPDecimal) -> String {
     val.scaled(18).to_string()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_realistic_limit_order(
     app: &InjectiveTestApp,
     trader: &SigningAccount,
@@ -531,38 +523,6 @@ pub fn fund_account_with_some_inj(
 
 pub fn human_to_dec(raw_number: &str, decimals: &Decimals) -> FPDecimal {
     FPDecimal::must_from_str(&raw_number.replace('_', "")).scaled(decimals.get_decimals())
-    //
-    // let number = raw_number.replace('_', "");
-    // let has_decimal_fraction = number.contains(".");
-    // if !has_decimal_fraction {
-    //     return format!("{}{}", number, decimals.get_right_padding_zeroes());
-    // }
-    //
-    // let separated: Vec<&str> = number.split_terminator('.').collect();
-    // let zeros_to_right_pad = decimals.get_decimals() - separated[1].len();
-    // if zeros_to_right_pad < 0 {
-    //     panic!("Too many decimal places")
-    // }
-    //
-    // let right_zeroes = "0".repeat(zeros_to_right_pad);
-    // let decimal_padded = &format!("{}{}", separated[1], right_zeroes);
-    //
-    // let is_below_zero = number.chars().nth(0).unwrap().to_string() == "0";
-    // if is_below_zero {
-    //     // take only decimal fraction and pad with zeros
-    //     return remove_left_zeroes(decimal_padded);
-    // }
-    //
-    // // take integer and decimal fraction and pad with zeros
-    // format!("{}{}", separated[0], decimal_padded)
-}
-
-fn remove_left_zeroes(raw_number: &str) -> String {
-    let mut number = raw_number.to_string();
-    while number.chars().nth(0).unwrap().to_string() == "0" {
-        number.remove(0);
-    }
-    number
 }
 
 pub fn human_to_proto(raw_number: &str, decimals: i32) -> String {
@@ -630,8 +590,8 @@ mod tests {
     #[test]
     fn it_converts_decimals_above_zero_with_max_precision_limit_of_18_to_dec() {
         let integer = "1.000000000000000001";
-        let mut decimals = Decimals::Eighteen;
-        let mut expected = FPDecimal::must_from_str("1000000000000000001");
+        let decimals = Decimals::Eighteen;
+        let expected = FPDecimal::must_from_str("1000000000000000001");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -652,8 +612,8 @@ mod tests {
     #[test]
     fn it_converts_decimals_above_zero_with_max_precision_limit_of_6_to_dec() {
         let integer = "1.000001";
-        let  decimals = Decimals::Six;
-        let mut expected = FPDecimal::must_from_str("1000001");
+        let decimals = Decimals::Six;
+        let expected = FPDecimal::must_from_str("1000001");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -696,8 +656,8 @@ mod tests {
     #[test]
     fn it_converts_decimals_below_zero_with_max_precision_limit_of_18_to_dec() {
         let integer = "0.000000000000000001";
-        let mut decimals = Decimals::Eighteen;
-        let mut expected = FPDecimal::must_from_str("1");
+        let decimals = Decimals::Eighteen;
+        let expected = FPDecimal::must_from_str("1");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -718,8 +678,8 @@ mod tests {
     #[test]
     fn it_converts_decimals_below_zero_with_max_precision_limit_of_6_to_dec() {
         let integer = "0.000001";
-        let mut decimals = Decimals::Six;
-        let mut expected = FPDecimal::must_from_str("1");
+        let decimals = Decimals::Six;
+        let expected = FPDecimal::must_from_str("1");
 
         let actual = human_to_dec(integer, &decimals);
         assert_eq!(
@@ -806,8 +766,8 @@ mod tests {
     #[test]
     fn it_converts_decimal_below_zero_with_18_decimals_with_max_precision_to_proto() {
         let number = "0.000000000000000001";
-        let mut decimals = Decimals::Eighteen;
-        let mut expected = "1000000000000000000";
+        let decimals = Decimals::Eighteen;
+        let expected = "1000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(
@@ -821,7 +781,7 @@ mod tests {
     fn it_panics_when_converting_decimal_below_zero_with_18_decimals_with_too_high_precision_to_proto(
     ) {
         let number = "0.0000000000000000001";
-        let mut decimals = Decimals::Eighteen;
+        let decimals = Decimals::Eighteen;
 
         human_to_proto(number, decimals.get_decimals());
     }
@@ -829,8 +789,8 @@ mod tests {
     #[test]
     fn it_converts_decimal_below_zero_with_6_decimals_with_max_precision_to_proto() {
         let number = "0.000001";
-        let mut decimals = Decimals::Six;
-        let mut expected = "1000000000000000000";
+        let decimals = Decimals::Six;
+        let expected = "1000000000000000000";
 
         let actual = human_to_proto(number, decimals.get_decimals());
         assert_eq!(

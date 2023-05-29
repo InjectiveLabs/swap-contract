@@ -1,20 +1,20 @@
-use cosmwasm_std::{coin, Addr};
 
-use injective_test_tube::RunnerError::{ExecuteError, QueryError};
+
+
 use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult, Wasm,
+    Account, Bank, Exchange, InjectiveTestApp, Module, Wasm,
 };
 
-use injective_math::{round_to_min_tick, FPDecimal};
+use injective_math::{FPDecimal};
 use injective_std::types::injective::exchange::v1beta1::{
     QuerySubaccountDepositsRequest, Subaccount,
 };
 
-use crate::msg::{ExecuteMsg, QueryMsg};
+use crate::msg::{ExecuteMsg};
 use crate::testing::test_utils::{
-    create_limit_order, create_realistic_limit_order, fund_account_with_some_inj, human_to_dec,
-    init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address,
-    launch_custom_spot_market, launch_spot_market, must_init_account_with_funds, pause_spot_market,
+    create_realistic_limit_order, human_to_dec,
+    init_contract_and_get_address,
+    launch_custom_spot_market, must_init_account_with_funds,
     query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals,
     OrderSide,
 };
@@ -54,10 +54,22 @@ fn happy_path_two_hops_swap_realistic_scales() {
     );
 
     // set the market
-    let spot_market_1_id =
-        launch_custom_spot_market(&exchange, &owner, ETH, USDT, "0.000000000000001000", "1000000000000000");
-    let spot_market_2_id =
-        launch_custom_spot_market(&exchange, &owner, ATOM, USDT, "0.001000000000000000", "1000.000000000000000000");
+    let spot_market_1_id = launch_custom_spot_market(
+        &exchange,
+        &owner,
+        ETH,
+        USDT,
+        "0.000000000000001000",
+        "1000000000000000",
+    );
+    let spot_market_2_id = launch_custom_spot_market(
+        &exchange,
+        &owner,
+        ATOM,
+        USDT,
+        "0.001000000000000000",
+        "1000.000000000000000000",
+    );
 
     let contr_addr =
         init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, &Decimals::Six)]);
