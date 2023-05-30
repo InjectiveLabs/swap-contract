@@ -5,11 +5,6 @@ use serde::{Deserialize, Serialize};
 use injective_cosmwasm::MarketId;
 use injective_math::FPDecimal;
 
-pub struct ExecutionPrice {
-    pub worst_price: FPDecimal,
-    pub average_price: FPDecimal,
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct FPCoin {
     pub amount: FPDecimal,
