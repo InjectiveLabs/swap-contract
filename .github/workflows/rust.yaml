@@ -54,12 +54,16 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Install cw-optimizoor
-        uses: actions-rs/install@v0.1
-        with:
-          crate: cw-optimizoor
-          version: latest
-          use-tool-cache: true
+      - name: Check if cw-optimize is installed
+        run: |
+          cargo cw-optimizoor --version || cargo install cw-optimizoor
+
+#      - name: Install cw-optimizoor
+#        uses: actions-rs/install@v0.1
+#        with:
+#          crate: cw-optimizoor
+#          version: latest
+#          use-tool-cache: true
 
       - name: Compile contracts
         run: |
