@@ -9,7 +9,7 @@ use injective_math::{round_to_min_tick, FPDecimal};
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    create_limit_order, init_contract_and_get_address,
+    create_limit_order, fund_account_with_some_inj, init_contract_and_get_address,
     init_contract_with_fee_recipient_and_get_address, init_default_signer_account,
     init_default_validator_account, init_rich_account, launch_spot_market,
     must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance,
@@ -18,8 +18,16 @@ use crate::testing::test_utils::{
     USDT,
 };
 
+/*
+   This suite of tests focuses on calculation logic itself and doesn't attempt to use neither
+   realistic market configuration nor order prices, so that we don't have to deal with scaling issues.
+
+   Hardcoded values used in these tests come from the first tab of this spreadsheet:
+   https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
+*/
+
 #[test]
-fn happy_path_two_hops_swap() {
+fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -148,7 +156,7 @@ fn happy_path_two_hops_swap() {
 }
 
 #[test]
-fn happy_path_two_hops_single_price_level_swap() {
+fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -276,7 +284,7 @@ fn happy_path_two_hops_single_price_level_swap() {
 }
 
 #[test]
-fn happy_path_three_hops_quote_conversion_swap() {
+fn it_executes_swap_between_markets_using_different_quote_assets() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -290,8 +298,14 @@ fn happy_path_three_hops_quote_conversion_swap() {
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDC);
     let spot_market_3_id = launch_spot_market(&exchange, &owner, USDC, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[
+            str_coin("100_000", USDC, Decimals::Six),
+            str_coin("100_000", USDT, Decimals::Six),
+        ],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -420,7 +434,166 @@ fn happy_path_three_hops_quote_conversion_swap() {
 }
 
 #[test]
-fn happy_path_simple_sell_swap() {
+fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buffer_is_insufficient()
+{
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+    let exchange = Exchange::new(&app);
+    let bank = Bank::new(&app);
+
+    let _signer = init_default_signer_account(&app);
+    let _validator = init_default_validator_account(&app);
+    let owner = init_rich_account(&app);
+
+    let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
+    let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDC);
+    let spot_market_3_id = launch_spot_market(&exchange, &owner, USDC, USDT);
+
+    let contr_addr = init_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[
+            str_coin("0.0001", USDC, Decimals::Six),
+            str_coin("100_000", USDT, Decimals::Six),
+        ],
+    );
+    set_route_and_assert_success(
+        &wasm,
+        &owner,
+        &contr_addr,
+        ETH,
+        ATOM,
+        vec![
+            spot_market_1_id.as_str().into(),
+            spot_market_3_id.as_str().into(),
+            spot_market_2_id.as_str().into(),
+        ],
+    );
+
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
+
+    //ETH-USDT
+    create_limit_order(
+        &app,
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        201_000,
+        5,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        195_000,
+        4,
+    );
+    create_limit_order(
+        &app,
+        &trader2,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        192_000,
+        3,
+    );
+
+    //ATOM-USDC
+    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
+    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
+    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
+    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+
+    //USDT-USDC
+    create_limit_order(
+        &app,
+        &trader3,
+        &spot_market_3_id,
+        OrderSide::Sell,
+        1,
+        100_000_000,
+    );
+
+    app.increase_time(1);
+
+    let swapper = must_init_account_with_funds(
+        &app,
+        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
+    );
+
+    let query_result: RunnerResult<FPDecimal> = wasm.query(
+        &contr_addr,
+        &QueryMsg::GetExecutionQuantity {
+            source_denom: ETH.to_string(),
+            to_denom: ATOM.to_string(),
+            from_quantity: FPDecimal::from(12u128),
+        },
+    );
+
+    assert!(query_result.is_err(), "swap should have failed");
+    assert!(
+        query_result
+            .unwrap_err()
+            .to_string()
+            .contains("Swap amount too high"),
+        "incorrect query result error message"
+    );
+
+    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
+    assert_eq!(
+        contract_balances_before.len(),
+        2,
+        "wrong number of denoms in contract balances"
+    );
+
+    let execute_result = wasm.execute(
+        &contr_addr,
+        &ExecuteMsg::Swap {
+            target_denom: ATOM.to_string(),
+            min_quantity: FPDecimal::from(2800u128),
+        },
+        &[coin(12, ETH)],
+        &swapper,
+    );
+
+    assert!(execute_result.is_err(), "swap should have failed");
+    assert!(
+        execute_result
+            .unwrap_err()
+            .to_string()
+            .contains("Swap amount too high"),
+        "incorrect query result error message"
+    );
+
+    let source_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
+    let target_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
+    assert_eq!(
+        source_balance,
+        FPDecimal::must_from_str("12"),
+        "source balance should not have changed after failed swap"
+    );
+    assert_eq!(
+        target_balance,
+        FPDecimal::zero(),
+        "target balance should not have changed after failed swap"
+    );
+
+    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
+    assert_eq!(
+        contract_balances_after.len(),
+        2,
+        "wrong number of denoms in contract balances"
+    );
+    assert_eq!(
+        contract_balances_after, contract_balances_before,
+        "contract balance has changed after swap"
+    );
+}
+
+#[test]
+fn it_executes_a_sell_of_base_asset() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -549,7 +722,7 @@ fn happy_path_simple_sell_swap() {
 }
 
 #[test]
-fn happy_path_simple_buy_swap() {
+fn it_executes_a_buy_of_base_asset() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -699,7 +872,7 @@ fn happy_path_simple_buy_swap() {
 }
 
 #[test]
-fn happy_path_external_fee_receiver() {
+fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -873,7 +1046,7 @@ fn happy_path_external_fee_receiver() {
 }
 
 #[test]
-fn not_enough_buffer() {
+fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -887,7 +1060,7 @@ fn not_enough_buffer() {
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
     let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100", USDT, Decimals::Six)]);
+        init_contract_and_get_address(&wasm, &owner, &[str_coin("0.001", USDT, Decimals::Six)]);
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -949,12 +1122,14 @@ fn not_enough_buffer() {
             from_quantity: FPDecimal::from(12u128),
         },
     );
-    assert_eq!(
-        query_result.unwrap_err(),
-        RunnerError::QueryError {
-            msg: "Generic error: Swap amount too high: query wasm contract failed".to_string()
-        },
-        "wrong error message"
+
+    assert!(query_result.is_err(), "query should fail");
+    assert!(
+        query_result
+            .unwrap_err()
+            .to_string()
+            .contains("Swap amount too high"),
+        "wrong query error message"
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, contr_addr.as_str());
@@ -973,11 +1148,14 @@ fn not_enough_buffer() {
         &[coin(12, ETH)],
         &swapper,
     );
-    let expected_error = RunnerError::ExecuteError { msg: "failed to execute message; message index: 0: dispatch: submessages: reply: Generic error: Swap amount too high: execute wasm contract failed".to_string() };
-    assert_eq!(
-        execute_result.unwrap_err(),
-        expected_error,
-        "wrong error message"
+
+    assert!(execute_result.is_err(), "execute should fail");
+    assert!(
+        execute_result
+            .unwrap_err()
+            .to_string()
+            .contains("Swap amount too high"),
+        "wrong execute error message"
     );
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
@@ -987,7 +1165,11 @@ fn not_enough_buffer() {
         FPDecimal::from(12u128),
         "source balance changes after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "target balance changes after failed swap");
+    assert_eq!(
+        to_balance,
+        FPDecimal::zero(),
+        "target balance changes after failed swap"
+    );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
@@ -1002,7 +1184,7 @@ fn not_enough_buffer() {
 }
 
 #[test]
-fn no_funds_passed() {
+fn it_reverts_swap_if_no_funds_were_passed() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1065,7 +1247,11 @@ fn no_funds_passed() {
         FPDecimal::from(12u128),
         "source balance changes after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "target balance changes after failed swap");
+    assert_eq!(
+        to_balance,
+        FPDecimal::zero(),
+        "target balance changes after failed swap"
+    );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
 
@@ -1081,7 +1267,7 @@ fn no_funds_passed() {
 }
 
 #[test]
-fn multiple_fund_denoms_passed() {
+fn it_reverts_swap_if_multiple_funds_were_passed() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1170,7 +1356,7 @@ fn multiple_fund_denoms_passed() {
 }
 
 #[test]
-fn zero_minimum_amount_to_receive() {
+fn it_reverts_if_user_passes_quantities_equal_to_zero() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1250,7 +1436,7 @@ fn zero_minimum_amount_to_receive() {
         query_result
             .unwrap_err()
             .to_string()
-            .contains("Generic error: from_quantity must be positive: query wasm contract failed"),
+            .contains("from_quantity must be positive"),
         "incorrect error returned by query"
     );
 
@@ -1304,7 +1490,7 @@ fn zero_minimum_amount_to_receive() {
 }
 
 #[test]
-fn negative_minimum_amount_to_receive() {
+fn it_reverts_if_user_passes_negative_quantities() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1420,7 +1606,7 @@ fn negative_minimum_amount_to_receive() {
 }
 
 #[test]
-fn not_enough_orders_to_satisfy_min_quantity() {
+fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1531,7 +1717,11 @@ fn not_enough_orders_to_satisfy_min_quantity() {
         FPDecimal::from(12u128),
         "source balance changed after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "target balance changed after failed swap");
+    assert_eq!(
+        to_balance,
+        FPDecimal::zero(),
+        "target balance changed after failed swap"
+    );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
@@ -1546,7 +1736,7 @@ fn not_enough_orders_to_satisfy_min_quantity() {
 }
 
 #[test]
-fn min_quantity_cannot_be_reached() {
+fn it_reverts_if_min_quantity_cannot_be_reached() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1661,7 +1851,7 @@ fn min_quantity_cannot_be_reached() {
 }
 
 #[test]
-fn no_known_route_exists() {
+fn it_reverts_if_no_known_route_exists() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1765,7 +1955,11 @@ fn no_known_route_exists() {
         FPDecimal::from(12u128),
         "target balance changes after failed swap"
     );
-    assert_eq!(to_balance, FPDecimal::zero(), "source balance changes after failed swap");
+    assert_eq!(
+        to_balance,
+        FPDecimal::zero(),
+        "source balance changes after failed swap"
+    );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
     assert_eq!(
@@ -1780,7 +1974,7 @@ fn no_known_route_exists() {
 }
 
 #[test]
-fn route_exists_but_market_does_not() {
+fn it_reverts_if_route_exists_but_market_does_not() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1906,7 +2100,7 @@ fn route_exists_but_market_does_not() {
 }
 
 #[test]
-fn paused_market() {
+fn it_reverts_if_market_is_paused() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1915,6 +2109,7 @@ fn paused_market() {
 
     let signer = init_default_signer_account(&app);
     let validator = init_default_validator_account(&app);
+    fund_account_with_some_inj(&bank, &signer, &validator);
     let owner = init_rich_account(&app);
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
@@ -2009,7 +2204,7 @@ fn paused_market() {
 }
 
 #[test]
-fn insufficient_gas() {
+fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -2134,7 +2329,7 @@ fn insufficient_gas() {
 }
 
 #[test]
-fn admin_can_withdraw_all_funds_from_contract_to_his_address() {
+fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
@@ -2195,7 +2390,7 @@ fn admin_can_withdraw_all_funds_from_contract_to_his_address() {
 }
 
 #[test]
-fn admin_can_withdraw_all_funds_from_contract_to_other_address() {
+fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
@@ -2258,7 +2453,7 @@ fn admin_can_withdraw_all_funds_from_contract_to_other_address() {
 }
 
 #[test]
-fn non_admin_cannot_withdraw_jack_shit_from_contract() {
+fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);

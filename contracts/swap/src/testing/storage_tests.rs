@@ -10,7 +10,7 @@ use crate::testing::test_utils::{TEST_CONTRACT_ADDR, TEST_USER_ADDR};
 use crate::types::{Config, SwapRoute};
 
 #[test]
-fn store_and_read_swap_route() {
+fn it_can_store_and_read_swap_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "foo";
     let quote_denom = "bar";
@@ -38,7 +38,7 @@ fn store_and_read_swap_route() {
 }
 
 #[test]
-fn update_and_read_swap_route() {
+fn it_can_update_and_read_swap_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "foo";
     let quote_denom = "bar";
@@ -73,7 +73,7 @@ fn update_and_read_swap_route() {
 }
 
 #[test]
-fn test_set_route_as_owner() {
+fn owner_can_set_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "inj".to_string();
@@ -123,7 +123,7 @@ fn test_set_route_as_owner() {
 }
 
 #[test]
-fn test_set_route_single_step_route() {
+fn it_can_set_route_single_step_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "usd".to_string();
@@ -170,7 +170,7 @@ fn test_set_route_single_step_route() {
 }
 
 #[test]
-fn test_set_route_same_denom() {
+fn it_retuns_error_when_setting_route_for_the_same_denom_as_target_and_source() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "eth".to_string();
@@ -216,7 +216,7 @@ fn test_set_route_same_denom() {
 }
 
 #[test]
-fn test_set_route_no_market_id() {
+fn it_returns_error_when_setting_route_with_no_market_ids() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "atom".to_string();
@@ -256,7 +256,7 @@ fn test_set_route_no_market_id() {
 }
 
 #[test]
-fn test_set_route_same_market_id() {
+fn it_returns_error_when_setting_route_with_duplicated_market_ids() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "ATOM".to_string();
@@ -302,7 +302,7 @@ fn test_set_route_same_market_id() {
 }
 
 #[test]
-fn test_set_route_as_unauthorised() {
+fn it_returns_error_if_non_admin_tries_to_set_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "inj".to_string();
@@ -343,7 +343,7 @@ fn test_set_route_as_unauthorised() {
 }
 
 #[test]
-fn test_delete_existing_route_as_admin() {
+fn it_allows_admint_to_delete_existing_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "inj".to_string();
@@ -389,7 +389,7 @@ fn test_delete_existing_route_as_admin() {
 }
 
 #[test]
-fn test_delete_non_existent_route_as_admin() {
+fn it_doesnt_fail_if_admin_deletes_non_existent_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "inj".to_string();
@@ -430,7 +430,7 @@ fn test_delete_non_existent_route_as_admin() {
 }
 
 #[test]
-fn test_delete_route_as_unauthorised() {
+fn it_returns_error_if_non_admin_tries_to_delete_route() {
     let mut deps = inj_mock_deps(|_| {});
     let base_denom = "eth".to_string();
     let quote_denom = "inj".to_string();

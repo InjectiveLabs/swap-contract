@@ -49,18 +49,14 @@ pub const DEFAULT_RELAYER_SHARE: f64 = 1.0 - DEFAULT_SELF_RELAYING_FEE_PART;
 #[repr(i32)]
 pub enum Decimals {
     Eighteen = 18,
-    Twelve = 12,
     Six = 6,
-    Zero = 0,
 }
 
 impl Decimals {
     pub fn get_decimals(&self) -> i32 {
         match self {
             Decimals::Eighteen => 18,
-            Decimals::Twelve => 12,
             Decimals::Six => 6,
-            Decimals::Zero => 0,
         }
     }
 }
@@ -313,10 +309,6 @@ pub fn create_realistic_limit_order(
 ) {
     let (price_to_send, quantity_to_send) =
         scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
-    println!(
-        "price_to_send: {}, quantity_to_send: {}",
-        price_to_send, quantity_to_send
-    );
 
     let exchange = Exchange::new(app);
     exchange

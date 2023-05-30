@@ -4,7 +4,6 @@ use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
 };
 use cw2::set_contract_version;
-use protobuf::Message;
 
 use crate::admin::{delete_route, save_config, set_route, update_config, withdraw_support_funds};
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper};

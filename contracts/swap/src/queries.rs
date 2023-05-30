@@ -2,11 +2,11 @@ use cosmwasm_std::{Addr, Deps, Env, StdError, StdResult};
 use injective_cosmwasm::{
     InjectiveQuerier, InjectiveQueryWrapper, MarketId, OrderSide, PriceLevel, SpotMarket,
 };
-use injective_math::FPDecimal;
 use injective_math::utils::round_to_min_tick;
+use injective_math::FPDecimal;
 
 use crate::helpers::{counter_denom, Scaled};
-use crate::state::{CONFIG, read_swap_route};
+use crate::state::{read_swap_route, CONFIG};
 use crate::types::{FPCoin, StepExecutionEstimate};
 
 pub fn estimate_swap_result(
@@ -165,11 +165,14 @@ fn estimate_execution_buy(
     };
     deps.api.debug(&format!(
         "estimate_execution_buy: required_funds: {}, funds_in_contract: {}, available_funds: {}: diff: {}, funds_for_margin: {}",
-        required_funds, funds_in_contract, available_funds, funds_in_contract - required_funds, funds_for_margin
+        required_funds, funds_in_contract, available_funds, if !is_simulation { funds_in_contract - required_funds} else { funds_in_contract + available_funds - required_funds}, funds_for_margin
     ));
 
     if required_funds > funds_for_margin {
-        Err(StdError::generic_err(format!("Swap amount too high, required funds: {}, available funds: {}", required_funds, funds_for_margin)))
+        Err(StdError::generic_err(format!(
+            "Swap amount too high, required funds: {}, available funds: {}",
+            required_funds, funds_for_margin
+        )))
     } else {
         Ok((expected_quantity, worst_price))
     }
