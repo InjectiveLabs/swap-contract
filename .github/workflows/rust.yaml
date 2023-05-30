@@ -62,9 +62,9 @@ jobs:
           ./grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./target/debug/lcov.info --ignore *_test.rs
 
       - name: Serve lcov coverage info
-        uses: romeovs/lcov-reporter-action@v0.2.16
+        uses: romeovs/lcov-reporter-action@v0.3.1
         with:
-          lcov-file: .swap-contract/target/debug/lcov.info
+          lcov-file: ./target/debug/lcov.info
 
 #  lints:
 #    name: Lints
