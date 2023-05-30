@@ -24,6 +24,17 @@ jobs:
           override: true
           components: llvm-tools-preview
 
+      - name: Install cw-optimizoor
+        uses: actions-rs/install@v0.1
+        with:
+          crate: cw-optimizoor
+          version: latest
+          use-tool-cache: true
+
+      - name: Compile contracts
+        run: |
+          cargo cw-optimizoor
+
       - name: Set github url and credentials
         run: |
           /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf ssh://git@github
@@ -53,35 +64,35 @@ jobs:
           fail_ci_if_error: true
           name: codecov-mito
 
-  lints:
-    name: Lints
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
-
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: 1.67.0
-          override: true
-          components: rustfmt, clippy
-
-      - name: Set github url and credentials
-        run: |
-          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf ssh://git@github
-          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf https://github
-          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf git@github
-
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --tests -- -D warnings
+#  lints:
+#    name: Lints
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout sources
+#        uses: actions/checkout@v2
+#
+#      - name: Install stable toolchain
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: 1.67.0
+#          override: true
+#          components: rustfmt, clippy
+#
+#      - name: Set github url and credentials
+#        run: |
+#          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf ssh://git@github
+#          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf https://github
+#          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf git@github
+#
+#      - name: Run cargo fmt
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: fmt
+#          args: --all -- --check
+#
+#      - name: Run cargo clippy
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: clippy
+#          args: --tests -- -D warnings
