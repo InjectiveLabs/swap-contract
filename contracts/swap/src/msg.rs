@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use injective_cosmwasm::MarketId;
 use injective_math::FPDecimal;
 
+#[serde(rename_all = "snake_case")]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum FeeRecipient {
     Address(Addr),
