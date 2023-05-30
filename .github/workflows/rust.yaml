@@ -30,6 +30,10 @@ jobs:
           override: true
           components: llvm-tools-preview
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "false"
+
       - name: Install cw-optimizoor
         uses: actions-rs/install@v0.1
         with:
@@ -60,7 +64,7 @@ jobs:
       - name: Serve lcov coverage info
         uses: romeovs/lcov-reporter-action@v0.2.16
         with:
-          lcov-file: ./target/debug/lcov.info
+          lcov-file: .swap-contract/target/debug/lcov.info
 
 #  lints:
 #    name: Lints
