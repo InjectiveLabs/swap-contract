@@ -33,14 +33,10 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2022-09-19
+          toolchain: 1.67.0
           target: wasm32-unknown-unknown
           override: true
           components: llvm-tools-preview
-
-#      - uses: Swatinem/rust-cache@v2
-#        with:
-#          cache-targets: "true"
 
       - name: Set up cargo cache
         uses: actions/cache@v3
@@ -58,13 +54,6 @@ jobs:
         run: |
           cargo cw-optimizoor --version || cargo install cw-optimizoor
 
-#      - name: Install cw-optimizoor
-#        uses: actions-rs/install@v0.1
-#        with:
-#          crate: cw-optimizoor
-#          version: latest
-#          use-tool-cache: true
-
       - name: Compile contracts
         run: |
           cargo cw-optimizoor
@@ -76,7 +65,7 @@ jobs:
           toolchain: nightly-2022-09-19
           args: --locked --tests
         env:
-          LLVM_PROFILE_FILE: "mito-contracts-%p-%m.profraw"
+          LLVM_PROFILE_FILE: "swap-converter-%p-%m.profraw"
           RUSTFLAGS: "-Cinstrument-coverage"
           RUST_BACKTRACE: 1
 
@@ -97,40 +86,47 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v2
 
-#      - name: Serve lcov coverage info
-#        uses: romeovs/lcov-reporter-action@v0.3.1
-#        with:
-#          lcov-file: ./target/debug/lcov.info
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
 
-#  lints:
-#    name: Lints
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Checkout sources
-#        uses: actions/checkout@v2
-#
-#      - name: Install stable toolchain
-#        uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: 1.67.0
-#          override: true
-#          components: rustfmt, clippy
-#
-#      - name: Set github url and credentials
-#        run: |
-#          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf ssh://git@github
-#          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf https://github
-#          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf git@github
-#
-#      - name: Run cargo fmt
-#        uses: actions-rs/cargo@v1
-#        with:
-#          command: fmt
-#          args: --all -- --check
-#
-#      - name: Run cargo clippy
-#        uses: actions-rs/cargo@v1
-#        with:
-#          command: clippy
-#          args: --tests -- -D warnings
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.67.0
+          override: true
+          components: rustfmt, clippy
+
+      - name: Set up cargo cache
+        uses: actions/cache@v3
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Set github url and credentials
+        run: |
+          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf ssh://git@github
+          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf https://github
+          /usr/bin/git config --global --add url."https://${{ secrets.ACCESS_TOKEN }}:x-oauth-basic@github".insteadOf git@github
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --tests -- -D warnings
