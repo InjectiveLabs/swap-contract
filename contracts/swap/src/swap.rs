@@ -156,7 +156,7 @@ pub fn handle_atomic_order_reply(
         denom: current_step.step_target_denom,
     };
 
-    deps.api.debug(&format!("New balance: {:?}", new_balance));
+    deps.api.debug(&format!("New balance: {new_balance:?}"));
 
     let swap = SWAP_OPERATION_STATE.load(deps.storage)?;
     if current_step.step_idx < (swap.swap_steps.len() - 1) as u16 {
@@ -173,7 +173,7 @@ pub fn handle_atomic_order_reply(
             to_address: swap.sender_address.to_string(),
             amount: vec![new_balance.clone().into()],
         };
-        deps.api.debug(&format!("Send message: {:?}", send_message));
+        deps.api.debug(&format!("Send message: {send_message:?}"));
         SWAP_OPERATION_STATE.remove(deps.storage);
         STEP_STATE.remove(deps.storage);
         let response = Response::new()

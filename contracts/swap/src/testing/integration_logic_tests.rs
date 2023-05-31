@@ -100,7 +100,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
-                to_denom: ATOM.to_string(),
+                target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
             },
         )
@@ -230,7 +230,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
-                to_denom: ATOM.to_string(),
+                target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(3u128),
             },
         )
@@ -377,7 +377,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
-                to_denom: ATOM.to_string(),
+                target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
             },
         )
@@ -527,7 +527,7 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
@@ -655,7 +655,7 @@ fn it_executes_a_sell_of_base_asset() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: USDT.to_string(),
+            target_denom: USDT.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
@@ -812,7 +812,7 @@ fn it_executes_a_buy_of_base_asset() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: USDT.to_string(),
-            to_denom: ETH.to_string(),
+            target_denom: ETH.to_string(),
             from_quantity: FPDecimal::from(swapper_usdt),
         },
     );
@@ -974,7 +974,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
-                to_denom: ATOM.to_string(),
+                target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
             },
         )
@@ -1118,7 +1118,7 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
@@ -1428,7 +1428,7 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(0u128),
         },
     );
@@ -1678,7 +1678,7 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
@@ -1923,7 +1923,7 @@ fn it_reverts_if_no_known_route_exists() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
@@ -2037,7 +2037,7 @@ fn it_reverts_if_route_exists_but_market_does_not() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
@@ -2140,7 +2140,7 @@ fn it_reverts_if_market_is_paused() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
@@ -2273,7 +2273,7 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );

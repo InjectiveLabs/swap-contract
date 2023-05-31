@@ -62,7 +62,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: unit-test
-          toolchain: nightly-2022-09-19
+          toolchain: 1.67.0
           args: --locked --tests
         env:
           LLVM_PROFILE_FILE: "swap-converter-%p-%m.profraw"

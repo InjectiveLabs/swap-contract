@@ -167,7 +167,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
-                to_denom: ATOM.to_string(),
+                target_denom: ATOM.to_string(),
                 from_quantity: human_to_dec("12", Decimals::Eighteen),
             },
         )
@@ -392,7 +392,7 @@ fn happy_path_two_hops_swap_realistic_values() {
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
-                to_denom: ATOM.to_string(),
+                target_denom: ATOM.to_string(),
                 from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),
             },
         )
@@ -831,7 +831,7 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
                 source_denom: ETH.to_string(),
-                to_denom: ATOM.to_string(),
+                target_denom: ATOM.to_string(),
                 from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),
             },
         )
@@ -1276,7 +1276,7 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
-            to_denom: ATOM.to_string(),
+            target_denom: ATOM.to_string(),
             from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),
         },
     );

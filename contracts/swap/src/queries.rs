@@ -90,7 +90,7 @@ pub fn estimate_single_swap_execution(
             "Invalid swap denom - neither base nor quote",
         ));
     };
-    deps.api.debug(&format!("Is buy: {}", is_buy));
+    deps.api.debug(&format!("Is buy: {is_buy}"));
 
     let (expected_quantity, worst_price) = if is_buy {
         estimate_execution_buy(
@@ -170,8 +170,7 @@ fn estimate_execution_buy(
 
     if required_funds > funds_for_margin {
         Err(StdError::generic_err(format!(
-            "Swap amount too high, required funds: {}, available funds: {}",
-            required_funds, funds_for_margin
+            "Swap amount too high, required funds: {required_funds}, available funds: {funds_for_margin}",
         )))
     } else {
         Ok((expected_quantity, worst_price))
@@ -220,7 +219,7 @@ pub fn find_minimum_orders(
 ) -> StdResult<Vec<PriceLevel>> {
     deps.api
         .debug(&format!("find_minimum_orders, total: {total}"));
-    deps.api.debug(&format!("levels: {:?}", levels));
+    deps.api.debug(&format!("levels: {levels:?}",));
     let mut sum = FPDecimal::zero();
     let mut orders: Vec<PriceLevel> = Vec::new();
     for level in levels {

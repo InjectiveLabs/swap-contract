@@ -94,7 +94,7 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
         QueryMsg::GetExecutionQuantity {
             from_quantity,
             source_denom,
-            to_denom,
+            target_denom: to_denom,
         } => {
             let target_quantity =
                 estimate_swap_result(deps, env, source_denom, from_quantity, to_denom)?;

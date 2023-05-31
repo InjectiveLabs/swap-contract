@@ -54,6 +54,6 @@ pub enum QueryMsg {
     GetExecutionQuantity {
         from_quantity: FPDecimal,
         source_denom: String,
-        to_denom: String,
+        target_denom: String,
     },
 }

@@ -21,8 +21,7 @@ pub fn read_swap_route(
     let key = route_key(source_denom, target_denom);
     SWAP_ROUTES.load(storage, key).map_err(|_| {
         StdError::generic_err(format!(
-            "No swap route not found from {} to {}",
-            source_denom, target_denom
+            "No swap route not found from {source_denom} to {target_denom}",
         ))
     })
 }

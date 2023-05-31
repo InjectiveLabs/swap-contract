@@ -176,7 +176,7 @@ pub fn launch_spot_market(
     base: &str,
     quote: &str,
 ) -> String {
-    let ticker = format!("{}/{}", base, quote);
+    let ticker = format!("{base}/{quote}");
     exchange
         .instant_spot_market_launch(
             MsgInstantSpotMarketLaunch {
@@ -202,7 +202,7 @@ pub fn launch_custom_spot_market(
     min_price_tick_size: &str,
     min_quantity_tick_size: &str,
 ) -> String {
-    let ticker = format!("{}/{}", base, quote);
+    let ticker = format!("{base}/{quote}");
     exchange
         .instant_spot_market_launch(
             MsgInstantSpotMarketLaunch {
@@ -261,8 +261,8 @@ pub fn create_limit_order(
                         )
                         .to_string(),
                         fee_recipient: trader.address(),
-                        price: format!("{}000000000000000000", price),
-                        quantity: format!("{}000000000000000000", quantity),
+                        price: format!("{price}000000000000000000"),
+                        quantity: format!("{quantity}000000000000000000"),
                     }),
                     order_type: if order_side == OrderSide::Buy {
                         OrderType::BuyAtomic.into()
@@ -472,7 +472,7 @@ pub fn pass_spot_market_params_update_proposal(
     let mut buf = vec![];
     exchange::v1beta1::SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
 
-    println!("submitting proposal: {:?}", proposal);
+    println!("submitting proposal: {proposal:?}");
     let submit_response = gov.submit_proposal(
         MsgSubmitProposal {
             content: Some(Any {
@@ -491,7 +491,7 @@ pub fn pass_spot_market_params_update_proposal(
     assert!(submit_response.is_ok(), "failed to submit proposal");
 
     let proposal_id = submit_response.unwrap().data.proposal_id;
-    println!("voting on proposal: {:?}", proposal_id);
+    println!("voting on proposal: {proposal_id:?}");
     let vote_response = gov.vote(
         MsgVote {
             proposal_id,
