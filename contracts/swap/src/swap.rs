@@ -37,14 +37,15 @@ pub fn start_swap_flow(
         });
     }
 
-    let coin_provided = info.funds[0].clone();
-    let source_denom = coin_provided.denom.clone();
-    let route = read_swap_route(deps.storage, &source_denom, &target_denom)?;
-    let steps = route.steps_from(&source_denom);
+    let sender_address = info.sender;
+    let coin_provided = &info.funds[0];
+    let source_denom = &coin_provided.denom;
+    let route = read_swap_route(deps.storage, source_denom, &target_denom)?;
+    let steps = route.steps_from(source_denom);
 
-    let current_balance: FPCoin = coin_provided.into();
+    let current_balance: FPCoin = coin_provided.to_owned().into();
     let swap_operation = CurrentSwapOperation {
-        sender_address: info.sender,
+        sender_address,
         swap_steps: steps,
         min_target_quantity,
     };

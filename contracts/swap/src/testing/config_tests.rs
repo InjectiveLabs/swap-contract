@@ -40,6 +40,24 @@ pub fn admin_can_update_config() {
         config.fee_recipient, new_fee_recipient,
         "fee_recipient was not updated"
     );
+
+    res.events
+        .iter()
+        .find(|e| e.ty == "config_updated")
+        .expect("update_config event expected")
+        .attributes
+        .iter()
+        .find(|a| a.key == "admin" && a.value == new_admin)
+        .expect("admin attribute expected");
+
+    res.events
+        .iter()
+        .find(|e| e.ty == "config_updated")
+        .expect("update_config event expected")
+        .attributes
+        .iter()
+        .find(|a| a.key == "fee_recipient" && a.value == new_fee_recipient)
+        .expect("fee_recipient attribute expected");
 }
 
 #[test]

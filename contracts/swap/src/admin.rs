@@ -2,7 +2,9 @@ use crate::msg::FeeRecipient;
 use crate::state::{remove_swap_route, store_swap_route, CONFIG};
 use crate::types::{Config, SwapRoute};
 use crate::ContractError;
-use cosmwasm_std::{Addr, BankMsg, Coin, Deps, DepsMut, Env, Response, StdResult};
+use cosmwasm_std::{
+    ensure_eq, Addr, Attribute, BankMsg, Coin, Deps, DepsMut, Env, Event, Response, StdResult,
+};
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper, MarketId};
 use std::collections::HashSet;
 
@@ -28,11 +30,8 @@ pub fn verify_sender_is_admin(
     sender: &Addr,
 ) -> Result<(), ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    if config.admin != sender {
-        Err(ContractError::Unauthorized {})
-    } else {
-        Ok(())
-    }
+    ensure_eq!(&config.admin, sender, ContractError::Unauthorized {});
+    Ok(())
 }
 
 pub fn update_config(
@@ -44,17 +43,26 @@ pub fn update_config(
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     verify_sender_is_admin(deps.as_ref(), &sender)?;
     let mut config = CONFIG.load(deps.storage)?;
+    let mut updated_config_event_attrs: Vec<Attribute> = Vec::new();
     if let Some(admin) = admin {
-        config.admin = admin;
+        config.admin = admin.clone();
+        updated_config_event_attrs.push(Attribute::new("admin", admin.to_string()));
     }
     if let Some(fee_recipient) = fee_recipient {
         config.fee_recipient = match fee_recipient {
             FeeRecipient::Address(addr) => addr,
             FeeRecipient::SwapContract => env.contract.address,
         };
+        updated_config_event_attrs.push(Attribute::new(
+            "fee_recipient",
+            config.fee_recipient.to_string(),
+        ));
     }
     CONFIG.save(deps.storage, &config)?;
-    Ok(Response::new().add_attribute("method", "update_config"))
+
+    Ok(Response::new()
+        .add_attribute("method", "update_config")
+        .add_event(Event::new("config_updated").add_attributes(updated_config_event_attrs)))
 }
 
 pub fn withdraw_support_funds(
@@ -125,7 +133,6 @@ pub fn delete_route(
     target_denom: String,
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     verify_sender_is_admin(deps.as_ref(), sender)?;
-
     remove_swap_route(deps.storage, &source_denom, &target_denom);
 
     Ok(Response::new().add_attribute("method", "delete_route"))

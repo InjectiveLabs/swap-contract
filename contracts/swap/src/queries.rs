@@ -29,13 +29,13 @@ pub fn estimate_swap_result(
         let cur_swap = current_swap.clone();
         let swap_estimate = estimate_single_swap_execution(&deps, &env, &step, current_swap, true)?;
         let new_amount = swap_estimate.result_quantity;
-        println!(
+        deps.api.debug(&format!(
             "Exchanged {}{} into {}{}",
             &cur_swap.amount,
             &cur_swap.denom,
             &swap_estimate.result_quantity,
             &swap_estimate.result_denom
-        );
+        ));
         current_swap = FPCoin {
             amount: new_amount,
             denom: swap_estimate.result_denom,
