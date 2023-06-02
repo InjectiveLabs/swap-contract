@@ -247,15 +247,6 @@ fn estimate_execution_sell(
             amount: expected_fee,
         }),
     })
-
-    // Ok(EstimationResult {
-    //     worst_price,
-    //     result_quantity: expected_quantity,
-    //     fee: FPCoin {
-    //         amount: expected_fee,
-    //         denom: market.quote_denom.clone(),
-    //     },
-    // })
 }
 
 pub fn find_minimum_orders(
