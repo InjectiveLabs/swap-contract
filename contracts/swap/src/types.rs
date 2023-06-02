@@ -26,7 +26,7 @@ impl From<Coin> for FPCoin {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct StepExecutionEstimate {
     pub worst_price: FPDecimal,
     pub result_denom: String,
@@ -90,12 +90,4 @@ pub struct SwapStep {
 pub struct SwapEstimationResult {
     pub target_quantity: FPDecimal,
     pub fees: Vec<FPCoin>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct EstimationResult {
-    pub worst_price: FPDecimal,
-    pub result_quantity: FPDecimal,
-    pub fee: FPCoin,
 }

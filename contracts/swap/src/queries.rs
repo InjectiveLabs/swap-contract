@@ -7,7 +7,7 @@ use injective_math::FPDecimal;
 
 use crate::helpers::{counter_denom, Scaled};
 use crate::state::{read_swap_route, CONFIG};
-use crate::types::{EstimationResult, FPCoin, StepExecutionEstimate, SwapEstimationResult};
+use crate::types::{FPCoin, StepExecutionEstimate, SwapEstimationResult};
 
 pub fn estimate_swap_result(
     deps: Deps<InjectiveQueryWrapper>,
@@ -120,44 +120,28 @@ pub fn estimate_single_swap_execution(
             deps,
             &env.contract.address,
             &market,
-            balance_in.amount,
+            balance_in,
             fee_percent,
             is_simulation,
         )?
     } else {
-        estimate_execution_sell(deps, &querier, &market, balance_in.amount, fee_percent)?
+        estimate_execution_sell(deps, &querier, &market, balance_in, fee_percent)?
     };
-    let rounded = round_to_min_tick(
-        execution_estimate.result_quantity,
-        if is_buy {
-            market.min_quantity_tick_size
-        } else {
-            market.min_price_tick_size
-        },
-    );
-
-    let new_denom = counter_denom(&market, &balance_in.denom)?;
-    Ok(StepExecutionEstimate {
-        worst_price: execution_estimate.worst_price,
-        result_denom: new_denom.to_string(),
-        result_quantity: rounded,
-        is_buy_order: is_buy,
-        fee_estimate: Some(execution_estimate.fee),
-    })
+    Ok(execution_estimate)
 }
 
 fn estimate_execution_buy(
     deps: &Deps<InjectiveQueryWrapper>,
     contract_address: &Addr,
     market: &SpotMarket,
-    amount: FPDecimal,
+    amount_coin: FPCoin,
     fee_percent: FPDecimal,
     is_simulation: bool,
-) -> StdResult<EstimationResult> {
+) -> StdResult<StepExecutionEstimate> {
     let inj_querier = InjectiveQuerier::new(&deps.querier);
-    let available_funds = amount / (FPDecimal::one() + fee_percent); // keep reserve for fee
-    let fee_estimate = amount - available_funds;
-    deps.api.debug(&format!("estimate_execution_buy: fee percent: {fee_percent}, To change: {amount}, available (after fee): {available_funds}, fee: {fee_estimate}"));
+    let available_funds = amount_coin.amount / (FPDecimal::one() + fee_percent); // keep reserve for fee
+    let fee_estimate = amount_coin.amount - available_funds;
+    deps.api.debug(&format!("estimate_execution_buy: fee percent: {fee_percent}, To change: {}, available (after fee): {available_funds}, fee: {fee_estimate}", amount_coin.amount));
     let top_orders = find_minimum_orders(
         deps,
         &inj_querier
@@ -198,13 +182,15 @@ fn estimate_execution_buy(
             "Swap amount too high, required funds: {required_funds}, available funds: {funds_for_margin}",
         )))
     } else {
-        Ok(EstimationResult {
+        Ok(StepExecutionEstimate {
             worst_price,
-            result_quantity: expected_quantity,
-            fee: FPCoin {
+            result_quantity: round_to_min_tick(expected_quantity, market.min_quantity_tick_size),
+            result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
+            is_buy_order: true,
+            fee_estimate: Some(FPCoin {
                 denom: market.quote_denom.clone(),
                 amount: fee_estimate,
-            },
+            }),
         })
     }
 }
@@ -213,16 +199,17 @@ fn estimate_execution_sell(
     deps: &Deps<InjectiveQueryWrapper>,
     querier: &InjectiveQuerier,
     market: &SpotMarket,
-    amount: FPDecimal,
-    fee: FPDecimal,
-) -> StdResult<EstimationResult> {
+    amount_coin: FPCoin,
+    fee_percent: FPDecimal,
+) -> StdResult<StepExecutionEstimate> {
     deps.api.debug(&format!(
-        "estimate_execution_sell: total: {amount}, will call query now"
+        "estimate_execution_sell: total: {}, will call query now",
+        amount_coin.amount
     ));
     let orders = &querier.query_spot_market_orderbook(
         &market.market_id,
         OrderSide::Buy,
-        Some(amount),
+        Some(amount_coin.amount),
         None,
     )?;
     deps.api.debug(&format!(
@@ -233,26 +220,42 @@ fn estimate_execution_sell(
     let top_orders = find_minimum_orders(
         deps,
         &querier
-            .query_spot_market_orderbook(&market.market_id, OrderSide::Buy, Some(amount), None)?
+            .query_spot_market_orderbook(
+                &market.market_id,
+                OrderSide::Buy,
+                Some(amount_coin.amount),
+                None,
+            )?
             .buys_price_level,
-        amount,
+        amount_coin.amount,
         |l| l.q,
     )?;
     let avg_price = avg_price(&top_orders);
-    let expected_exchange_quantity = amount * avg_price;
-    let expected_fee = expected_exchange_quantity * fee;
+    let expected_exchange_quantity = amount_coin.amount * avg_price;
+    let expected_fee = expected_exchange_quantity * fee_percent;
     let expected_quantity = expected_exchange_quantity - expected_fee;
     deps.api.debug(&format!("Sell exchange: {expected_exchange_quantity}, fee: {expected_fee}, total: {expected_quantity}"));
     let worst_price = worst_price(&top_orders);
 
-    Ok(EstimationResult {
+    Ok(StepExecutionEstimate {
         worst_price,
-        result_quantity: expected_quantity,
-        fee: FPCoin {
-            amount: expected_fee,
+        result_quantity: round_to_min_tick(expected_quantity, market.min_price_tick_size),
+        result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
+        is_buy_order: false,
+        fee_estimate: Some(FPCoin {
             denom: market.quote_denom.clone(),
-        },
+            amount: expected_fee,
+        }),
     })
+
+    // Ok(EstimationResult {
+    //     worst_price,
+    //     result_quantity: expected_quantity,
+    //     fee: FPCoin {
+    //         amount: expected_fee,
+    //         denom: market.quote_denom.clone(),
+    //     },
+    // })
 }
 
 pub fn find_minimum_orders(

@@ -906,7 +906,7 @@ pub fn round_usd_like_fee(raw_fee: &FPCoin, min_price_tick_size: FPDecimal) -> F
 pub fn assert_fee_is_as_expected(
     raw_fees: &mut Vec<FPCoin>,
     expected_fees: &mut Vec<FPCoin>,
-    min_price_tick_size: FPDecimal,
+    tick_size: FPDecimal,
 ) {
     assert_eq!(
         raw_fees.len(),
@@ -919,7 +919,7 @@ pub fn assert_fee_is_as_expected(
 
     for (raw_fee, expected_fee) in raw_fees.iter().zip(expected_fees.iter()) {
         assert_eq!(
-            &round_usd_like_fee(raw_fee, min_price_tick_size),
+            &round_usd_like_fee(raw_fee, tick_size),
             expected_fee,
             "Wrong amount of fee received"
         );
