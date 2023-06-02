@@ -2,10 +2,12 @@ use crate::msg::FeeRecipient;
 use crate::state::{remove_swap_route, store_swap_route, CONFIG};
 use crate::types::{Config, SwapRoute};
 use crate::ContractError;
+use crate::ContractError::CustomError;
 use cosmwasm_std::{
-    ensure_eq, Addr, Attribute, BankMsg, Coin, Deps, DepsMut, Env, Event, Response, StdResult,
+    ensure, ensure_eq, Addr, Attribute, BankMsg, Coin, Deps, DepsMut, Env, Event, Response,
+    StdResult,
 };
-use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper, MarketId};
+use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper, MarketId};
 use std::collections::HashSet;
 
 pub fn save_config(
@@ -121,9 +123,60 @@ pub fn set_route(
         source_denom,
         target_denom,
     };
+    verify_route_exists(deps.as_ref(), &route)?;
     store_swap_route(deps.storage, &route)?;
 
     Ok(Response::new().add_attribute("method", "set_route"))
+}
+
+fn verify_route_exists(
+    deps: Deps<InjectiveQueryWrapper>,
+    route: &SwapRoute,
+) -> Result<(), ContractError> {
+    struct MarketDenom {
+        quote_denom: String,
+        base_denom: String,
+    }
+    let mut denoms: Vec<MarketDenom> = Vec::new();
+    let querier = InjectiveQuerier::new(&deps.querier);
+
+    for market_id in route.steps.iter() {
+        let market = querier
+            .query_spot_market(market_id)?
+            .market
+            .ok_or(CustomError {
+                val: format!("Market {} not found", market_id.as_str()).to_string(),
+            })?;
+
+        denoms.push(MarketDenom {
+            quote_denom: market.quote_denom,
+            base_denom: market.base_denom,
+        })
+    }
+
+    // defensive programming
+    ensure!(
+        !denoms.is_empty(),
+        CustomError {
+            val: "No market denoms found".to_string()
+        }
+    );
+    ensure!(
+        denoms.first().unwrap().quote_denom == route.source_denom
+            || denoms.first().unwrap().base_denom == route.source_denom,
+        CustomError {
+            val: "Source denom not found in first market".to_string()
+        }
+    );
+    ensure!(
+        denoms.last().unwrap().quote_denom == route.target_denom
+            || denoms.last().unwrap().base_denom == route.target_denom,
+        CustomError {
+            val: "Target denom not found in last market".to_string()
+        }
+    );
+
+    Ok(())
 }
 
 pub fn delete_route(

@@ -4,12 +4,13 @@ use injective_math::FPDecimal;
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    create_realistic_limit_order, dec_to_proto, human_to_dec, init_contract_and_get_address,
-    init_default_validator_account, init_rich_account, launch_custom_spot_market,
-    must_init_account_with_funds, query_all_bank_balances, query_bank_balance,
-    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
-    DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, USDT,
+    assert_fee_is_as_expected, create_realistic_limit_order, dec_to_proto, human_to_dec,
+    init_contract_and_get_address, init_default_validator_account, init_rich_account,
+    launch_custom_spot_market, must_init_account_with_funds, query_all_bank_balances,
+    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
+    DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, USDT,
 };
+use crate::types::{FPCoin, SwapEstimationResult};
 
 /*
    This test suite focuses on using using realistic values both for spot markets and for orders.
@@ -162,7 +163,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
         ],
     );
 
-    let query_result: FPDecimal = wasm
+    let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
@@ -174,10 +175,18 @@ fn happy_path_two_hops_swap_realistic_scales() {
         .unwrap();
 
     assert_eq!(
-        query_result,
+        query_result.target_quantity,
         human_to_dec("2893.888", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
+
+    let mut expected_fees = vec![FPCoin {
+        amount: human_to_dec("3541.5", Decimals::Six) + human_to_dec("3530.891412", Decimals::Six),
+        denom: "usdt".to_string(),
+    }];
+
+    // we don't care about decimal fraction of the fee
+    assert_fee_is_as_expected(&mut query_result.fees, &mut expected_fees, FPDecimal::one());
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(
@@ -387,7 +396,7 @@ fn happy_path_two_hops_swap_realistic_values() {
         ],
     );
 
-    let query_result: FPDecimal = wasm
+    let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
@@ -399,10 +408,18 @@ fn happy_path_two_hops_swap_realistic_values() {
         .unwrap();
 
     assert_eq!(
-        query_result,
+        query_result.target_quantity,
         human_to_dec("906.262", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
+
+    let mut expected_fees = vec![FPCoin {
+        amount: human_to_dec("12.221313", Decimals::Six) + human_to_dec("12.184704", Decimals::Six),
+        denom: "usdt".to_string(),
+    }];
+
+    // we don't care about decimal fraction of the fee
+    assert_fee_is_as_expected(&mut query_result.fees, &mut expected_fees, FPDecimal::one());
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(

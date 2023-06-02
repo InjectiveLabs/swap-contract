@@ -32,6 +32,7 @@ pub struct StepExecutionEstimate {
     pub result_denom: String,
     pub result_quantity: FPDecimal,
     pub is_buy_order: bool,
+    pub fee_estimate: Option<FPCoin>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -82,4 +83,19 @@ impl SwapRoute {
 pub struct SwapStep {
     pub market_id: MarketId,
     pub quote_denom: String, // quote for this step of swap, eg for swpa eth/inj using eth/usdt and inj/usdt markets, quotes will be eth in 1st step and usdt in 2nd
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct SwapEstimationResult {
+    pub target_quantity: FPDecimal,
+    pub fees: Vec<FPCoin>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct EstimationResult {
+    pub worst_price: FPDecimal,
+    pub result_quantity: FPDecimal,
+    pub fee: FPCoin,
 }
