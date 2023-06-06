@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdError, StdResult, Storage};
+use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 
 use crate::types::{Config, CurrentSwapOperation, CurrentSwapStep, SwapRoute};
@@ -24,6 +24,15 @@ pub fn read_swap_route(
             "No swap route not found from {source_denom} to {target_denom}",
         ))
     })
+}
+
+pub fn get_all_swap_routes(storage: &dyn Storage) -> StdResult<Vec<SwapRoute>> {
+    let routes = SWAP_ROUTES
+        .range(storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
+
+    Ok(routes)
 }
 
 pub fn remove_swap_route(storage: &mut dyn Storage, source_denom: &str, target_denom: &str) {

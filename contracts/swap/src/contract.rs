@@ -12,7 +12,7 @@ use crate::error::ContractError;
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::queries::estimate_swap_result;
-use crate::state::read_swap_route;
+use crate::state::{get_all_swap_routes, read_swap_route};
 use crate::swap::{handle_atomic_order_reply, start_swap_flow};
 
 // version info for migration info
@@ -99,6 +99,10 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
             let target_quantity =
                 estimate_swap_result(deps, env, source_denom, from_quantity, to_denom)?;
             Ok(to_binary(&target_quantity)?)
+        }
+        QueryMsg::GetAllRoutes {} => {
+            let routes = get_all_swap_routes(deps.storage)?;
+            Ok(to_binary(&routes)?)
         }
     }
 }

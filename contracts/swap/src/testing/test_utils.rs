@@ -25,17 +25,17 @@ use injective_cosmwasm::{
     InjectiveQueryWrapper, MarketId, PriceLevel, WasmMockQuerier, TEST_MARKET_ID_1,
     TEST_MARKET_ID_2,
 };
-use injective_math::FPDecimal;
+use injective_math::{round_to_min_tick, FPDecimal};
 use prost::Message;
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
+use crate::types::FPCoin;
 
 pub const TEST_CONTRACT_ADDR: &str = "inj14hj2tavq8fpesdwxxcu44rty3hh90vhujaxlnz";
 pub const TEST_USER_ADDR: &str = "inj1p7z8p649xspcey7wp5e4leqf7wa39kjjj6wja8";
 
 pub const ETH: &str = "eth";
 pub const ATOM: &str = "atom";
-pub const SOL: &str = "sol";
 pub const USDT: &str = "usdt";
 pub const USDC: &str = "usdc";
 pub const INJ: &str = "inj";
@@ -131,8 +131,7 @@ pub fn mock_deps_eth_inj(
             create_orderbook_response_handler(orderbooks);
 
         if multiplier_query_behaviour == MultiplierQueryBehaviour::Fail {
-            pub fn create_spot_error_multi_market_handler() -> Option<Box<dyn HandlesMarketIdQuery>>
-            {
+            pub fn create_spot_error_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
                 struct Temp {}
 
                 impl HandlesMarketIdQuery for Temp {
@@ -145,7 +144,7 @@ pub fn mock_deps_eth_inj(
             }
 
             querier.market_atomic_execution_fee_multiplier_response_handler =
-                create_spot_error_multi_market_handler()
+                create_spot_error_multiplier_handler()
         }
     })
 }
@@ -893,6 +892,36 @@ mod tests {
         assert_eq!(
             scaled_quantity, "1620000000000000000000000",
             "quantity was scaled incorrectly"
+        );
+    }
+}
+
+pub fn round_usd_like_fee(raw_fee: &FPCoin, min_price_tick_size: FPDecimal) -> FPCoin {
+    FPCoin {
+        amount: round_to_min_tick(raw_fee.amount, min_price_tick_size),
+        denom: raw_fee.denom.clone(),
+    }
+}
+
+pub fn assert_fee_is_as_expected(
+    raw_fees: &mut Vec<FPCoin>,
+    expected_fees: &mut Vec<FPCoin>,
+    tick_size: FPDecimal,
+) {
+    assert_eq!(
+        raw_fees.len(),
+        expected_fees.len(),
+        "Wrong number of fee denoms received"
+    );
+
+    raw_fees.sort_by_key(|f| f.denom.clone());
+    expected_fees.sort_by_key(|f| f.denom.clone());
+
+    for (raw_fee, expected_fee) in raw_fees.iter().zip(expected_fees.iter()) {
+        assert_eq!(
+            &round_usd_like_fee(raw_fee, tick_size),
+            expected_fee,
+            "Wrong amount of fee received"
         );
     }
 }

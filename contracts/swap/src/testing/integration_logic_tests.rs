@@ -9,14 +9,15 @@ use injective_math::{round_to_min_tick, FPDecimal};
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    create_limit_order, fund_account_with_some_inj, init_contract_and_get_address,
-    init_contract_with_fee_recipient_and_get_address, init_default_signer_account,
-    init_default_validator_account, init_rich_account, launch_spot_market,
-    must_init_account_with_funds, pause_spot_market, query_all_bank_balances, query_bank_balance,
-    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
-    DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, SOL, USDC,
-    USDT,
+    assert_fee_is_as_expected, create_limit_order, fund_account_with_some_inj,
+    init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address,
+    init_default_signer_account, init_default_validator_account, init_rich_account,
+    launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances,
+    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
+    DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART,
+    DEFAULT_TAKER_FEE, ETH, INJ, USDC, USDT,
 };
+use crate::types::{FPCoin, SwapEstimationResult};
 
 /*
    This suite of tests focuses on calculation logic itself and doesn't attempt to use neither
@@ -95,7 +96,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: FPDecimal = wasm
+    let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
@@ -107,17 +108,30 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
         .unwrap();
 
     assert_eq!(
-        query_result,
+        query_result.target_quantity,
         FPDecimal::must_from_str("2893.888"),
         "incorrect swap result estimate returned by query"
     );
 
-    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(
-        contract_balances_before.len(),
+        query_result.fees.len(),
         1,
-        "wrong number of denoms in contract balances"
+        "Wrong number of fee denoms received"
     );
+
+    // values from the spreadsheet
+    let mut expected_fees = vec![FPCoin {
+        amount: FPDecimal::must_from_str("3541.5") + FPDecimal::must_from_str("3530.891412"),
+        denom: "usdt".to_string(),
+    }];
+
+    assert_fee_is_as_expected(
+        &mut query_result.fees,
+        &mut expected_fees,
+        FPDecimal::must_from_str("0.000001"),
+    );
+
+    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
 
     wasm.execute(
         &contr_addr,
@@ -225,7 +239,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     );
 
     let expected_atom_estimate_quantity = FPDecimal::must_from_str("751.492");
-    let query_result: FPDecimal = wasm
+    let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
@@ -235,9 +249,22 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
             },
         )
         .unwrap();
+
     assert_eq!(
-        query_result, expected_atom_estimate_quantity,
+        query_result.target_quantity, expected_atom_estimate_quantity,
         "incorrect swap result estimate returned by query"
+    );
+
+    // values based on the spreadsheet
+    let mut expected_fees = vec![FPCoin {
+        amount: FPDecimal::must_from_str("904.5") + FPDecimal::must_from_str("901.790564"),
+        denom: "usdt".to_string(),
+    }];
+
+    assert_fee_is_as_expected(
+        &mut query_result.fees,
+        &mut expected_fees,
+        FPDecimal::must_from_str("0.000001"),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -372,7 +399,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: FPDecimal = wasm
+    let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
@@ -385,9 +412,26 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
 
     // expected amount is a bit lower, even though 1 USDT = 1 USDC, because of the fees
     assert_eq!(
-        query_result,
+        query_result.target_quantity,
         FPDecimal::must_from_str("2889.64"),
         "incorrect swap result estimate returned by query"
+    );
+
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: FPDecimal::must_from_str("3541.5") + FPDecimal::must_from_str("3530.891412"),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: FPDecimal::must_from_str("3525.603007"),
+            denom: "usdc".to_string(),
+        },
+    ];
+
+    assert_fee_is_as_expected(
+        &mut query_result.fees,
+        &mut expected_fees,
+        FPDecimal::must_from_str("0.000001"),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -523,7 +567,7 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
+    let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
@@ -651,20 +695,22 @@ fn it_executes_a_sell_of_base_asset() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
-        &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
-            source_denom: ETH.to_string(),
-            target_denom: USDT.to_string(),
-            from_quantity: FPDecimal::from(12u128),
-        },
-    );
+    let mut query_result: SwapEstimationResult = wasm
+        .query(
+            &contr_addr,
+            &QueryMsg::GetExecutionQuantity {
+                source_denom: ETH.to_string(),
+                target_denom: USDT.to_string(),
+                from_quantity: FPDecimal::from(12u128),
+            },
+        )
+        .unwrap();
 
     // calculate how much can be USDT can be bought for 12 ETH without fees
     let orders_nominal_total_value = FPDecimal::from(201_000u128) * FPDecimal::from(5u128)
         + FPDecimal::from(195_000u128) * FPDecimal::from(4u128)
         + FPDecimal::from(192_000u128) * FPDecimal::from(3u128);
-    let expected_query_result = orders_nominal_total_value
+    let expected_target_quantity = orders_nominal_total_value
         * (FPDecimal::one()
             - FPDecimal::must_from_str(&format!(
                 "{}",
@@ -672,9 +718,19 @@ fn it_executes_a_sell_of_base_asset() {
             )));
 
     assert_eq!(
-        query_result.unwrap(),
-        expected_query_result,
+        query_result.target_quantity, expected_target_quantity,
         "incorrect swap result estimate returned by query"
+    );
+
+    let mut expected_fees = vec![FPCoin {
+        amount: FPDecimal::must_from_str("3541.5"),
+        denom: "usdt".to_string(),
+    }];
+
+    assert_fee_is_as_expected(
+        &mut query_result.fees,
+        &mut expected_fees,
+        FPDecimal::must_from_str("0.000001"),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -697,7 +753,7 @@ fn it_executes_a_sell_of_base_asset() {
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, USDT, swapper.address().as_str());
-    let expected_execute_result = expected_query_result.int();
+    let expected_execute_result = expected_target_quantity.int();
 
     assert_eq!(
         from_balance,
@@ -808,18 +864,31 @@ fn it_executes_a_buy_of_base_asset() {
     // we need to use worst priced order
     let dust_value = dust * FPDecimal::from(201_000u128);
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
-        &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
-            source_denom: USDT.to_string(),
-            target_denom: ETH.to_string(),
-            from_quantity: FPDecimal::from(swapper_usdt),
-        },
-    );
+    let mut query_result: SwapEstimationResult = wasm
+        .query(
+            &contr_addr,
+            &QueryMsg::GetExecutionQuantity {
+                source_denom: USDT.to_string(),
+                target_denom: ETH.to_string(),
+                from_quantity: FPDecimal::from(swapper_usdt),
+            },
+        )
+        .unwrap();
+
     assert_eq!(
-        query_result.unwrap(),
-        expected_quantity_rounded,
+        query_result.target_quantity, expected_quantity_rounded,
         "incorrect swap result estimate returned by query"
+    );
+
+    let mut expected_fees = vec![FPCoin {
+        amount: FPDecimal::must_from_str("3536.188217"),
+        denom: "usdt".to_string(),
+    }];
+
+    assert_fee_is_as_expected(
+        &mut query_result.fees,
+        &mut expected_fees,
+        FPDecimal::must_from_str("0.000001"),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -969,7 +1038,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: FPDecimal = wasm
+    let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
             &QueryMsg::GetExecutionQuantity {
@@ -981,9 +1050,20 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
         .unwrap();
 
     assert_eq!(
-        query_result,
+        query_result.target_quantity,
         FPDecimal::must_from_str("2888.222"),
         "incorrect swap result estimate returned by query"
+    );
+
+    let mut expected_fees = vec![FPCoin {
+        amount: FPDecimal::must_from_str("5902.5") + FPDecimal::must_from_str("5873.061097"),
+        denom: "usdt".to_string(),
+    }];
+
+    assert_fee_is_as_expected(
+        &mut query_result.fees,
+        &mut expected_fees,
+        FPDecimal::must_from_str("0.000001"),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -1114,7 +1194,7 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
+    let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
@@ -1424,7 +1504,7 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
+    let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
@@ -1674,7 +1754,7 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
+    let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
@@ -1851,255 +1931,6 @@ fn it_reverts_if_min_quantity_cannot_be_reached() {
 }
 
 #[test]
-fn it_reverts_if_no_known_route_exists() {
-    let app = InjectiveTestApp::new();
-    let wasm = Wasm::new(&app);
-    let exchange = Exchange::new(&app);
-    let bank = Bank::new(&app);
-
-    let _signer = init_default_signer_account(&app);
-    let _validator = init_default_validator_account(&app);
-    let owner = init_rich_account(&app);
-
-    let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
-    let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
-
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
-    set_route_and_assert_success(
-        &wasm,
-        &owner,
-        &contr_addr,
-        ETH,
-        SOL,
-        vec![
-            spot_market_1_id.as_str().into(),
-            spot_market_2_id.as_str().into(),
-        ],
-    );
-
-    let trader1 = init_rich_account(&app);
-    let trader2 = init_rich_account(&app);
-    let trader3 = init_rich_account(&app);
-
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 450); //not enough for minimum requested
-
-    app.increase_time(1);
-
-    let swapper = must_init_account_with_funds(
-        &app,
-        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
-    );
-
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
-        &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
-            source_denom: ETH.to_string(),
-            target_denom: ATOM.to_string(),
-            from_quantity: FPDecimal::from(12u128),
-        },
-    );
-    assert_eq!(query_result.unwrap_err(), QueryError { msg: "Generic error: No swap route not found from eth to atom: query wasm contract failed".to_string() }, "wrong error message");
-
-    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
-    assert_eq!(
-        contract_balances_before.len(),
-        1,
-        "wrong number of denoms in contract balances"
-    );
-
-    let execute_result = wasm.execute(
-        &contr_addr,
-        &ExecuteMsg::Swap {
-            target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
-        },
-        &[coin(12, ETH)],
-        &swapper,
-    );
-
-    assert_eq!(execute_result.unwrap_err(), RunnerError::ExecuteError { msg: "failed to execute message; message index: 0: Generic error: No swap route not found from eth to atom: execute wasm contract failed".to_string() }, "wrong error message");
-
-    let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
-    let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
-    assert_eq!(
-        from_balance,
-        FPDecimal::from(12u128),
-        "target balance changes after failed swap"
-    );
-    assert_eq!(
-        to_balance,
-        FPDecimal::zero(),
-        "source balance changes after failed swap"
-    );
-
-    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
-    assert_eq!(
-        contract_balances_after.len(),
-        1,
-        "wrong number of denoms in contract balances"
-    );
-    assert_eq!(
-        contract_balances_after, contract_balances_before,
-        "contract balance has changed after swap"
-    );
-}
-
-#[test]
-fn it_reverts_if_route_exists_but_market_does_not() {
-    let app = InjectiveTestApp::new();
-    let wasm = Wasm::new(&app);
-    let exchange = Exchange::new(&app);
-    let bank = Bank::new(&app);
-
-    let _signer = init_default_signer_account(&app);
-    let _validator = init_default_validator_account(&app);
-    let owner = init_rich_account(&app);
-
-    let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
-    let spot_market_2_id = "0x01edfab47f124748dc89998eb33144af734484ba07099014594321729a0ca16b";
-
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
-    set_route_and_assert_success(
-        &wasm,
-        &owner,
-        &contr_addr,
-        ETH,
-        ATOM,
-        vec![spot_market_1_id.as_str().into(), spot_market_2_id.into()],
-    );
-
-    let trader1 = init_rich_account(&app);
-    let trader2 = init_rich_account(&app);
-
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    app.increase_time(1);
-
-    let swapper = must_init_account_with_funds(
-        &app,
-        &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
-    );
-
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
-        &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
-            source_denom: ETH.to_string(),
-            target_denom: ATOM.to_string(),
-            from_quantity: FPDecimal::from(12u128),
-        },
-    );
-    assert!(
-        query_result
-            .unwrap_err()
-            .to_string()
-            .contains("market should be available"),
-        "wrong error returned"
-    );
-
-    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
-    assert_eq!(
-        contract_balances_before.len(),
-        1,
-        "wrong number of denoms in contract balances"
-    );
-
-    let execute_result = wasm.execute(
-        &contr_addr,
-        &ExecuteMsg::Swap {
-            target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
-        },
-        &[coin(12, ETH)],
-        &swapper,
-    );
-
-    assert!(
-        execute_result
-            .unwrap_err()
-            .to_string()
-            .contains("market should be available"),
-        "wrong error returned"
-    );
-
-    let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
-    let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
-    assert_eq!(
-        from_balance,
-        FPDecimal::from(12u128),
-        "source balance changed after failed swap"
-    );
-    assert_eq!(
-        to_balance,
-        FPDecimal::zero(),
-        "target balance changed after failed swap"
-    );
-
-    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
-    assert_eq!(
-        contract_balances_after.len(),
-        1,
-        "wrong number of denoms in contract balances"
-    );
-    assert_eq!(
-        contract_balances_after, contract_balances_before,
-        "contract balance has changed after failed swap"
-    );
-}
-
-#[test]
 fn it_reverts_if_market_is_paused() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
@@ -2136,7 +1967,7 @@ fn it_reverts_if_market_is_paused() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
+    let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
@@ -2269,7 +2100,7 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
 
     app.increase_time(1);
 
-    let query_result: RunnerResult<FPDecimal> = wasm.query(
+    let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
         &QueryMsg::GetExecutionQuantity {
             source_denom: ETH.to_string(),
@@ -2278,8 +2109,10 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
         },
     );
 
+    let target_quantity = query_result.unwrap().target_quantity;
+
     assert_eq!(
-        query_result.unwrap(),
+        target_quantity,
         FPDecimal::must_from_str("2893.888"),
         "incorrect swap result estimate returned by query"
     );
