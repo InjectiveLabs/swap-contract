@@ -180,10 +180,17 @@ fn happy_path_two_hops_swap_realistic_scales() {
         "incorrect swap result estimate returned by query"
     );
 
-    let mut expected_fees = vec![FPCoin {
-        amount: human_to_dec("3541.5", Decimals::Six) + human_to_dec("3530.891412", Decimals::Six),
-        denom: "usdt".to_string(),
-    }];
+    // values from the spreadsheet
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: human_to_dec("3541.5", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: human_to_dec("3530.891412", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+    ];
 
     // we don't care about decimal fraction of the fee
     assert_fee_is_as_expected(&mut query_result.fees, &mut expected_fees, FPDecimal::one());
@@ -413,10 +420,16 @@ fn happy_path_two_hops_swap_realistic_values() {
         "incorrect swap result estimate returned by query"
     );
 
-    let mut expected_fees = vec![FPCoin {
-        amount: human_to_dec("12.221313", Decimals::Six) + human_to_dec("12.184704", Decimals::Six),
-        denom: "usdt".to_string(),
-    }];
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: human_to_dec("12.221313", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: human_to_dec("12.184704", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+    ];
 
     // we don't care about decimal fraction of the fee
     assert_fee_is_as_expected(&mut query_result.fees, &mut expected_fees, FPDecimal::one());
@@ -675,10 +688,6 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
             - FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
 
     // here the actual difference is 0.49 USDT after 100 executions, which we attribute differences between decimal precision of Rust/Go and Google Sheets
-    println!(
-        "contract balance diff: {}",
-        contract_balance_diff / FPDecimal::must_from_str("1000000")
-    );
     assert!(
         contract_balance_diff - human_to_dec("0.5", Decimals::Six) < FPDecimal::zero(),
         "contract balance has changed too much after swap"

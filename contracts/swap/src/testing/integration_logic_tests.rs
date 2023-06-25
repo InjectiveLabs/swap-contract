@@ -115,15 +115,21 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
 
     assert_eq!(
         query_result.fees.len(),
-        1,
+        2,
         "Wrong number of fee denoms received"
     );
 
     // values from the spreadsheet
-    let mut expected_fees = vec![FPCoin {
-        amount: FPDecimal::must_from_str("3541.5") + FPDecimal::must_from_str("3530.891412"),
-        denom: "usdt".to_string(),
-    }];
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: FPDecimal::must_from_str("3541.5"),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: FPDecimal::must_from_str("3530.891412"),
+            denom: "usdt".to_string(),
+        },
+    ];
 
     assert_fee_is_as_expected(
         &mut query_result.fees,
@@ -255,11 +261,17 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
         "incorrect swap result estimate returned by query"
     );
 
-    // values based on the spreadsheet
-    let mut expected_fees = vec![FPCoin {
-        amount: FPDecimal::must_from_str("904.5") + FPDecimal::must_from_str("901.790564"),
-        denom: "usdt".to_string(),
-    }];
+    // values from the spreadsheet
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: FPDecimal::must_from_str("904.5"),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: FPDecimal::must_from_str("901.790564"),
+            denom: "usdt".to_string(),
+        },
+    ];
 
     assert_fee_is_as_expected(
         &mut query_result.fees,
@@ -419,7 +431,11 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
 
     let mut expected_fees = vec![
         FPCoin {
-            amount: FPDecimal::must_from_str("3541.5") + FPDecimal::must_from_str("3530.891412"),
+            amount: FPDecimal::must_from_str("3541.5"),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: FPDecimal::must_from_str("3530.891412"),
             denom: "usdt".to_string(),
         },
         FPCoin {
@@ -1055,10 +1071,16 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
         "incorrect swap result estimate returned by query"
     );
 
-    let mut expected_fees = vec![FPCoin {
-        amount: FPDecimal::must_from_str("5902.5") + FPDecimal::must_from_str("5873.061097"),
-        denom: "usdt".to_string(),
-    }];
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: FPDecimal::must_from_str("5902.5"),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: FPDecimal::must_from_str("5873.061097"),
+            denom: "usdt".to_string(),
+        },
+    ];
 
     assert_fee_is_as_expected(
         &mut query_result.fees,
@@ -2167,7 +2189,7 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
 
-    let usdt_to_witdhraw = str_coin("10_000", USDT, Decimals::Six);
+    let usdt_to_withdraw = str_coin("10_000", USDT, Decimals::Six);
     let eth_to_withdraw = str_coin("0.00062", ETH, Decimals::Eighteen);
 
     let owner = must_init_account_with_funds(
@@ -2175,11 +2197,11 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
         &[
             eth_to_withdraw.clone(),
             str_coin("1", INJ, Decimals::Eighteen),
-            usdt_to_witdhraw.clone(),
+            usdt_to_withdraw.clone(),
         ],
     );
 
-    let initial_contract_balance = &[eth_to_withdraw, usdt_to_witdhraw];
+    let initial_contract_balance = &[eth_to_withdraw, usdt_to_withdraw];
     let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -2228,7 +2250,7 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
 
-    let usdt_to_witdhraw = str_coin("10_000", USDT, Decimals::Six);
+    let usdt_to_withdraw = str_coin("10_000", USDT, Decimals::Six);
     let eth_to_withdraw = str_coin("0.00062", ETH, Decimals::Eighteen);
 
     let owner = must_init_account_with_funds(
@@ -2236,11 +2258,11 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
         &[
             eth_to_withdraw.clone(),
             str_coin("1", INJ, Decimals::Eighteen),
-            usdt_to_witdhraw.clone(),
+            usdt_to_withdraw.clone(),
         ],
     );
 
-    let initial_contract_balance = &[eth_to_withdraw, usdt_to_witdhraw];
+    let initial_contract_balance = &[eth_to_withdraw, usdt_to_withdraw];
     let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -2291,7 +2313,7 @@ fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
     let wasm = Wasm::new(&app);
     let bank = Bank::new(&app);
 
-    let usdt_to_witdhraw = str_coin("10_000", USDT, Decimals::Six);
+    let usdt_to_withdraw = str_coin("10_000", USDT, Decimals::Six);
     let eth_to_withdraw = str_coin("0.00062", ETH, Decimals::Eighteen);
 
     let owner = must_init_account_with_funds(
@@ -2299,11 +2321,11 @@ fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
         &[
             eth_to_withdraw.clone(),
             str_coin("1", INJ, Decimals::Eighteen),
-            usdt_to_witdhraw.clone(),
+            usdt_to_withdraw.clone(),
         ],
     );
 
-    let initial_contract_balance = &[eth_to_withdraw, usdt_to_witdhraw];
+    let initial_contract_balance = &[eth_to_withdraw, usdt_to_withdraw];
     let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);

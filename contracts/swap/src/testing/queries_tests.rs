@@ -58,13 +58,19 @@ fn test_calculate_swap_price() {
 
     assert_eq!(
         actual_swap_result.fees.len(),
-        1,
+        2,
         "Wrong number of fee denoms received"
     );
 
     // values from the spreadsheet
-    let expected_fee = FPCoin {
-        amount: FPDecimal::must_from_str("9368.749003") + FPDecimal::must_from_str("9444"),
+    let expected_fee_1 = FPCoin {
+        amount: FPDecimal::must_from_str("9368.749003"),
+        denom: "usdt".to_string(),
+    };
+
+    // values from the spreadsheet
+    let expected_fee_2 = FPCoin {
+        amount: FPDecimal::must_from_str("9444"),
         denom: "usdt".to_string(),
     };
 
@@ -73,8 +79,17 @@ fn test_calculate_swap_price() {
             &actual_swap_result.fees[0],
             FPDecimal::must_from_str("0.000001")
         ),
-        expected_fee,
-        "Wrong amount of fee received"
+        expected_fee_2,
+        "Wrong amount of first fee received"
+    );
+
+    assert_eq!(
+        round_usd_like_fee(
+            &actual_swap_result.fees[1],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_1,
+        "Wrong amount of second fee received"
     );
 }
 
@@ -121,13 +136,19 @@ fn test_calculate_swap_price_self_relaying() {
 
     assert_eq!(
         actual_swap_result.fees.len(),
-        1,
+        2,
         "Wrong number of fee denoms received"
     );
 
     // values from the spreadsheet
-    let expected_fee = FPCoin {
-        amount: FPDecimal::must_from_str("5639.2664") + FPDecimal::must_from_str("5666.4"),
+    let expected_fee_1 = FPCoin {
+        amount: FPDecimal::must_from_str("5666.4"),
+        denom: "usdt".to_string(),
+    };
+
+    // values from the spreadsheet
+    let expected_fee_2 = FPCoin {
+        amount: FPDecimal::must_from_str("5639.2664"),
         denom: "usdt".to_string(),
     };
 
@@ -136,9 +157,18 @@ fn test_calculate_swap_price_self_relaying() {
             &actual_swap_result.fees[0],
             FPDecimal::must_from_str("0.000001")
         ),
-        expected_fee,
+        expected_fee_1,
         "Wrong amount of fee received"
     );
+
+    assert_eq!(
+        round_usd_like_fee(
+            &actual_swap_result.fees[1],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of fee received"
+    )
 }
 
 #[test]

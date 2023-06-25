@@ -25,7 +25,7 @@ pub fn estimate_swap_result(
         amount: quantity,
         denom: source_denom,
     };
-    let mut total_fees: Vec<FPCoin> = vec![];
+    let mut fees: Vec<FPCoin> = vec![];
 
     for step in steps {
         let cur_swap = current_swap.clone();
@@ -51,19 +51,11 @@ pub fn estimate_swap_result(
             step_fee.amount, step_fee.denom
         ));
 
-        if !total_fees.iter().any(|x| x.denom == step_fee.denom) {
-            total_fees.push(step_fee);
-        } else {
-            let idx = total_fees
-                .iter()
-                .position(|x| x.denom == step_fee.denom)
-                .unwrap();
-            total_fees[idx].amount += step_fee.amount;
-        }
+        fees.push(step_fee);
     }
     Ok(SwapEstimationResult {
+        fees,
         target_quantity: current_swap.amount,
-        fees: total_fees,
     })
 }
 
