@@ -8,6 +8,7 @@ use injective_math::FPDecimal;
 use crate::helpers::counter_denom;
 use crate::state::{read_swap_route, CONFIG};
 use crate::types::{FPCoin, StepExecutionEstimate, SwapEstimationAmount, SwapEstimationResult};
+
 pub enum SwapQuantityMode {
     InputQuantity(FPDecimal),
     OutputQuantity(FPDecimal),
@@ -422,7 +423,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_avg_price_simple() {
+    fn test_average_price_simple() {
         let levels = vec![
             create_price_level(1, 200),
             create_price_level(2, 200),
@@ -434,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn test_avg_price_simple_2() {
+    fn test_average_price_simple_2() {
         let levels = vec![
             create_price_level(1, 300),
             create_price_level(2, 200),

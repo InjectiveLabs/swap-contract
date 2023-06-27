@@ -59,6 +59,14 @@ pub struct CurrentSwapStep {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct SwapResults {
+    pub market_id: MarketId,
+    pub quantity: FPDecimal,
+    pub price: FPDecimal,
+    pub fee: FPDecimal,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Config {
     // if fee_recipient is contract, fee discount is replayed to a sender (will not stay in the contract)
     pub fee_recipient: Addr,

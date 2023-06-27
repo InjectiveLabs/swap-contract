@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{BankMsg, DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg};
+use cosmwasm_std::{BankMsg, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg};
 
 use protobuf::Message;
 
-use crate::contract::ATOMIC_ORDER_REPLY_ID;
+use crate::contract::{ATOMIC_ORDER_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION};
 use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address,
     InjectiveMsgWrapper, InjectiveQueryWrapper, OrderType, SpotOrder,
@@ -16,8 +16,10 @@ use crate::error::ContractError;
 use crate::helpers::dec_scale_factor;
 
 use crate::queries::estimate_single_swap_execution;
-use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE};
-use crate::types::{CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount};
+use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS};
+use crate::types::{
+    CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapResults,
+};
 
 pub fn start_swap_flow(
     deps: DepsMut<InjectiveQueryWrapper>,
@@ -50,6 +52,7 @@ pub fn start_swap_flow(
         min_target_quantity,
     };
 
+    SWAP_RESULTS.save(deps.storage, &Vec::new())?;
     SWAP_OPERATION_STATE.save(deps.storage, &swap_operation)?;
     execute_swap_step(deps, env, swap_operation, 0, current_balance).map_err(ContractError::Std)
 }
@@ -139,15 +142,19 @@ pub fn handle_atomic_order_reply(
         }),
     }?;
 
-    let quantity = FPDecimal::from_str(&trade_data.quantity)? / dec_scale_factor; // need to remove protobuf scale factor to get real values
-    let avg_price = FPDecimal::from_str(&trade_data.price)? / dec_scale_factor;
+    // need to remove protobuf scale factor to get real values
+    let average_price = FPDecimal::from_str(&trade_data.price)? / dec_scale_factor;
+    let quantity = FPDecimal::from_str(&trade_data.quantity)? / dec_scale_factor;
     let fee = FPDecimal::from_str(&trade_data.fee)? / dec_scale_factor;
 
+    let mut swap_results = SWAP_RESULTS.load(deps.storage)?;
+
     let current_step = STEP_STATE.load(deps.storage).map_err(ContractError::Std)?;
+
     let new_quantity = if current_step.is_buy {
         quantity
     } else {
-        quantity * avg_price - fee
+        quantity * average_price - fee
     };
 
     let new_balance = FPCoin {
@@ -156,7 +163,16 @@ pub fn handle_atomic_order_reply(
     };
 
     let swap = SWAP_OPERATION_STATE.load(deps.storage)?;
+
+    swap_results.push(SwapResults {
+        market_id: swap.swap_steps[(current_step.step_idx) as usize].to_owned(),
+        price: average_price,
+        quantity,
+        fee,
+    });
+
     if current_step.step_idx < (swap.swap_steps.len() - 1) as u16 {
+        SWAP_RESULTS.save(deps.storage, &swap_results)?;
         return execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance)
             .map_err(ContractError::Std);
     }
@@ -172,13 +188,29 @@ pub fn handle_atomic_order_reply(
         amount: vec![new_balance.clone().into()],
     };
 
+    let swap_results_json = serde_json_wasm::to_string(&swap_results).unwrap();
+    let swap_event = Event::new("atomic_swap_execution")
+        .add_attribute("contract_type", CONTRACT_NAME)
+        .add_attribute("contract_version", CONTRACT_VERSION)
+        .add_attribute("sender", swap.sender_address)
+        .add_attribute("swap_final_amount", new_balance.amount.to_string())
+        .add_attribute("swap_final_denom", new_balance.denom)
+        .add_attribute("swap_results", swap_results_json);
+
     SWAP_OPERATION_STATE.remove(deps.storage);
     STEP_STATE.remove(deps.storage);
+    SWAP_RESULTS.remove(deps.storage);
 
     let response = Response::new()
         .add_message(send_message)
-        .add_attribute("swap_final_amount", new_balance.amount.to_string())
-        .add_attribute("swap_final_denom", new_balance.denom);
+        .add_event(swap_event);
+
+    // - Converted amount
+    // - Converted value (How much the user got as a result of the convert)
+    // - Route taken (INJ -> USDT -> ATOM e.g)
+    // - Fees (For each leg)
+    // - Rate
+    // - User who executed the contract
 
     Ok(response)
 }

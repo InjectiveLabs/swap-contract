@@ -1,11 +1,12 @@
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 
-use crate::types::{Config, CurrentSwapOperation, CurrentSwapStep, SwapRoute};
+use crate::types::{Config, CurrentSwapOperation, CurrentSwapStep, SwapResults, SwapRoute};
 
 pub const SWAP_ROUTES: Map<(String, String), SwapRoute> = Map::new("swap_routes");
 pub const SWAP_OPERATION_STATE: Item<CurrentSwapOperation> = Item::new("current_swap_cache");
 pub const STEP_STATE: Item<CurrentSwapStep> = Item::new("current_step_cache");
+pub const SWAP_RESULTS: Item<Vec<SwapResults>> = Item::new("swap_results");
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub fn store_swap_route(storage: &mut dyn Storage, route: &SwapRoute) -> StdResult<()> {
