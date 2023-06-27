@@ -70,13 +70,13 @@ pub fn create_price_level(p: u128, q: u128) -> PriceLevel {
 }
 
 #[derive(PartialEq)]
-pub enum MultiplierQueryBehaviour {
+pub enum MultiplierQueryBehavior {
     Success,
     Fail,
 }
 
 pub fn mock_deps_eth_inj(
-    multiplier_query_behaviour: MultiplierQueryBehaviour,
+    multiplier_query_behavior: MultiplierQueryBehavior,
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier, InjectiveQueryWrapper> {
     inj_mock_deps(|querier| {
         let mut markets = HashMap::new();
@@ -130,7 +130,7 @@ pub fn mock_deps_eth_inj(
         querier.spot_market_orderbook_response_handler =
             create_orderbook_response_handler(orderbooks);
 
-        if multiplier_query_behaviour == MultiplierQueryBehaviour::Fail {
+        if multiplier_query_behavior == MultiplierQueryBehavior::Fail {
             pub fn create_spot_error_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
                 struct Temp {}
 

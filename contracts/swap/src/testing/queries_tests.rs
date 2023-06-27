@@ -9,17 +9,17 @@ use injective_cosmwasm::{OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 use injective_math::FPDecimal;
 
 use crate::msg::{FeeRecipient, InstantiateMsg};
-use crate::queries::estimate_swap_result;
+use crate::queries::{estimate_swap_result, SwapQuantityMode};
 use crate::state::get_all_swap_routes;
 use crate::testing::test_utils::{
-    mock_deps_eth_inj, round_usd_like_fee, MultiplierQueryBehaviour, TEST_USER_ADDR,
+    mock_deps_eth_inj, round_usd_like_fee, MultiplierQueryBehavior, TEST_USER_ADDR,
 };
 use crate::types::{FPCoin, SwapRoute};
 
 /// In this test we swap 1000 INJ to ETH, we assume avg price of INJ at 8 usdt and avg price of eth 2000 usdt
 #[test]
 fn test_calculate_swap_price() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let admin = &Addr::unchecked(TEST_USER_ADDR);
 
     instantiate(
@@ -45,19 +45,19 @@ fn test_calculate_swap_price() {
         deps.as_ref(),
         mock_env(),
         "eth".to_string(),
-        FPDecimal::from_str("12").unwrap(),
         "inj".to_string(),
+        SwapQuantityMode::InputQuantity(FPDecimal::from_str("12").unwrap()),
     )
     .unwrap();
 
     assert_eq!(
-        actual_swap_result.target_quantity,
+        actual_swap_result.result_quantity,
         FPDecimal::must_from_str("2879.74"),
         "Wrong amount of swap execution estimate received"
     ); // value rounded to min tick
 
     assert_eq!(
-        actual_swap_result.fees.len(),
+        actual_swap_result.expected_fees.len(),
         2,
         "Wrong number of fee denoms received"
     );
@@ -76,7 +76,7 @@ fn test_calculate_swap_price() {
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.fees[0],
+            &actual_swap_result.expected_fees[0],
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_2,
@@ -85,7 +85,7 @@ fn test_calculate_swap_price() {
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.fees[1],
+            &actual_swap_result.expected_fees[1],
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_1,
@@ -96,7 +96,7 @@ fn test_calculate_swap_price() {
 /// In this test we swap 1000 INJ to ETH, we assume avg price of INJ at 8 usdt and avg price of eth 2000 usdt
 #[test]
 fn test_calculate_swap_price_self_relaying() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let admin = &Addr::unchecked(TEST_USER_ADDR);
 
     instantiate(
@@ -123,19 +123,19 @@ fn test_calculate_swap_price_self_relaying() {
         deps.as_ref(),
         mock_env(),
         "eth".to_string(),
-        FPDecimal::from_str("12").unwrap(),
         "inj".to_string(),
+        SwapQuantityMode::InputQuantity(FPDecimal::from_str("12").unwrap()),
     )
     .unwrap();
 
     assert_eq!(
-        actual_swap_result.target_quantity,
+        actual_swap_result.result_quantity,
         FPDecimal::must_from_str("2888.78"),
         "Wrong amount of swap execution estimate received"
     ); // value rounded to min tick
 
     assert_eq!(
-        actual_swap_result.fees.len(),
+        actual_swap_result.expected_fees.len(),
         2,
         "Wrong number of fee denoms received"
     );
@@ -154,7 +154,7 @@ fn test_calculate_swap_price_self_relaying() {
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.fees[0],
+            &actual_swap_result.expected_fees[0],
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_1,
@@ -163,7 +163,7 @@ fn test_calculate_swap_price_self_relaying() {
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.fees[1],
+            &actual_swap_result.expected_fees[1],
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_2,
@@ -173,7 +173,7 @@ fn test_calculate_swap_price_self_relaying() {
 
 #[test]
 fn get_all_queries_returns_empty_array_if_no_routes_are_set() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let admin = &Addr::unchecked(TEST_USER_ADDR);
 
     instantiate(
@@ -198,7 +198,7 @@ fn get_all_queries_returns_empty_array_if_no_routes_are_set() {
 
 #[test]
 fn get_all_queries_returns_expected_array_if_routes_are_set() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let admin = &Addr::unchecked(TEST_USER_ADDR);
 
     instantiate(

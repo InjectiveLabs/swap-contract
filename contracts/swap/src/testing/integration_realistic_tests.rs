@@ -166,7 +166,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: ATOM.to_string(),
                 from_quantity: human_to_dec("12", Decimals::Eighteen),
@@ -175,7 +175,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
         .unwrap();
 
     assert_eq!(
-        query_result.target_quantity,
+        query_result.result_quantity,
         human_to_dec("2893.888", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
@@ -193,7 +193,11 @@ fn happy_path_two_hops_swap_realistic_scales() {
     ];
 
     // we don't care about decimal fraction of the fee
-    assert_fee_is_as_expected(&mut query_result.fees, &mut expected_fees, FPDecimal::one());
+    assert_fee_is_as_expected(
+        &mut query_result.expected_fees,
+        &mut expected_fees,
+        FPDecimal::one(),
+    );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(
@@ -406,7 +410,7 @@ fn happy_path_two_hops_swap_realistic_values() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: ATOM.to_string(),
                 from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),
@@ -415,7 +419,7 @@ fn happy_path_two_hops_swap_realistic_values() {
         .unwrap();
 
     assert_eq!(
-        query_result.target_quantity,
+        query_result.result_quantity,
         human_to_dec("906.262", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
@@ -432,7 +436,11 @@ fn happy_path_two_hops_swap_realistic_values() {
     ];
 
     // we don't care about decimal fraction of the fee
-    assert_fee_is_as_expected(&mut query_result.fees, &mut expected_fees, FPDecimal::one());
+    assert_fee_is_as_expected(
+        &mut query_result.expected_fees,
+        &mut expected_fees,
+        FPDecimal::one(),
+    );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(
@@ -855,7 +863,7 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
     let query_result: FPDecimal = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: ATOM.to_string(),
                 from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),
@@ -1300,7 +1308,7 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(
         &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
+        &QueryMsg::GetOutputQuantity {
             source_denom: ETH.to_string(),
             target_denom: ATOM.to_string(),
             from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),

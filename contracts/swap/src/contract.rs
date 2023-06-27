@@ -11,13 +11,14 @@ use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper};
 use crate::error::ContractError;
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::queries::estimate_swap_result;
+use crate::queries::{estimate_swap_result, SwapQuantityMode};
 use crate::state::{get_all_swap_routes, read_swap_route};
 use crate::swap::{handle_atomic_order_reply, start_swap_flow};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:atomic-order-example";
-const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const CONTRACT_NAME: &str = "crates.io:atomic-order-example";
+pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub const ATOMIC_ORDER_REPLY_ID: u64 = 1u64;
 pub const DEPOSIT_REPLY_ID: u64 = 2u64;
 
@@ -91,13 +92,32 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
             &source_denom,
             &target_denom,
         )?)?),
-        QueryMsg::GetExecutionQuantity {
+        QueryMsg::GetOutputQuantity {
             from_quantity,
             source_denom,
             target_denom: to_denom,
         } => {
-            let target_quantity =
-                estimate_swap_result(deps, env, source_denom, from_quantity, to_denom)?;
+            let target_quantity = estimate_swap_result(
+                deps,
+                env,
+                source_denom,
+                to_denom,
+                SwapQuantityMode::InputQuantity(from_quantity),
+            )?;
+            Ok(to_binary(&target_quantity)?)
+        }
+        QueryMsg::GetInputQuantity {
+            to_quantity,
+            source_denom,
+            target_denom: to_denom,
+        } => {
+            let target_quantity = estimate_swap_result(
+                deps,
+                env,
+                source_denom,
+                to_denom,
+                SwapQuantityMode::OutputQuantity(to_quantity),
+            )?;
             Ok(to_binary(&target_quantity)?)
         }
         QueryMsg::GetAllRoutes {} => {

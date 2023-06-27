@@ -17,7 +17,7 @@ use crate::helpers::dec_scale_factor;
 
 use crate::queries::estimate_single_swap_execution;
 use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE};
-use crate::types::{CurrentSwapOperation, CurrentSwapStep, FPCoin};
+use crate::types::{CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount};
 
 pub fn start_swap_flow(
     deps: DepsMut<InjectiveQueryWrapper>,
@@ -49,6 +49,7 @@ pub fn start_swap_flow(
         swap_steps: steps,
         min_target_quantity,
     };
+
     SWAP_OPERATION_STATE.save(deps.storage, &swap_operation)?;
     execute_swap_step(deps, env, swap_operation, 0, current_balance).map_err(ContractError::Std)
 }
@@ -68,7 +69,7 @@ pub fn execute_swap_step(
         &deps.as_ref(),
         &env,
         &market_id,
-        current_balance.clone(),
+        SwapEstimationAmount::InputQuantity(current_balance.clone()),
         false,
     )?;
 
@@ -104,7 +105,7 @@ pub fn execute_swap_step(
     };
     STEP_STATE.save(deps.storage, &current_step)?;
 
-    let response: Response<InjectiveMsgWrapper> = Response::new().add_submessage(order_message);
+    let response = Response::new().add_submessage(order_message);
     Ok(response)
 }
 
@@ -131,19 +132,16 @@ pub fn handle_atomic_order_reply(
         err: err.to_string(),
     })?;
 
-    // unwrap results into trade_data
     let trade_data = match order_response.results.into_option() {
         Some(trade_data) => Ok(trade_data),
         None => Err(ContractError::CustomError {
             val: "No trade data in order response".to_string(),
         }),
     }?;
+
     let quantity = FPDecimal::from_str(&trade_data.quantity)? / dec_scale_factor; // need to remove protobuf scale factor to get real values
     let avg_price = FPDecimal::from_str(&trade_data.price)? / dec_scale_factor;
     let fee = FPDecimal::from_str(&trade_data.fee)? / dec_scale_factor;
-    deps.api.debug(&format!(
-        "Quantity: {quantity}, price {avg_price}, fee {fee}"
-    ));
 
     let current_step = STEP_STATE.load(deps.storage).map_err(ContractError::Std)?;
     let new_quantity = if current_step.is_buy {
@@ -157,31 +155,30 @@ pub fn handle_atomic_order_reply(
         denom: current_step.step_target_denom,
     };
 
-    deps.api.debug(&format!("New balance: {new_balance:?}"));
-
     let swap = SWAP_OPERATION_STATE.load(deps.storage)?;
     if current_step.step_idx < (swap.swap_steps.len() - 1) as u16 {
-        execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance)
-            .map_err(ContractError::Std)
-    } else {
-        // last step, finalize and send back funds to a caller
-        if new_balance.amount < swap.min_target_quantity {
-            return Err(ContractError::MinExpectedSwapAmountNotReached(
-                swap.min_target_quantity,
-            ));
-        }
-        let send_message = BankMsg::Send {
-            to_address: swap.sender_address.to_string(),
-            amount: vec![new_balance.clone().into()],
-        };
-        deps.api.debug(&format!("Send message: {send_message:?}"));
-        SWAP_OPERATION_STATE.remove(deps.storage);
-        STEP_STATE.remove(deps.storage);
-        let response = Response::new()
-            .add_message(send_message)
-            .add_attribute("swap_final_amount", new_balance.amount.to_string())
-            .add_attribute("swap_final_denom", new_balance.denom);
-
-        Ok(response)
+        return execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance)
+            .map_err(ContractError::Std);
     }
+
+    // last step, finalize and send back funds to a caller
+    if new_balance.amount < swap.min_target_quantity {
+        return Err(ContractError::MinExpectedSwapAmountNotReached(
+            swap.min_target_quantity,
+        ));
+    }
+    let send_message = BankMsg::Send {
+        to_address: swap.sender_address.to_string(),
+        amount: vec![new_balance.clone().into()],
+    };
+
+    SWAP_OPERATION_STATE.remove(deps.storage);
+    STEP_STATE.remove(deps.storage);
+
+    let response = Response::new()
+        .add_message(send_message)
+        .add_attribute("swap_final_amount", new_balance.amount.to_string())
+        .add_attribute("swap_final_denom", new_balance.denom);
+
+    Ok(response)
 }

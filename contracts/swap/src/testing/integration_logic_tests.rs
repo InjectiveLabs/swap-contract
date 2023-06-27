@@ -99,7 +99,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
@@ -108,13 +108,13 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
         .unwrap();
 
     assert_eq!(
-        query_result.target_quantity,
+        query_result.result_quantity,
         FPDecimal::must_from_str("2893.888"),
         "incorrect swap result estimate returned by query"
     );
 
     assert_eq!(
-        query_result.fees.len(),
+        query_result.expected_fees.len(),
         2,
         "Wrong number of fee denoms received"
     );
@@ -132,7 +132,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     ];
 
     assert_fee_is_as_expected(
-        &mut query_result.fees,
+        &mut query_result.expected_fees,
         &mut expected_fees,
         FPDecimal::must_from_str("0.000001"),
     );
@@ -248,7 +248,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(3u128),
@@ -257,7 +257,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
         .unwrap();
 
     assert_eq!(
-        query_result.target_quantity, expected_atom_estimate_quantity,
+        query_result.result_quantity, expected_atom_estimate_quantity,
         "incorrect swap result estimate returned by query"
     );
 
@@ -274,7 +274,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     ];
 
     assert_fee_is_as_expected(
-        &mut query_result.fees,
+        &mut query_result.expected_fees,
         &mut expected_fees,
         FPDecimal::must_from_str("0.000001"),
     );
@@ -414,7 +414,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
@@ -424,7 +424,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
 
     // expected amount is a bit lower, even though 1 USDT = 1 USDC, because of the fees
     assert_eq!(
-        query_result.target_quantity,
+        query_result.result_quantity,
         FPDecimal::must_from_str("2889.64"),
         "incorrect swap result estimate returned by query"
     );
@@ -445,7 +445,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     ];
 
     assert_fee_is_as_expected(
-        &mut query_result.fees,
+        &mut query_result.expected_fees,
         &mut expected_fees,
         FPDecimal::must_from_str("0.000001"),
     );
@@ -585,7 +585,7 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
 
     let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
+        &QueryMsg::GetOutputQuantity {
             source_denom: ETH.to_string(),
             target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
@@ -714,7 +714,7 @@ fn it_executes_a_sell_of_base_asset() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: USDT.to_string(),
                 from_quantity: FPDecimal::from(12u128),
@@ -734,7 +734,7 @@ fn it_executes_a_sell_of_base_asset() {
             )));
 
     assert_eq!(
-        query_result.target_quantity, expected_target_quantity,
+        query_result.result_quantity, expected_target_quantity,
         "incorrect swap result estimate returned by query"
     );
 
@@ -744,7 +744,7 @@ fn it_executes_a_sell_of_base_asset() {
     }];
 
     assert_fee_is_as_expected(
-        &mut query_result.fees,
+        &mut query_result.expected_fees,
         &mut expected_fees,
         FPDecimal::must_from_str("0.000001"),
     );
@@ -883,7 +883,7 @@ fn it_executes_a_buy_of_base_asset() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: USDT.to_string(),
                 target_denom: ETH.to_string(),
                 from_quantity: FPDecimal::from(swapper_usdt),
@@ -892,7 +892,7 @@ fn it_executes_a_buy_of_base_asset() {
         .unwrap();
 
     assert_eq!(
-        query_result.target_quantity, expected_quantity_rounded,
+        query_result.result_quantity, expected_quantity_rounded,
         "incorrect swap result estimate returned by query"
     );
 
@@ -902,7 +902,7 @@ fn it_executes_a_buy_of_base_asset() {
     }];
 
     assert_fee_is_as_expected(
-        &mut query_result.fees,
+        &mut query_result.expected_fees,
         &mut expected_fees,
         FPDecimal::must_from_str("0.000001"),
     );
@@ -1057,7 +1057,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     let mut query_result: SwapEstimationResult = wasm
         .query(
             &contr_addr,
-            &QueryMsg::GetExecutionQuantity {
+            &QueryMsg::GetOutputQuantity {
                 source_denom: ETH.to_string(),
                 target_denom: ATOM.to_string(),
                 from_quantity: FPDecimal::from(12u128),
@@ -1066,7 +1066,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
         .unwrap();
 
     assert_eq!(
-        query_result.target_quantity,
+        query_result.result_quantity,
         FPDecimal::must_from_str("2888.222"),
         "incorrect swap result estimate returned by query"
     );
@@ -1083,7 +1083,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     ];
 
     assert_fee_is_as_expected(
-        &mut query_result.fees,
+        &mut query_result.expected_fees,
         &mut expected_fees,
         FPDecimal::must_from_str("0.000001"),
     );
@@ -1218,7 +1218,7 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
 
     let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
+        &QueryMsg::GetOutputQuantity {
             source_denom: ETH.to_string(),
             target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
@@ -1528,7 +1528,7 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
 
     let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
+        &QueryMsg::GetOutputQuantity {
             source_denom: ETH.to_string(),
             target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(0u128),
@@ -1538,7 +1538,7 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
         query_result
             .unwrap_err()
             .to_string()
-            .contains("from_quantity must be positive"),
+            .contains("source_quantity must be positive"),
         "incorrect error returned by query"
     );
 
@@ -1778,7 +1778,7 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
 
     let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
+        &QueryMsg::GetOutputQuantity {
             source_denom: ETH.to_string(),
             target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
@@ -1991,7 +1991,7 @@ fn it_reverts_if_market_is_paused() {
 
     let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
+        &QueryMsg::GetOutputQuantity {
             source_denom: ETH.to_string(),
             target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
@@ -2124,14 +2124,14 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
 
     let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
         &contr_addr,
-        &QueryMsg::GetExecutionQuantity {
+        &QueryMsg::GetOutputQuantity {
             source_denom: ETH.to_string(),
             target_denom: ATOM.to_string(),
             from_quantity: FPDecimal::from(12u128),
         },
     );
 
-    let target_quantity = query_result.unwrap().target_quantity;
+    let target_quantity = query_result.unwrap().result_quantity;
 
     assert_eq!(
         target_quantity,

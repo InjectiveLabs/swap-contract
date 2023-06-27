@@ -51,8 +51,13 @@ pub enum QueryMsg {
         source_denom: String,
         target_denom: String,
     },
-    GetExecutionQuantity {
+    GetOutputQuantity {
         from_quantity: FPDecimal,
+        source_denom: String,
+        target_denom: String,
+    },
+    GetInputQuantity {
+        to_quantity: FPDecimal,
         source_denom: String,
         target_denom: String,
     },
