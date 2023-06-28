@@ -16,9 +16,8 @@ use crate::testing::test_utils::{
 };
 use crate::types::{FPCoin, SwapRoute};
 
-/// In this test we swap 1000 INJ to ETH, we assume avg price of INJ at 8 usdt and avg price of eth 2000 usdt
 #[test]
-fn test_calculate_swap_price() {
+fn test_calculate_swap_price_source_quantity() {
     let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let admin = &Addr::unchecked(TEST_USER_ADDR);
 
@@ -59,7 +58,7 @@ fn test_calculate_swap_price() {
     assert_eq!(
         actual_swap_result.expected_fees.len(),
         2,
-        "Wrong number of fee denoms received"
+        "Wrong number of fee entries received"
     );
 
     // values from the spreadsheet
@@ -93,9 +92,8 @@ fn test_calculate_swap_price() {
     );
 }
 
-/// In this test we swap 1000 INJ to ETH, we assume avg price of INJ at 8 usdt and avg price of eth 2000 usdt
 #[test]
-fn test_calculate_swap_price_self_relaying() {
+fn test_calculate_swap_price_self_relaying_source_quantity() {
     let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let admin = &Addr::unchecked(TEST_USER_ADDR);
 
@@ -137,7 +135,7 @@ fn test_calculate_swap_price_self_relaying() {
     assert_eq!(
         actual_swap_result.expected_fees.len(),
         2,
-        "Wrong number of fee denoms received"
+        "Wrong number of fee entries received"
     );
 
     // values from the spreadsheet
@@ -169,6 +167,82 @@ fn test_calculate_swap_price_self_relaying() {
         expected_fee_2,
         "Wrong amount of fee received"
     )
+}
+
+#[test]
+fn test_calculate_swap_price_target_quantity() {
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
+    let admin = &Addr::unchecked(TEST_USER_ADDR);
+
+    instantiate(
+        deps.as_mut_deps(),
+        mock_env(),
+        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        InstantiateMsg {
+            fee_recipient: FeeRecipient::Address(admin.to_owned()),
+            admin: admin.to_owned(),
+        },
+    )
+    .unwrap();
+    set_route(
+        deps.as_mut_deps(),
+        &Addr::unchecked(TEST_USER_ADDR),
+        "eth".to_string(),
+        "inj".to_string(),
+        vec![TEST_MARKET_ID_1.into(), TEST_MARKET_ID_2.into()],
+    )
+    .unwrap();
+
+    let actual_swap_result = estimate_swap_result(
+        deps.as_ref(),
+        &mock_env(),
+        "eth".to_string(),
+        "inj".to_string(),
+        SwapQuantity::OutputQuantity(FPDecimal::from_str("2888.78").unwrap()),
+    )
+    .unwrap();
+
+    assert_eq!(
+        actual_swap_result.result_quantity,
+        FPDecimal::must_from_str("12"),
+        "Wrong amount of swap execution estimate received"
+    ); // value rounded to min tick
+
+    assert_eq!(
+        actual_swap_result.expected_fees.len(),
+        2,
+        "Wrong number of fee entries received"
+    );
+
+    // values from the spreadsheet
+    let expected_fee_1 = FPCoin {
+        amount: FPDecimal::must_from_str("9368.749003"),
+        denom: "usdt".to_string(),
+    };
+
+    // values from the spreadsheet
+    let expected_fee_2 = FPCoin {
+        amount: FPDecimal::must_from_str("9444"),
+        denom: "usdt".to_string(),
+    };
+
+    assert_eq!(
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[0],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of first fee received"
+    );
+
+    assert_eq!(
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[1],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_1,
+        "Wrong amount of second fee received"
+    );
 }
 
 #[test]

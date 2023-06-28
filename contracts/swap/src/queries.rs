@@ -200,7 +200,7 @@ fn estimate_execution_buy(
         let orders = querier.query_spot_market_orderbook(
             &market.market_id,
             OrderSide::Sell,
-            Some(amount_coin.amount),
+            Some(amount_coin.amount * (FPDecimal::one() + fee_percent)),
             None,
         )?;
         get_minimum_liquidity_levels(deps, &orders.sells_price_level, amount_coin.amount, |l| l.q)?
@@ -216,13 +216,13 @@ fn estimate_execution_buy(
 
         (expected_quantity, result_quantity, fee_estimate)
     } else {
-        let expected_exchange_quantity = amount_coin.amount * average_price;
+        let expected_exchange_quantity =
+            (amount_coin.amount * (FPDecimal::one() + fee_percent)) * average_price;
         let fee_estimate = expected_exchange_quantity * fee_percent;
         let result_quantity = expected_exchange_quantity - fee_estimate;
 
         (expected_exchange_quantity, result_quantity, fee_estimate)
     };
-
     // check if user funds + contract funds are enough to create order
     let required_funds = worst_price * expected_quantity * (FPDecimal::one() + fee_percent);
     let funds_in_contract: FPDecimal = deps
@@ -299,8 +299,9 @@ fn estimate_execution_sell_from_target(
     amount_coin: FPCoin,
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
-    let available_funds = amount_coin.amount / (FPDecimal::one() + fee_percent); // keep reserve for fee
-    let fee_estimate = amount_coin.amount - available_funds;
+    let available_funds = amount_coin.amount;
+    // let available_funds = amount_coin.amount / (FPDecimal::one() + fee_percent); // keep reserve for fee
+    // let fee_estimate = amount_coin.amount - available_funds;
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
@@ -317,9 +318,15 @@ fn estimate_execution_sell_from_target(
     let expected_input_quantity = amount_coin.amount / average_price;
     let worst_price = get_worst_price_from_orders(&top_orders);
 
+    let fee_estimate = expected_input_quantity * fee_percent;
+    let expected_input_quantity_with_fee = expected_input_quantity + fee_estimate;
+
     Ok(StepExecutionEstimate {
         worst_price,
-        result_quantity: round_to_min_tick(expected_input_quantity, market.min_price_tick_size),
+        result_quantity: round_to_min_tick(
+            expected_input_quantity_with_fee,
+            market.min_price_tick_size,
+        ),
         result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
         is_buy_order: false,
         fee_estimate: Some(FPCoin {
