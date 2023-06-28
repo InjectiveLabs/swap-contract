@@ -198,7 +198,7 @@ fn test_calculate_swap_price_target_quantity() {
         &mock_env(),
         "eth".to_string(),
         "inj".to_string(),
-        SwapQuantity::OutputQuantity(FPDecimal::from_str("2888.78").unwrap()),
+        SwapQuantity::OutputQuantity(FPDecimal::from_str("2879.743675898814381036").unwrap()),
     )
     .unwrap();
 

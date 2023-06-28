@@ -5,7 +5,7 @@ use injective_cosmwasm::{
 use injective_math::utils::round_to_min_tick;
 use injective_math::FPDecimal;
 
-use crate::helpers::counter_denom;
+use crate::helpers::{counter_denom, round_up_to_min_tick};
 use crate::state::{read_swap_route, CONFIG};
 use crate::types::{FPCoin, StepExecutionEstimate, SwapEstimationAmount, SwapEstimationResult};
 
@@ -200,7 +200,7 @@ fn estimate_execution_buy(
         let orders = querier.query_spot_market_orderbook(
             &market.market_id,
             OrderSide::Sell,
-            Some(amount_coin.amount * (FPDecimal::one() + fee_percent)),
+            Some(amount_coin.amount),
             None,
         )?;
         get_minimum_liquidity_levels(deps, &orders.sells_price_level, amount_coin.amount, |l| l.q)?
@@ -216,13 +216,17 @@ fn estimate_execution_buy(
 
         (expected_quantity, result_quantity, fee_estimate)
     } else {
-        let expected_exchange_quantity =
-            (amount_coin.amount * (FPDecimal::one() + fee_percent)) * average_price;
+        let expected_exchange_quantity = amount_coin.amount * average_price;
         let fee_estimate = expected_exchange_quantity * fee_percent;
-        let result_quantity = expected_exchange_quantity - fee_estimate;
+
+        let result_quantity = round_up_to_min_tick(
+            expected_exchange_quantity + fee_estimate,
+            market.min_price_tick_size,
+        );
 
         (expected_exchange_quantity, result_quantity, fee_estimate)
     };
+
     // check if user funds + contract funds are enough to create order
     let required_funds = worst_price * expected_quantity * (FPDecimal::one() + fee_percent);
     let funds_in_contract: FPDecimal = deps
@@ -299,9 +303,12 @@ fn estimate_execution_sell_from_target(
     amount_coin: FPCoin,
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
-    let available_funds = amount_coin.amount;
-    // let available_funds = amount_coin.amount / (FPDecimal::one() + fee_percent); // keep reserve for fee
-    // let fee_estimate = amount_coin.amount - available_funds;
+    // let available_funds = amount_coin.amount;
+    let available_funds = round_to_min_tick(
+        amount_coin.amount + amount_coin.amount * fee_percent,
+        market.min_quantity_tick_size,
+    );
+    let fee_estimate = amount_coin.amount - available_funds;
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
@@ -323,7 +330,7 @@ fn estimate_execution_sell_from_target(
 
     Ok(StepExecutionEstimate {
         worst_price,
-        result_quantity: round_to_min_tick(
+        result_quantity: round_up_to_min_tick(
             expected_input_quantity_with_fee,
             market.min_price_tick_size,
         ),
@@ -368,6 +375,20 @@ pub fn get_minimum_liquidity_levels(
 ) -> StdResult<Vec<PriceLevel>> {
     let mut sum = FPDecimal::zero();
     let mut orders: Vec<PriceLevel> = Vec::new();
+
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
+    println!("total: {total}");
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
+    println!("---------------");
 
     for level in levels {
         let value = calc(level);
