@@ -4,7 +4,7 @@ use cosmwasm_std::{BankMsg, DepsMut, Env, Event, MessageInfo, Reply, Response, S
 
 use protobuf::Message;
 
-use crate::contract::{ATOMIC_ORDER_REPLY_ID, CONTRACT_NAME, CONTRACT_VERSION};
+use crate::contract::ATOMIC_ORDER_REPLY_ID;
 use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address,
     InjectiveMsgWrapper, InjectiveQueryWrapper, OrderType, SpotOrder,
@@ -190,8 +190,6 @@ pub fn handle_atomic_order_reply(
 
     let swap_results_json = serde_json_wasm::to_string(&swap_results).unwrap();
     let swap_event = Event::new("atomic_swap_execution")
-        .add_attribute("contract_type", CONTRACT_NAME)
-        .add_attribute("contract_version", CONTRACT_VERSION)
         .add_attribute("sender", swap.sender_address)
         .add_attribute("swap_final_amount", new_balance.amount.to_string())
         .add_attribute("swap_final_denom", new_balance.denom)
@@ -204,13 +202,6 @@ pub fn handle_atomic_order_reply(
     let response = Response::new()
         .add_message(send_message)
         .add_event(swap_event);
-
-    // - Converted amount
-    // - Converted value (How much the user got as a result of the convert)
-    // - Route taken (INJ -> USDT -> ATOM e.g)
-    // - Fees (For each leg)
-    // - Rate
-    // - User who executed the contract
 
     Ok(response)
 }
