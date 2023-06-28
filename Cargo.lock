@@ -1100,31 +1100,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "helix-converter"
-version = "0.1.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cosmwasm-storage",
- "cw-multi-test",
- "cw-storage-plus 0.14.0",
- "cw-utils 0.14.0",
- "cw2 0.14.0",
- "injective-cosmwasm",
- "injective-math",
- "injective-protobuf",
- "injective-std",
- "injective-test-tube",
- "num-traits",
- "prost 0.11.9",
- "protobuf",
- "schemars",
- "serde",
- "serde-json-wasm",
- "thiserror",
-]
-
-[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1326,6 +1301,31 @@ checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
  "hashbrown",
+]
+
+[[package]]
+name = "injective-converter"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-multi-test",
+ "cw-storage-plus 0.14.0",
+ "cw-utils 0.14.0",
+ "cw2 0.14.0",
+ "injective-cosmwasm",
+ "injective-math",
+ "injective-protobuf",
+ "injective-std",
+ "injective-test-tube",
+ "num-traits",
+ "prost 0.11.9",
+ "protobuf",
+ "schemars",
+ "serde",
+ "serde-json-wasm",
+ "thiserror",
 ]
 
 [[package]]

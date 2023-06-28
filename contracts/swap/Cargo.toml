@@ -1,7 +1,7 @@
 [package]
 authors = [ "Antoni Mysliborski <antoni@injectivelabs.org>" ]
 edition = "2021"
-name    = "helix-converter"
+name    = "injective-converter"
 version = "0.1.0"
 
 exclude = [
