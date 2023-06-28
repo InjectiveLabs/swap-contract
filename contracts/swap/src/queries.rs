@@ -219,7 +219,7 @@ fn estimate_execution_buy(
         let expected_exchange_quantity =
             (amount_coin.amount * (FPDecimal::one() + fee_percent)) * average_price;
         let fee_estimate = expected_exchange_quantity * fee_percent;
-        let result_quantity = expected_exchange_quantity - fee_estimate;
+        let result_quantity = expected_exchange_quantity;
 
         (expected_exchange_quantity, result_quantity, fee_estimate)
     };

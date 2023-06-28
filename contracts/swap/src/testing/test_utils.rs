@@ -20,10 +20,10 @@ use injective_test_tube::{
 
 use crate::helpers::Scaled;
 use injective_cosmwasm::{
-    create_mock_spot_market, create_orderbook_response_handler, create_spot_multi_market_handler,
-    get_default_subaccount_id_for_checked_address, inj_mock_deps, HandlesMarketIdQuery,
-    InjectiveQueryWrapper, MarketId, PriceLevel, WasmMockQuerier, TEST_MARKET_ID_1,
-    TEST_MARKET_ID_2,
+    create_orderbook_response_handler, create_spot_multi_market_handler,
+    get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids,
+    HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, SpotMarket, WasmMockQuerier,
+    TEST_MARKET_ID_1, TEST_MARKET_ID_2,
 };
 use injective_math::{round_to_min_tick, FPDecimal};
 use prost::Message;
@@ -82,27 +82,141 @@ pub fn mock_deps_eth_inj(
         let mut markets = HashMap::new();
         markets.insert(
             MarketId::new(TEST_MARKET_ID_1).unwrap(),
-            create_mock_spot_market("eth", 0),
+            create_mock_spot_market(
+                "eth",
+                FPDecimal::must_from_str("0.01"),
+                FPDecimal::must_from_str("0.01"),
+                0,
+            ),
         );
         markets.insert(
             MarketId::new(TEST_MARKET_ID_2).unwrap(),
-            create_mock_spot_market("inj", 1),
+            create_mock_spot_market(
+                "inj",
+                FPDecimal::must_from_str("0.01"),
+                FPDecimal::must_from_str("0.01"),
+                1,
+            ),
         );
         querier.spot_market_response_handler = create_spot_multi_market_handler(markets);
 
         let mut orderbooks = HashMap::new();
         let eth_buy_orderbook = vec![
             PriceLevel {
-                p: 201000u128.into(),
-                q: FPDecimal::from_str("5").unwrap(),
+                p: FPDecimal::must_from_str("0.000000002107200000"),
+                q: FPDecimal::from_str("784000000000000000.000000000000000000").unwrap(),
             },
             PriceLevel {
-                p: 195000u128.into(),
-                q: FPDecimal::from_str("4").unwrap(),
+                p: FPDecimal::must_from_str("0.000000001978000000"),
+                q: FPDecimal::from_str("1230000000000000000.000000000000000000").unwrap(),
             },
             PriceLevel {
-                p: 192000u128.into(),
-                q: FPDecimal::from_str("3").unwrap(),
+                p: FPDecimal::must_from_str("0.000000001966660000"),
+                q: FPDecimal::from_str("2070000000000000000.000000000000000000").unwrap(),
+            },
+        ];
+        orderbooks.insert(MarketId::new(TEST_MARKET_ID_1).unwrap(), eth_buy_orderbook);
+
+        let inj_sell_orderbook = vec![
+            PriceLevel {
+                p: 800u128.into(),
+                q: 800u128.into(),
+            },
+            PriceLevel {
+                p: 810u128.into(),
+                q: 800u128.into(),
+            },
+            PriceLevel {
+                p: 820u128.into(),
+                q: 800u128.into(),
+            },
+            PriceLevel {
+                p: 830u128.into(),
+                q: 800u128.into(),
+            },
+        ];
+        orderbooks.insert(MarketId::new(TEST_MARKET_ID_2).unwrap(), inj_sell_orderbook);
+
+        querier.spot_market_orderbook_response_handler =
+            create_orderbook_response_handler(orderbooks);
+
+        if multiplier_query_behavior == MultiplierQueryBehavior::Fail {
+            pub fn create_spot_error_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
+                struct Temp {}
+
+                impl HandlesMarketIdQuery for Temp {
+                    fn handle(&self, _: MarketId) -> QuerierResult {
+                        SystemResult::Err(SystemError::Unknown {})
+                    }
+                }
+
+                Some(Box::new(Temp {}))
+            }
+
+            querier.market_atomic_execution_fee_multiplier_response_handler =
+                create_spot_error_multiplier_handler()
+        }
+    })
+}
+
+fn create_mock_spot_market(
+    base: &str,
+    min_price_tick_size: FPDecimal,
+    min_quantity_tick_size: FPDecimal,
+    idx: u32,
+) -> SpotMarket {
+    SpotMarket {
+        ticker: format!("{base}usdt"),
+        base_denom: base.to_string(),
+        quote_denom: "usdt".to_string(),
+        maker_fee_rate: FPDecimal::from_str("0.001").unwrap(),
+        taker_fee_rate: FPDecimal::from_str("0.002").unwrap(),
+        relayer_fee_share_rate: FPDecimal::from_str("0.4").unwrap(),
+        market_id: test_market_ids()[idx as usize].clone(),
+        status: 1,
+        min_price_tick_size,
+        min_quantity_tick_size,
+    }
+}
+
+pub fn mock_realistic_deps_eth_inj(
+    multiplier_query_behavior: MultiplierQueryBehavior,
+) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier, InjectiveQueryWrapper> {
+    inj_mock_deps(|querier| {
+        let mut markets = HashMap::new();
+        markets.insert(
+            MarketId::new(TEST_MARKET_ID_1).unwrap(),
+            create_mock_spot_market(
+                "eth",
+                FPDecimal::must_from_str("0.000000000000001"),
+                FPDecimal::must_from_str("1000000000000000"),
+                0,
+            ),
+        );
+        markets.insert(
+            MarketId::new(TEST_MARKET_ID_2).unwrap(),
+            create_mock_spot_market(
+                "inj",
+                FPDecimal::must_from_str("0.001"),
+                FPDecimal::must_from_str("1000"),
+                1,
+            ),
+        );
+        querier.spot_market_response_handler = create_spot_multi_market_handler(markets);
+
+        let mut orderbooks = HashMap::new();
+        let eth_buy_orderbook = vec![
+            PriceLevel {
+                p: FPDecimal::must_from_str("0.000000002107200000"),
+                q: FPDecimal::from_str("784000000000000000.000000000000000000").unwrap(),
+            },
+            PriceLevel {
+                p: FPDecimal::must_from_str("0.000000001978000000"),
+                q: FPDecimal::from_str("1230000000000000000.000000000000000000").unwrap(),
+            },
+            PriceLevel {
+                p: FPDecimal::must_from_str("0.000000001966660000"),
+                q: FPDecimal::from_str("2070000000000000000.000000000000000000").unwrap(),
             },
         ];
         orderbooks.insert(MarketId::new(TEST_MARKET_ID_1).unwrap(), eth_buy_orderbook);
