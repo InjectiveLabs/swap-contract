@@ -5,6 +5,7 @@ use cosmwasm_std::{coin, Addr};
 
 use crate::admin::set_route;
 use crate::contract::instantiate;
+use crate::helpers::Scaled;
 use injective_cosmwasm::{OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 use injective_math::FPDecimal;
 
@@ -12,7 +13,8 @@ use crate::msg::{FeeRecipient, InstantiateMsg};
 use crate::queries::{estimate_swap_result, SwapQuantity};
 use crate::state::get_all_swap_routes;
 use crate::testing::test_utils::{
-    mock_deps_eth_inj, round_usd_like_fee, MultiplierQueryBehavior, TEST_USER_ADDR,
+    human_to_dec, mock_deps_eth_inj, mock_realistic_deps_eth_inj, round_usd_like_fee, Decimals,
+    MultiplierQueryBehavior, TEST_USER_ADDR,
 };
 use crate::types::{FPCoin, SwapRoute};
 
@@ -167,6 +169,202 @@ fn test_calculate_swap_price_self_relaying_source_quantity() {
         expected_fee_2,
         "Wrong amount of fee received"
     )
+}
+
+#[test]
+fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
+    let mut deps = mock_realistic_deps_eth_inj(MultiplierQueryBehavior::Success);
+    let admin = &Addr::unchecked(TEST_USER_ADDR);
+
+    instantiate(
+        deps.as_mut_deps(),
+        mock_env(),
+        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        InstantiateMsg {
+            fee_recipient: FeeRecipient::Address(admin.to_owned()),
+            admin: admin.to_owned(),
+        },
+    )
+    .unwrap();
+    set_route(
+        deps.as_mut_deps(),
+        &Addr::unchecked(TEST_USER_ADDR),
+        "eth".to_string(),
+        "usdt".to_string(),
+        vec![TEST_MARKET_ID_1.into()],
+    )
+    .unwrap();
+
+    let eth_input_amount = human_to_dec("4.08", Decimals::Eighteen);
+
+    let input_swap_estimate = estimate_swap_result(
+        deps.as_ref(),
+        &mock_env(),
+        "eth".to_string(),
+        "usdt".to_string(),
+        SwapQuantity::InputQuantity(eth_input_amount),
+    )
+    .unwrap();
+
+    let expected_usdt_result_quantity = human_to_dec("8115.51193865568", Decimals::Six);
+
+    assert_eq!(
+        input_swap_estimate.result_quantity, expected_usdt_result_quantity,
+        "Wrong amount of swap execution estimate received when using source quantity"
+    ); // value rounded to min tick
+
+    assert_eq!(
+        input_swap_estimate.expected_fees.len(),
+        1,
+        "Wrong number of fee entries received"
+    );
+
+    let expected_usdt_fee_amount = human_to_dec("32.59241742432", Decimals::Six);
+
+    // values from the spreadsheet
+    let expected_fee_2 = FPCoin {
+        amount: expected_usdt_fee_amount,
+        denom: "usdt".to_string(),
+    };
+
+    assert_eq!(
+        round_usd_like_fee(
+            &input_swap_estimate.expected_fees[0],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of first fee received"
+    );
+
+    let output_swap_estimate = estimate_swap_result(
+        deps.as_ref(),
+        &mock_env(),
+        "eth".to_string(),
+        "usdt".to_string(),
+        SwapQuantity::OutputQuantity(expected_usdt_result_quantity),
+    )
+    .unwrap();
+
+    let diff = (output_swap_estimate.result_quantity - eth_input_amount).abs();
+    println!("eth diff: {}", diff.scaled(-18));
+
+    assert_eq!(
+        output_swap_estimate.result_quantity, eth_input_amount,
+        "Wrong amount of swap execution estimate received when using target quantity"
+    ); // value rounded to min tick
+
+    assert_eq!(
+        output_swap_estimate.expected_fees.len(),
+        1,
+        "Wrong number of fee entries received"
+    );
+
+    assert_eq!(
+        round_usd_like_fee(
+            &output_swap_estimate.expected_fees[0],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of first fee received"
+    );
+}
+
+#[test]
+fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
+    let mut deps = mock_realistic_deps_eth_inj(MultiplierQueryBehavior::Success);
+    let admin = &Addr::unchecked(TEST_USER_ADDR);
+
+    instantiate(
+        deps.as_mut_deps(),
+        mock_env(),
+        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        InstantiateMsg {
+            fee_recipient: FeeRecipient::Address(admin.to_owned()),
+            admin: admin.to_owned(),
+        },
+    )
+    .unwrap();
+    set_route(
+        deps.as_mut_deps(),
+        &Addr::unchecked(TEST_USER_ADDR),
+        "eth".to_string(),
+        "usdt".to_string(),
+        vec![TEST_MARKET_ID_1.into()],
+    )
+    .unwrap();
+
+    let usdt_input_amount = human_to_dec("8000", Decimals::Six);
+
+    let input_swap_estimate = estimate_swap_result(
+        deps.as_ref(),
+        &mock_env(),
+        "usdt".to_string(),
+        "eth".to_string(),
+        SwapQuantity::InputQuantity(usdt_input_amount),
+    )
+    .unwrap();
+
+    let expected_eth_result_quantity = human_to_dec("3.988", Decimals::Eighteen);
+
+    assert_eq!(
+        input_swap_estimate.result_quantity, expected_eth_result_quantity,
+        "Wrong amount of swap execution estimate received when using source quantity"
+    ); // value rounded to min tick
+
+    assert_eq!(
+        input_swap_estimate.expected_fees.len(),
+        1,
+        "Wrong number of fee entries received"
+    );
+
+    let expected_usdt_fee_amount = human_to_dec("31.872509960159", Decimals::Six);
+
+    // values from the spreadsheet
+    let expected_fee_2 = FPCoin {
+        amount: expected_usdt_fee_amount,
+        denom: "usdt".to_string(),
+    };
+
+    assert_eq!(
+        round_usd_like_fee(
+            &input_swap_estimate.expected_fees[0],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of first fee received"
+    );
+
+    let output_swap_estimate = estimate_swap_result(
+        deps.as_ref(),
+        &mock_env(),
+        "usdt".to_string(),
+        "eth".to_string(),
+        SwapQuantity::OutputQuantity(expected_eth_result_quantity),
+    )
+    .unwrap();
+
+    let diff = (output_swap_estimate.result_quantity - usdt_input_amount).abs();
+    println!("usdt diff: {}", diff.scaled(-6));
+
+    assert_eq!(
+        output_swap_estimate.result_quantity, usdt_input_amount,
+        "Wrong amount of swap execution estimate received when using target quantity"
+    ); // value rounded to min tick
+
+    assert_eq!(
+        output_swap_estimate.expected_fees.len(),
+        1,
+        "Wrong number of fee entries received"
+    );
+
+    assert_eq!(
+        round_usd_like_fee(
+            &output_swap_estimate.expected_fees[0],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of first fee received"
+    );
 }
 
 #[test]
