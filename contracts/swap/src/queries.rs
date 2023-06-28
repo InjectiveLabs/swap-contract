@@ -9,49 +9,49 @@ use crate::helpers::counter_denom;
 use crate::state::{read_swap_route, CONFIG};
 use crate::types::{FPCoin, StepExecutionEstimate, SwapEstimationAmount, SwapEstimationResult};
 
-pub enum SwapQuantityMode {
+pub enum SwapQuantity {
     InputQuantity(FPDecimal),
     OutputQuantity(FPDecimal),
 }
 
 pub fn estimate_swap_result(
     deps: Deps<InjectiveQueryWrapper>,
-    env: Env,
+    env: &Env,
     source_denom: String,
-    to_denom: String,
-    mode: SwapQuantityMode,
+    target_denom: String,
+    swap_quantity: SwapQuantity,
 ) -> StdResult<SwapEstimationResult> {
-    match mode {
-        SwapQuantityMode::InputQuantity(quantity) => {
+    match swap_quantity {
+        SwapQuantity::InputQuantity(quantity) => {
             if quantity.is_zero() || quantity.is_negative() {
                 return Err(StdError::generic_err("source_quantity must be positive"));
             }
         }
-        SwapQuantityMode::OutputQuantity(quantity) => {
+        SwapQuantity::OutputQuantity(quantity) => {
             if quantity.is_zero() || quantity.is_negative() {
                 return Err(StdError::generic_err("target_quantity must be positive"));
             }
         }
     }
 
-    let route = read_swap_route(deps.storage, &source_denom, &to_denom)?;
+    let route = read_swap_route(deps.storage, &source_denom, &target_denom)?;
 
-    let (steps, mut current_swap) = match mode {
-        SwapQuantityMode::InputQuantity(quantity) => (
+    let (steps, mut current_swap) = match swap_quantity {
+        SwapQuantity::InputQuantity(quantity) => (
             route.steps_from(&source_denom),
             FPCoin {
                 amount: quantity,
                 denom: source_denom.clone(),
             },
         ),
-        SwapQuantityMode::OutputQuantity(quantity) => {
+        SwapQuantity::OutputQuantity(quantity) => {
             let mut steps = route.steps_from(&source_denom);
             steps.reverse();
             (
                 steps,
                 FPCoin {
                     amount: quantity,
-                    denom: to_denom,
+                    denom: target_denom,
                 },
             )
         }
@@ -62,13 +62,13 @@ pub fn estimate_swap_result(
     for step in steps {
         let swap_estimate = estimate_single_swap_execution(
             &deps,
-            &env,
+            env,
             &step,
-            match mode {
-                SwapQuantityMode::InputQuantity(_) => {
+            match swap_quantity {
+                SwapQuantity::InputQuantity(_) => {
                     SwapEstimationAmount::InputQuantity(current_swap.clone())
                 }
-                SwapQuantityMode::OutputQuantity(_) => {
+                SwapQuantity::OutputQuantity(_) => {
                     SwapEstimationAmount::ReceiveQuantity(current_swap.clone())
                 }
             },

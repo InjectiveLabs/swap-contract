@@ -9,7 +9,7 @@ use injective_cosmwasm::{OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 use injective_math::FPDecimal;
 
 use crate::msg::{FeeRecipient, InstantiateMsg};
-use crate::queries::{estimate_swap_result, SwapQuantityMode};
+use crate::queries::{estimate_swap_result, SwapQuantity};
 use crate::state::get_all_swap_routes;
 use crate::testing::test_utils::{
     mock_deps_eth_inj, round_usd_like_fee, MultiplierQueryBehavior, TEST_USER_ADDR,
@@ -43,10 +43,10 @@ fn test_calculate_swap_price() {
 
     let actual_swap_result = estimate_swap_result(
         deps.as_ref(),
-        mock_env(),
+        &mock_env(),
         "eth".to_string(),
         "inj".to_string(),
-        SwapQuantityMode::InputQuantity(FPDecimal::from_str("12").unwrap()),
+        SwapQuantity::InputQuantity(FPDecimal::from_str("12").unwrap()),
     )
     .unwrap();
 
@@ -121,10 +121,10 @@ fn test_calculate_swap_price_self_relaying() {
 
     let actual_swap_result = estimate_swap_result(
         deps.as_ref(),
-        mock_env(),
+        &mock_env(),
         "eth".to_string(),
         "inj".to_string(),
-        SwapQuantityMode::InputQuantity(FPDecimal::from_str("12").unwrap()),
+        SwapQuantity::InputQuantity(FPDecimal::from_str("12").unwrap()),
     )
     .unwrap();
 

@@ -33,6 +33,12 @@ impl From<Coin> for FPCoin {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum SwapQuantityMode {
+    MinOutputQuantity(FPDecimal),
+    ExactOutputQuantity(FPDecimal),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct StepExecutionEstimate {
     pub worst_price: FPDecimal,
     pub result_denom: String,
@@ -46,7 +52,8 @@ pub struct CurrentSwapOperation {
     // whole swap operation
     pub sender_address: Addr,
     pub swap_steps: Vec<MarketId>,
-    pub min_target_quantity: FPDecimal,
+    pub swap_quantity_mode: SwapQuantityMode,
+    pub refund: Coin,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

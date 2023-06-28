@@ -208,9 +208,9 @@ fn happy_path_two_hops_swap_realistic_scales() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[str_coin("12", ETH, Decimals::Eighteen)],
         &swapper,
@@ -451,9 +451,9 @@ fn happy_path_two_hops_swap_realistic_values() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(906u128),
+            min_output_quantity: FPDecimal::from(906u128),
         },
         &[str_coin(eth_to_swap, ETH, Decimals::Eighteen)],
         &swapper,
@@ -672,9 +672,9 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
 
         wasm.execute(
             &contr_addr,
-            &ExecuteMsg::Swap {
+            &ExecuteMsg::SwapMinOutput {
                 target_denom: ATOM.to_string(),
-                min_quantity: FPDecimal::from(906u128),
+                min_output_quantity: FPDecimal::from(906u128),
             },
             &[str_coin(eth_to_swap, ETH, Decimals::Eighteen)],
             &swapper,
@@ -886,9 +886,9 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(906u128),
+            min_output_quantity: FPDecimal::from(906u128),
         },
         &[str_coin(eth_to_swap, ETH, Decimals::Eighteen)],
         &swapper,
@@ -1104,9 +1104,9 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(906u128),
+            min_output_quantity: FPDecimal::from(906u128),
         },
         &[str_coin(eth_to_swap, ETH, Decimals::Eighteen)],
         &swapper,
@@ -1334,9 +1334,9 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(906u128),
+            min_output_quantity: FPDecimal::from(906u128),
         },
         &[str_coin(eth_to_swap, ETH, Decimals::Eighteen)],
         &swapper,

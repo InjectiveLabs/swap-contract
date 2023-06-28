@@ -388,14 +388,14 @@ pub fn set_route_and_assert_success(
     signer: &SigningAccount,
     contr_addr: &str,
     from_denom: &str,
-    to_denom: &str,
+    target_denom: &str,
     route: Vec<MarketId>,
 ) {
     wasm.execute(
         contr_addr,
         &ExecuteMsg::SetRoute {
             source_denom: from_denom.to_string(),
-            target_denom: to_denom.to_string(),
+            target_denom: target_denom.to_string(),
             route,
         },
         &[],

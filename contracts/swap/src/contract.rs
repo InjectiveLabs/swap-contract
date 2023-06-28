@@ -6,12 +6,13 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use crate::admin::{delete_route, save_config, set_route, update_config, withdraw_support_funds};
+use crate::types::SwapQuantityMode;
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper};
 
 use crate::error::ContractError;
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::queries::{estimate_swap_result, SwapQuantityMode};
+use crate::queries::{estimate_swap_result, SwapQuantity};
 use crate::state::{get_all_swap_routes, read_swap_route};
 use crate::swap::{handle_atomic_order_reply, start_swap_flow};
 
@@ -44,10 +45,26 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     match msg {
-        ExecuteMsg::Swap {
+        ExecuteMsg::SwapMinOutput {
             target_denom,
-            min_quantity,
-        } => start_swap_flow(deps, env, info, target_denom, min_quantity),
+            min_output_quantity,
+        } => start_swap_flow(
+            deps,
+            env,
+            info,
+            target_denom,
+            SwapQuantityMode::MinOutputQuantity(min_output_quantity),
+        ),
+        ExecuteMsg::SwapExactOutput {
+            target_denom,
+            target_output_quantity,
+        } => start_swap_flow(
+            deps,
+            env,
+            info,
+            target_denom,
+            SwapQuantityMode::ExactOutputQuantity(target_output_quantity),
+        ),
         // Admin functions:
         ExecuteMsg::SetRoute {
             source_denom,
@@ -95,28 +112,28 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
         QueryMsg::GetOutputQuantity {
             from_quantity,
             source_denom,
-            target_denom: to_denom,
+            target_denom,
         } => {
             let target_quantity = estimate_swap_result(
                 deps,
-                env,
+                &env,
                 source_denom,
-                to_denom,
-                SwapQuantityMode::InputQuantity(from_quantity),
+                target_denom,
+                SwapQuantity::InputQuantity(from_quantity),
             )?;
             Ok(to_binary(&target_quantity)?)
         }
         QueryMsg::GetInputQuantity {
             to_quantity,
             source_denom,
-            target_denom: to_denom,
+            target_denom,
         } => {
             let target_quantity = estimate_swap_result(
                 deps,
-                env,
+                &env,
                 source_denom,
-                to_denom,
-                SwapQuantityMode::OutputQuantity(to_quantity),
+                target_denom,
+                SwapQuantity::OutputQuantity(to_quantity),
             )?;
             Ok(to_binary(&target_quantity)?)
         }

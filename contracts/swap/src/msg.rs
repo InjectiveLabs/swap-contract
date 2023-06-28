@@ -21,9 +21,13 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Swap {
+    SwapMinOutput {
         target_denom: String,
-        min_quantity: FPDecimal,
+        min_output_quantity: FPDecimal,
+    },
+    SwapExactOutput {
+        target_denom: String,
+        target_output_quantity: FPDecimal,
     },
     SetRoute {
         source_denom: String,

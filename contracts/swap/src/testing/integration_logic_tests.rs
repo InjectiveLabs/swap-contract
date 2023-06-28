@@ -141,9 +141,9 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -288,9 +288,9 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(750u128),
+            min_output_quantity: FPDecimal::from(750u128),
         },
         &[coin(3, ETH)],
         &swapper,
@@ -459,9 +459,9 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -610,9 +610,9 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -758,9 +758,9 @@ fn it_executes_a_sell_of_base_asset() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: USDT.to_string(),
-            min_quantity: FPDecimal::from(2357458u128),
+            min_output_quantity: FPDecimal::from(2357458u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -916,9 +916,9 @@ fn it_executes_a_buy_of_base_asset() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ETH.to_string(),
-            min_quantity: FPDecimal::from(11u128),
+            min_output_quantity: FPDecimal::from(11u128),
         },
         &[coin(swapper_usdt, USDT)],
         &swapper,
@@ -1097,9 +1097,9 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
 
     wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2888u128),
+            min_output_quantity: FPDecimal::from(2888u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -1243,9 +1243,9 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -1327,9 +1327,9 @@ fn it_reverts_swap_if_no_funds_were_passed() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[],
         &swapper,
@@ -1417,9 +1417,9 @@ fn it_reverts_swap_if_multiple_funds_were_passed() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(10u128),
+            min_output_quantity: FPDecimal::from(10u128),
         },
         &[coin(10, ATOM), coin(12, ETH)],
         &swapper,
@@ -1552,9 +1552,9 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
     let err = wasm
         .execute(
             &contr_addr,
-            &ExecuteMsg::Swap {
+            &ExecuteMsg::SwapMinOutput {
                 target_denom: ATOM.to_string(),
-                min_quantity: FPDecimal::zero(),
+                min_output_quantity: FPDecimal::zero(),
             },
             &[coin(12, ETH)],
             &swapper,
@@ -1562,7 +1562,7 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
         .unwrap_err();
     assert!(
         err.to_string()
-            .contains("Min target quantity must be positive"),
+            .contains("Output quantity must be positive!"),
         "incorrect error returned by execute"
     );
 
@@ -1669,9 +1669,9 @@ fn it_reverts_if_user_passes_negative_quantities() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::must_from_str("-1"),
+            min_output_quantity: FPDecimal::must_from_str("-1"),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -1802,9 +1802,9 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -1917,9 +1917,9 @@ fn it_reverts_if_min_quantity_cannot_be_reached() {
     let min_quantity = 3500u128;
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(min_quantity),
+            min_output_quantity: FPDecimal::from(min_quantity),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -2015,9 +2015,9 @@ fn it_reverts_if_market_is_paused() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[coin(12, ETH)],
         &swapper,
@@ -2148,9 +2148,9 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
 
     let execute_result = wasm.execute(
         &contr_addr,
-        &ExecuteMsg::Swap {
+        &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2800u128),
         },
         &[coin(12, ETH)],
         &swapper,

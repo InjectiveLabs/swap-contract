@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{BankMsg, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg};
+use cosmwasm_std::{
+    BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg, Uint128,
+};
 
 use protobuf::Message;
 
@@ -15,10 +17,11 @@ use injective_protobuf::proto::tx;
 use crate::error::ContractError;
 use crate::helpers::dec_scale_factor;
 
-use crate::queries::estimate_single_swap_execution;
+use crate::queries::{estimate_single_swap_execution, estimate_swap_result, SwapQuantity};
 use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS};
 use crate::types::{
-    CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapResults,
+    CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapQuantityMode,
+    SwapResults,
 };
 
 pub fn start_swap_flow(
@@ -26,34 +29,73 @@ pub fn start_swap_flow(
     env: Env,
     info: MessageInfo,
     target_denom: String,
-    min_target_quantity: FPDecimal,
+    swap_quantity_mode: SwapQuantityMode,
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     if info.funds.len() != 1 {
         return Err(ContractError::CustomError {
             val: "Only one denom can be passed in funds".to_string(),
         });
     }
-    if min_target_quantity.is_negative() || min_target_quantity.is_zero() {
+    let quantity = match swap_quantity_mode {
+        SwapQuantityMode::MinOutputQuantity(q) => q,
+        SwapQuantityMode::ExactOutputQuantity(q) => q,
+    };
+
+    if quantity.is_negative() || quantity.is_zero() {
         return Err(ContractError::CustomError {
-            val: "Min target quantity must be positive!".to_string(),
+            val: "Output quantity must be positive!".to_string(),
         });
     }
 
-    let sender_address = info.sender;
-    let coin_provided = &info.funds[0];
-    let source_denom = &coin_provided.denom;
+    let source_denom = &info.funds[0].denom;
     let route = read_swap_route(deps.storage, source_denom, &target_denom)?;
     let steps = route.steps_from(source_denom);
 
-    let current_balance: FPCoin = coin_provided.to_owned().into();
+    let sender_address = info.sender;
+    let coin_provided = &info.funds[0];
+
+    let mut current_balance = coin_provided.to_owned().into();
+
+    let refund_amount = if matches!(
+        swap_quantity_mode,
+        SwapQuantityMode::ExactOutputQuantity(..)
+    ) {
+        let target_output_quantity = quantity;
+
+        let estimation = estimate_swap_result(
+            deps.as_ref(),
+            &env,
+            source_denom.to_owned(),
+            target_denom,
+            SwapQuantity::OutputQuantity(target_output_quantity),
+        )?;
+
+        if estimation.result_quantity > coin_provided.amount.into() {
+            return Err(ContractError::MaxInputAmountExceeded(
+                estimation.result_quantity,
+            ));
+        }
+
+        current_balance = FPCoin {
+            amount: estimation.result_quantity,
+            denom: source_denom.to_owned(),
+        };
+
+        FPDecimal::from(coin_provided.amount) - estimation.result_quantity
+    } else {
+        FPDecimal::zero()
+    };
+
     let swap_operation = CurrentSwapOperation {
         sender_address,
         swap_steps: steps,
-        min_target_quantity,
+        swap_quantity_mode,
+        refund: Coin::new(refund_amount.into(), source_denom.to_owned()),
     };
 
     SWAP_RESULTS.save(deps.storage, &Vec::new())?;
     SWAP_OPERATION_STATE.save(deps.storage, &swap_operation)?;
+
     execute_swap_step(deps, env, swap_operation, 0, current_balance).map_err(ContractError::Std)
 }
 
@@ -177,12 +219,18 @@ pub fn handle_atomic_order_reply(
             .map_err(ContractError::Std);
     }
 
-    // last step, finalize and send back funds to a caller
-    if new_balance.amount < swap.min_target_quantity {
-        return Err(ContractError::MinExpectedSwapAmountNotReached(
-            swap.min_target_quantity,
+    let min_output_quantity = match swap.swap_quantity_mode {
+        SwapQuantityMode::MinOutputQuantity(q) => q,
+        SwapQuantityMode::ExactOutputQuantity(q) => q,
+    };
+
+    if new_balance.amount < min_output_quantity {
+        return Err(ContractError::MinOutputAmountNotReached(
+            min_output_quantity,
         ));
     }
+
+    // last step, finalize and send back funds to a caller
     let send_message = BankMsg::Send {
         to_address: swap.sender_address.to_string(),
         amount: vec![new_balance.clone().into()],
@@ -190,7 +238,7 @@ pub fn handle_atomic_order_reply(
 
     let swap_results_json = serde_json_wasm::to_string(&swap_results).unwrap();
     let swap_event = Event::new("atomic_swap_execution")
-        .add_attribute("sender", swap.sender_address)
+        .add_attribute("sender", swap.sender_address.to_owned())
         .add_attribute("swap_final_amount", new_balance.amount.to_string())
         .add_attribute("swap_final_denom", new_balance.denom)
         .add_attribute("swap_results", swap_results_json);
@@ -199,9 +247,17 @@ pub fn handle_atomic_order_reply(
     STEP_STATE.remove(deps.storage);
     SWAP_RESULTS.remove(deps.storage);
 
-    let response = Response::new()
+    let mut response = Response::new()
         .add_message(send_message)
         .add_event(swap_event);
+
+    if swap.refund.amount > Uint128::zero() {
+        let refund_message = BankMsg::Send {
+            to_address: swap.sender_address.to_string(),
+            amount: vec![swap.refund],
+        };
+        response = response.add_message(refund_message)
+    }
 
     Ok(response)
 }

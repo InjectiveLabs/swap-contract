@@ -23,5 +23,8 @@ pub enum ContractError {
     ReplyParseFailure { id: u64, err: String },
 
     #[error("Min expected swap amount ({0}) not reached")]
-    MinExpectedSwapAmountNotReached(FPDecimal),
+    MinOutputAmountNotReached(FPDecimal),
+
+    #[error("Max input swap amount ({0}) exceeded")]
+    MaxInputAmountExceeded(FPDecimal),
 }
