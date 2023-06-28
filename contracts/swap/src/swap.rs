@@ -9,13 +9,13 @@ use protobuf::Message;
 use crate::contract::ATOMIC_ORDER_REPLY_ID;
 use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address,
-    InjectiveMsgWrapper, InjectiveQueryWrapper, OrderType, SpotOrder,
+    InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper, OrderType, SpotOrder,
 };
 use injective_math::FPDecimal;
 use injective_protobuf::proto::tx;
 
 use crate::error::ContractError;
-use crate::helpers::dec_scale_factor;
+use crate::helpers::{dec_scale_factor, round_up_to_min_tick};
 
 use crate::queries::{estimate_single_swap_execution, estimate_swap_result, SwapQuantity};
 use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS};
@@ -70,14 +70,24 @@ pub fn start_swap_flow(
             SwapQuantity::OutputQuantity(target_output_quantity),
         )?;
 
-        if estimation.result_quantity > coin_provided.amount.into() {
+        let querier = InjectiveQuerier::new(&deps.querier);
+        let first_market_id = steps[0].to_owned();
+        let market = querier
+            .query_spot_market(&first_market_id)?
+            .market
+            .expect("market should be available");
+
+        let required_input =
+            round_up_to_min_tick(estimation.result_quantity, market.min_quantity_tick_size);
+
+        if required_input > coin_provided.amount.into() {
             return Err(ContractError::MaxInputAmountExceeded(
                 estimation.result_quantity,
             ));
         }
 
         current_balance = FPCoin {
-            amount: estimation.result_quantity,
+            amount: required_input,
             denom: source_denom.to_owned(),
         };
 
