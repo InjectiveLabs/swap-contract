@@ -195,6 +195,7 @@ fn estimate_execution_buy(
             &orders.sells_price_level,
             available_funds.unwrap(),
             |l| l.q * l.p,
+            market.min_quantity_tick_size,
         )?
     } else {
         let orders = querier.query_spot_market_orderbook(
@@ -203,11 +204,17 @@ fn estimate_execution_buy(
             Some(amount_coin.amount * (FPDecimal::one() + fee_percent)),
             None,
         )?;
-        get_minimum_liquidity_levels(deps, &orders.sells_price_level, amount_coin.amount, |l| l.q)?
+        get_minimum_liquidity_levels(
+            deps,
+            &orders.sells_price_level,
+            amount_coin.amount,
+            |l| l.q,
+            market.min_quantity_tick_size,
+        )?
     };
 
     let worst_price = get_worst_price_from_orders(&top_orders);
-    let average_price = get_average_price_from_orders(&top_orders);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
 
     let (expected_quantity, result_quantity, fee_estimate) = if is_estimating_from_source {
         let expected_quantity = available_funds.unwrap() / average_price;
@@ -269,10 +276,15 @@ fn estimate_execution_sell_from_source(
         None,
     )?;
 
-    let top_orders =
-        get_minimum_liquidity_levels(deps, &orders.buys_price_level, amount_coin.amount, |l| l.q)?;
+    let top_orders = get_minimum_liquidity_levels(
+        deps,
+        &orders.buys_price_level,
+        amount_coin.amount,
+        |l| l.q,
+        market.min_quantity_tick_size,
+    )?;
 
-    let average_price = get_average_price_from_orders(&top_orders);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
     let expected_exchange_quantity = amount_coin.amount * average_price;
     let fee_estimate = expected_exchange_quantity * fee_percent;
 
@@ -309,12 +321,15 @@ fn estimate_execution_sell_from_target(
         None,
         Some(available_funds),
     )?;
-    let top_orders =
-        get_minimum_liquidity_levels(deps, &orders.buys_price_level, available_funds, |l| {
-            l.q * l.p
-        })?;
+    let top_orders = get_minimum_liquidity_levels(
+        deps,
+        &orders.buys_price_level,
+        available_funds,
+        |l| l.q * l.p,
+        market.min_quantity_tick_size,
+    )?;
 
-    let average_price = get_average_price_from_orders(&top_orders);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
     let expected_input_quantity = amount_coin.amount / average_price;
     let worst_price = get_worst_price_from_orders(&top_orders);
 
@@ -365,6 +380,7 @@ pub fn get_minimum_liquidity_levels(
     levels: &Vec<PriceLevel>,
     total: FPDecimal,
     calc: fn(&PriceLevel) -> FPDecimal,
+    min_quantity_tick_size: FPDecimal,
 ) -> StdResult<Vec<PriceLevel>> {
     let mut sum = FPDecimal::zero();
     let mut orders: Vec<PriceLevel> = Vec::new();
@@ -377,7 +393,7 @@ pub fn get_minimum_liquidity_levels(
 
             PriceLevel {
                 p: level.p,
-                q: ((value - excess) / value) * level.q, // we only take a part of this price level
+                q: round_to_min_tick(((value - excess) / value) * level.q, min_quantity_tick_size), // we only take a part of this price level
             }
         } else {
             level.clone() // take fully
@@ -400,13 +416,16 @@ pub fn get_minimum_liquidity_levels(
     Ok(orders)
 }
 
-fn get_average_price_from_orders(levels: &[PriceLevel]) -> FPDecimal {
+fn get_average_price_from_orders(
+    levels: &[PriceLevel],
+    min_price_tick_size: FPDecimal,
+) -> FPDecimal {
     let (total_quantity, total_notional) = levels
         .iter()
         .fold((FPDecimal::zero(), FPDecimal::zero()), |acc, pl| {
             (acc.0 + pl.q, acc.1 + pl.p * pl.q)
         });
-    total_notional / total_quantity
+    round_to_min_tick(total_notional / total_quantity, min_price_tick_size)
 }
 
 fn get_worst_price_from_orders(levels: &[PriceLevel]) -> FPDecimal {
@@ -437,7 +456,7 @@ mod tests {
             create_price_level(3, 200),
         ];
 
-        let avg = get_average_price_from_orders(&levels);
+        let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"));
         assert_eq!(avg, FPDecimal::from(2u128));
     }
 
@@ -449,7 +468,7 @@ mod tests {
             create_price_level(3, 100),
         ];
 
-        let avg = get_average_price_from_orders(&levels);
+        let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"));
         assert_eq!(avg, FPDecimal::from(1000u128) / FPDecimal::from(600u128));
     }
 
@@ -474,6 +493,7 @@ mod tests {
             &levels,
             FPDecimal::from(1000u128),
             |l| l.q,
+            FPDecimal::must_from_str("0.01"),
         );
         assert!(result.is_err());
         assert_eq!(
@@ -495,6 +515,7 @@ mod tests {
             &levels,
             FPDecimal::from(800u128),
             |l| l.q,
+            FPDecimal::must_from_str("0.01"),
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
@@ -517,6 +538,7 @@ mod tests {
             &levels,
             FPDecimal::from(450u128),
             |l| l.q,
+            FPDecimal::must_from_str("0.01"),
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
@@ -542,6 +564,7 @@ mod tests {
             &buy_levels,
             FPDecimal::from(3450u128),
             |l| l.q * l.p,
+            FPDecimal::must_from_str("0.01"),
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
