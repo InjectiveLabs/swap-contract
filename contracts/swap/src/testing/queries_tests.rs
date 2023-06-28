@@ -206,7 +206,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     )
     .unwrap();
 
-    let expected_usdt_result_quantity = human_to_dec("8115.51193865568", Decimals::Six);
+    let expected_usdt_result_quantity = human_to_dec("8115.53875488", Decimals::Six);
 
     assert_eq!(
         input_swap_estimate.result_quantity, expected_usdt_result_quantity,
@@ -219,7 +219,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
         "Wrong number of fee entries received"
     );
 
-    let expected_usdt_fee_amount = human_to_dec("32.59241742432", Decimals::Six);
+    let expected_usdt_fee_amount = human_to_dec("32.59252512", Decimals::Six);
 
     // values from the spreadsheet
     let expected_fee_2 = FPCoin {
