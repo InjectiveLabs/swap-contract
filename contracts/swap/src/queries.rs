@@ -448,7 +448,7 @@ pub fn get_minimum_liquidity_levels(
 
             // we only take a part of this price level
             let raw_quantity = ((value - excess) / value) * level.q;
-            let rounded_quantity = round_up_to_min_tick(raw_quantity, min_quantity_tick_size);
+            let rounded_quantity = round_to_min_tick(raw_quantity, min_quantity_tick_size);
 
             PriceLevel {
                 p: level.p,
@@ -490,7 +490,7 @@ fn get_average_price_from_orders(
         FPDecimal::zero(),
         "total_quantity was zero and would result in division by zero"
     );
-    round_to_min_tick(total_notional / total_quantity, min_price_tick_size)
+    round_up_to_min_tick(total_notional / total_quantity, min_price_tick_size)
 }
 
 fn get_worst_price_from_orders(levels: &[PriceLevel]) -> FPDecimal {
