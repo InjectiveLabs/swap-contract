@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult};
+use cosmwasm_std::{coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult, ContractResult, to_binary};
 use injective_std::shim::Any;
 use injective_std::types::cosmos::bank::v1beta1::{
     MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
@@ -19,12 +19,7 @@ use injective_test_tube::{
 };
 
 use crate::helpers::Scaled;
-use injective_cosmwasm::{
-    create_orderbook_response_handler, create_spot_multi_market_handler,
-    get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids,
-    HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, SpotMarket, WasmMockQuerier,
-    TEST_MARKET_ID_1, TEST_MARKET_ID_2,
-};
+use injective_cosmwasm::{create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids, HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, SpotMarket, WasmMockQuerier, TEST_MARKET_ID_1, TEST_MARKET_ID_2, QueryMarketAtomicExecutionFeeMultiplierResponse};
 use injective_math::{round_to_min_tick, FPDecimal};
 use prost::Message;
 
@@ -84,8 +79,8 @@ pub fn mock_deps_eth_inj(
             MarketId::new(TEST_MARKET_ID_1).unwrap(),
             create_mock_spot_market(
                 "eth",
-                FPDecimal::must_from_str("0.01"),
-                FPDecimal::must_from_str("0.01"),
+                FPDecimal::must_from_str("0.001"),
+                FPDecimal::must_from_str("0.001"),
                 0,
             ),
         );
@@ -93,8 +88,8 @@ pub fn mock_deps_eth_inj(
             MarketId::new(TEST_MARKET_ID_2).unwrap(),
             create_mock_spot_market(
                 "inj",
-                FPDecimal::must_from_str("0.01"),
-                FPDecimal::must_from_str("0.01"),
+                FPDecimal::must_from_str("0.001"),
+                FPDecimal::must_from_str("0.001"),
                 1,
             ),
         );
@@ -155,6 +150,24 @@ pub fn mock_deps_eth_inj(
 
             querier.market_atomic_execution_fee_multiplier_response_handler =
                 create_spot_error_multiplier_handler()
+        } else {
+            pub fn create_spot_ok_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
+                struct Temp {}
+
+                impl HandlesMarketIdQuery for Temp {
+                    fn handle(&self, _: MarketId) -> QuerierResult {
+                        let response = QueryMarketAtomicExecutionFeeMultiplierResponse {
+                            multiplier: FPDecimal::from_str("2.5").unwrap(),
+                        };
+                        SystemResult::Ok(ContractResult::from(to_binary(&response)))
+                    }
+                }
+
+                Some(Box::new(Temp {}))
+            }
+
+            querier.market_atomic_execution_fee_multiplier_response_handler =
+                create_spot_ok_multiplier_handler()
         }
     })
 }
@@ -239,6 +252,24 @@ pub fn mock_realistic_deps_eth_inj(
 
             querier.market_atomic_execution_fee_multiplier_response_handler =
                 create_spot_error_multiplier_handler()
+        } else {
+            pub fn create_spot_ok_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
+                struct Temp {}
+
+                impl HandlesMarketIdQuery for Temp {
+                    fn handle(&self, _: MarketId) -> QuerierResult {
+                        let response = QueryMarketAtomicExecutionFeeMultiplierResponse {
+                            multiplier: FPDecimal::from_str("2.5").unwrap(),
+                        };
+                        SystemResult::Ok(ContractResult::from(to_binary(&response)))
+                    }
+                }
+
+                Some(Box::new(Temp {}))
+            }
+
+            querier.market_atomic_execution_fee_multiplier_response_handler =
+                create_spot_ok_multiplier_handler()
         }
     })
 }
@@ -253,8 +284,8 @@ fn create_mock_spot_market(
         ticker: format!("{base}usdt"),
         base_denom: base.to_string(),
         quote_denom: "usdt".to_string(),
-        maker_fee_rate: FPDecimal::from_str("0.001").unwrap(),
-        taker_fee_rate: FPDecimal::from_str("0.002").unwrap(),
+        maker_fee_rate: FPDecimal::from_str("0.01").unwrap(),
+        taker_fee_rate: FPDecimal::from_str("0.001").unwrap(),
         relayer_fee_share_rate: FPDecimal::from_str("0.4").unwrap(),
         market_id: test_market_ids()[idx as usize].clone(),
         status: 1,

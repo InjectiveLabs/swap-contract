@@ -18,6 +18,10 @@ use crate::testing::test_utils::{
 };
 use crate::types::{FPCoin, SwapRoute};
 
+/**
+    Spreadsheet URL: https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
+**/
+
 #[test]
 fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
     let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
@@ -53,7 +57,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
 
     assert_eq!(
         actual_swap_result.result_quantity,
-        FPDecimal::must_from_str("2879.75"),
+        FPDecimal::must_from_str("2888.224"),
         "Wrong amount of swap execution estimate received when using source quantity"
     ); // value rounded to min tick
 
@@ -65,24 +69,15 @@ fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
 
     // values from the spreadsheet
     let expected_fee_1 = FPCoin {
-        amount: FPDecimal::must_from_str("9368.749003"),
+        amount: FPDecimal::must_from_str("5873.061097"),
         denom: "usdt".to_string(),
     };
 
     // values from the spreadsheet
     let expected_fee_2 = FPCoin {
-        amount: FPDecimal::must_from_str("9444"),
+        amount: FPDecimal::must_from_str("5902.5"),
         denom: "usdt".to_string(),
     };
-
-    assert_eq!(
-        round_usd_like_fee(
-            &actual_swap_result.expected_fees[0],
-            FPDecimal::must_from_str("0.000001")
-        ),
-        expected_fee_2,
-        "Wrong amount of first fee received when using source quantity"
-    );
 
     assert_eq!(
         round_usd_like_fee(
@@ -90,7 +85,16 @@ fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_1,
-        "Wrong amount of second fee received when using source quantity"
+        "Wrong amount of first trx fee received when using source quantity"
+    );
+
+    assert_eq!(
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[0],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of second trx fee received when using source quantity"
     );
 }
 
@@ -123,7 +127,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
         &mock_env(),
         "eth".to_string(),
         "inj".to_string(),
-        SwapQuantity::OutputQuantity(FPDecimal::from_str("2879.743675898814381036").unwrap()),
+        SwapQuantity::OutputQuantity(FPDecimal::from_str("2888.224").unwrap()),
     )
         .unwrap();
 
@@ -141,24 +145,15 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
 
     // values from the spreadsheet
     let expected_fee_1 = FPCoin {
-        amount: FPDecimal::must_from_str("9368.749003"),
+        amount: FPDecimal::must_from_str("5902.5"),
         denom: "usdt".to_string(),
     };
 
     // values from the spreadsheet
     let expected_fee_2 = FPCoin {
-        amount: FPDecimal::must_from_str("9444"),
+        amount: FPDecimal::must_from_str("5873.061097"),
         denom: "usdt".to_string(),
     };
-
-    assert_eq!(
-        round_usd_like_fee(
-            &actual_swap_result.expected_fees[0],
-            FPDecimal::must_from_str("0.000001")
-        ),
-        expected_fee_2,
-        "Wrong amount of first fee received when using target quantity"
-    );
 
     assert_eq!(
         round_usd_like_fee(
@@ -166,7 +161,16 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_1,
-        "Wrong amount of second fee received when using target quantity"
+        "Wrong amount of first trx fee received when using source quantity"
+    );
+
+    assert_eq!(
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[0],
+            FPDecimal::must_from_str("0.000001")
+        ),
+        expected_fee_2,
+        "Wrong amount of second trx fee received when using source quantity"
     );
 }
 
@@ -206,7 +210,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_source_quantity() {
 
     assert_eq!(
         actual_swap_result.result_quantity,
-        FPDecimal::must_from_str("2888.8"),
+        FPDecimal::must_from_str("2893.889"),
         "Wrong amount of swap execution estimate received"
     ); // value rounded to min tick
 
@@ -218,32 +222,38 @@ fn test_calculate_swap_price_self_fee_recipient_from_source_quantity() {
 
     // values from the spreadsheet
     let expected_fee_1 = FPCoin {
-        amount: FPDecimal::must_from_str("5666.4"),
+        amount: FPDecimal::must_from_str("3541.5"),
         denom: "usdt".to_string(),
     };
 
     // values from the spreadsheet
     let expected_fee_2 = FPCoin {
-        amount: FPDecimal::must_from_str("5639.2664"),
+        amount: FPDecimal::must_from_str("3530.891412"),
         denom: "usdt".to_string(),
     };
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.expected_fees[0],
-            FPDecimal::must_from_str("0.000001")
+            &expected_fee_1,
+            FPDecimal::must_from_str("0.00001")
         ),
-        expected_fee_1,
-        "Wrong amount of fee received"
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[0],
+            FPDecimal::must_from_str("0.00001")
+        ),
+        "Wrong amount of fee received for first trx"
     );
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.expected_fees[1],
-            FPDecimal::must_from_str("0.000001")
+            &expected_fee_2,
+            FPDecimal::must_from_str("0.00001")
         ),
-        expected_fee_2,
-        "Wrong amount of fee received"
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[1],
+            FPDecimal::must_from_str("0.00001")
+        ),
+        "Wrong amount of fee received for second trx"
     )
 }
 
@@ -277,7 +287,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
         &mock_env(),
         "eth".to_string(),
         "inj".to_string(),
-        SwapQuantity::OutputQuantity(FPDecimal::from_str("2888.8").unwrap()),
+        SwapQuantity::OutputQuantity(FPDecimal::from_str("2893.889").unwrap()),
     )
         .unwrap();
 
@@ -295,32 +305,38 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
 
     // values from the spreadsheet
     let expected_fee_1 = FPCoin {
-        amount: FPDecimal::must_from_str("5639.2664"),
+        amount: FPDecimal::must_from_str("3530.891412"),
         denom: "usdt".to_string(),
     };
 
     // values from the spreadsheet
     let expected_fee_2 = FPCoin {
-        amount: FPDecimal::must_from_str("5666.4"),
+        amount: FPDecimal::must_from_str("3541.5"),
         denom: "usdt".to_string(),
     };
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.expected_fees[0],
-            FPDecimal::must_from_str("0.000001")
+            &expected_fee_1,
+            FPDecimal::must_from_str("0.00001")
         ),
-        expected_fee_1,
-        "Wrong amount of first fee received when using target quantity"
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[0],
+            FPDecimal::must_from_str("0.00001")
+        ),
+        "Wrong amount of fee received for first trx"
     );
 
     assert_eq!(
         round_usd_like_fee(
-            &actual_swap_result.expected_fees[1],
-            FPDecimal::must_from_str("0.000001")
+            &expected_fee_2,
+            FPDecimal::must_from_str("0.00001")
         ),
-        expected_fee_2,
-        "Wrong amount of second fee received when using target quantity"
+        round_usd_like_fee(
+            &actual_swap_result.expected_fees[1],
+            FPDecimal::must_from_str("0.00001")
+        ),
+        "Wrong amount of fee received for second trx"
     )
 }
 

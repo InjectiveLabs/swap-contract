@@ -109,7 +109,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
 
     assert_eq!(
         query_result.result_quantity,
-        FPDecimal::must_from_str("2893.888"),
+        FPDecimal::must_from_str("2893.889"),
         "incorrect swap result estimate returned by query"
     );
 

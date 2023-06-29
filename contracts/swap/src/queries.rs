@@ -126,6 +126,7 @@ pub fn estimate_single_swap_execution(
     let fee_multiplier = querier
         .query_market_atomic_execution_fee_multiplier(market_id)?
         .multiplier;
+
     let fee_percent = market.taker_fee_rate
         * fee_multiplier
         * (FPDecimal::one() - get_effective_fee_discount_rate(&market, is_self_relayer));

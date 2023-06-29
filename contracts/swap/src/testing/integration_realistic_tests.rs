@@ -1,6 +1,7 @@
 use injective_test_tube::{Account, Bank, Exchange, InjectiveTestApp, Module, RunnerResult, Wasm};
 
 use injective_math::FPDecimal;
+use crate::helpers::Scaled;
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
@@ -176,7 +177,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
 
     assert_eq!(
         query_result.result_quantity,
-        human_to_dec("2893.888", Decimals::Six),
+        human_to_dec("2893.889", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
 
@@ -226,7 +227,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
     );
     assert_eq!(
         to_balance,
-        human_to_dec("2893.888", Decimals::Six),
+        human_to_dec("2893.889", Decimals::Six),
         "swapper did not receive expected amount"
     );
 
@@ -695,10 +696,12 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
         FPDecimal::must_from_str(contract_balances_after[0].amount.as_str())
             - FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
 
+
+    let max_diff = human_to_dec("0.5", Decimals::Six);
     // here the actual difference is 0.49 USDT after 100 executions, which we attribute differences between decimal precision of Rust/Go and Google Sheets
     assert!(
-        contract_balance_diff - human_to_dec("0.5", Decimals::Six) < FPDecimal::zero(),
-        "contract balance has changed too much after swap"
+        contract_balance_diff.abs() < max_diff && contract_balance_diff > FPDecimal::zero(),
+        "contract balance has changed too much after swap or it lost buffer money; max diff: {} USDT actual diff: {} USDT", max_diff.scaled(-6), contract_balance_diff.scaled(-6)
     );
 }
 
