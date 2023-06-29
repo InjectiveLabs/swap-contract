@@ -103,16 +103,16 @@ pub fn mock_deps_eth_inj(
         let mut orderbooks = HashMap::new();
         let eth_buy_orderbook = vec![
             PriceLevel {
-                p: FPDecimal::must_from_str("0.000000002107200000"),
-                q: FPDecimal::from_str("784000000000000000.000000000000000000").unwrap(),
+                p: 201000u128.into(),
+                q: FPDecimal::from_str("5").unwrap(),
             },
             PriceLevel {
-                p: FPDecimal::must_from_str("0.000000001978000000"),
-                q: FPDecimal::from_str("1230000000000000000.000000000000000000").unwrap(),
+                p: 195000u128.into(),
+                q: FPDecimal::from_str("4").unwrap(),
             },
             PriceLevel {
-                p: FPDecimal::must_from_str("0.000000001966660000"),
-                q: FPDecimal::from_str("2070000000000000000.000000000000000000").unwrap(),
+                p: 192000u128.into(),
+                q: FPDecimal::from_str("3").unwrap(),
             },
         ];
         orderbooks.insert(MarketId::new(TEST_MARKET_ID_1).unwrap(), eth_buy_orderbook);
