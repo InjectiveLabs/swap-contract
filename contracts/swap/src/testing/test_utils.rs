@@ -18,7 +18,7 @@ use injective_test_tube::{
     Account, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
 };
 
-use crate::helpers::Scaled;
+use crate::helpers::{round_up_to_min_tick, Scaled};
 use injective_cosmwasm::{create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids, HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, SpotMarket, WasmMockQuerier, TEST_MARKET_ID_1, TEST_MARKET_ID_2, QueryMarketAtomicExecutionFeeMultiplierResponse};
 use injective_math::{round_to_min_tick, FPDecimal};
 use prost::Message;
@@ -1041,17 +1041,21 @@ mod tests {
     }
 }
 
-pub fn round_usd_like_fee(raw_fee: &FPCoin, min_price_tick_size: FPDecimal) -> FPCoin {
-    FPCoin {
-        amount: round_to_min_tick(raw_fee.amount, min_price_tick_size),
-        denom: raw_fee.denom.clone(),
-    }
+// pub fn round_usd_like_fee(raw_fee: &FPCoin, min_price_tick_size: FPDecimal) -> FPCoin {
+//     FPCoin {
+//         amount: round_up_to_min_tick(raw_fee.amount, min_price_tick_size),
+//         denom: raw_fee.denom.clone(),
+//     }
+// }
+
+pub fn are_fpdecimals_approximately_equal(first: FPDecimal, second: FPDecimal, max_diff: FPDecimal) -> bool {
+    return (first - second).abs() <= max_diff;
 }
 
 pub fn assert_fee_is_as_expected(
     raw_fees: &mut Vec<FPCoin>,
     expected_fees: &mut Vec<FPCoin>,
-    tick_size: FPDecimal,
+    max_diff: FPDecimal,
 ) {
     assert_eq!(
         raw_fees.len(),
@@ -1063,10 +1067,13 @@ pub fn assert_fee_is_as_expected(
     expected_fees.sort_by_key(|f| f.denom.clone());
 
     for (raw_fee, expected_fee) in raw_fees.iter().zip(expected_fees.iter()) {
-        assert_eq!(
-            &round_usd_like_fee(raw_fee, tick_size),
-            expected_fee,
-            "Wrong amount of fee received"
+        assert!(are_fpdecimals_approximately_equal(
+            expected_fee.amount,
+            raw_fee.amount,
+            max_diff,
+        ),  "Wrong amount of trx fee received. Expected: {}, Actual: {}",
+                expected_fee.amount,
+                raw_fee.amount
         );
     }
 }

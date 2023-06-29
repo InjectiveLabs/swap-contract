@@ -246,7 +246,7 @@ fn estimate_execution_buy(
     println!("BUY");
     println!("is_estimating_from_source: {}", is_estimating_from_source);
     println!("is_rounding_up: {}", is_estimating_from_source);
-    println!("top_orders: {:?}", top_orders);
+    println!("top_orders: {}", top_orders.iter().map(|o| format!("p: {}, q: {}", o.p, o.q)).collect::<Vec<String>>().join(", "));
     println!("amount_coin.amount: {}", amount_coin.amount);
     println!("average_price: {}", average_price);
     println!("expected_quantity: {}", expected_quantity);
@@ -322,7 +322,7 @@ fn estimate_execution_sell_from_source(
     println!("SELL");
     println!("is_estimating_from_source: true");
     println!("is_rounding_up: false");
-    println!("top_orders: {:?}", top_orders);
+    println!("top_orders: {}", top_orders.iter().map(|o| format!("p: {}, q: {}", o.p, o.q)).collect::<Vec<String>>().join(", "));
     println!("amount_coin.amount: {}", amount_coin.amount);
     println!("average_price: {}", average_price);
     println!("expected_exchange_quantity: {}", expected_exchange_quantity);
@@ -376,7 +376,7 @@ fn estimate_execution_sell_from_target(
     println!("SELL");
     println!("is_estimating_from_source: false");
     println!("is_rounding_up: true");
-    println!("top_orders: {:?}", top_orders);
+    println!("top_orders: {}", top_orders.iter().map(|o| format!("p: {}, q: {}", o.p, o.q)).collect::<Vec<String>>().join(", "));
     println!("amount_coin.amount: {}", amount_coin.amount);
     println!("average_price: {}", average_price);
     println!("expected_input_quantity: {}", expected_input_quantity);
