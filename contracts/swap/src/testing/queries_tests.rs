@@ -53,7 +53,7 @@ fn test_calculate_swap_price_source_quantity() {
 
     assert_eq!(
         actual_swap_result.result_quantity,
-        FPDecimal::must_from_str("2879.74"),
+        FPDecimal::must_from_str("2879.75"),
         "Wrong amount of swap execution estimate received"
     ); // value rounded to min tick
 
@@ -130,7 +130,7 @@ fn test_calculate_swap_price_self_relaying_source_quantity() {
 
     assert_eq!(
         actual_swap_result.result_quantity,
-        FPDecimal::must_from_str("2888.78"),
+        FPDecimal::must_from_str("2888.8"),
         "Wrong amount of swap execution estimate received"
     ); // value rounded to min tick
 
@@ -216,7 +216,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     assert_eq!(
         input_swap_estimate.expected_fees.len(),
         1,
-        "Wrong number of fee entries received"
+        "Wrong number of fee entries received when using source quantity"
     );
 
     let expected_usdt_fee_amount = human_to_dec("32.59252512", Decimals::Six);
@@ -233,7 +233,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_2,
-        "Wrong amount of first fee received"
+        "Wrong amount of fee received when estimating when using source quantity"
     );
 
     let output_swap_estimate = estimate_swap_result(
@@ -256,7 +256,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     assert_eq!(
         output_swap_estimate.expected_fees.len(),
         1,
-        "Wrong number of fee entries received"
+        "Wrong number of fee entries received when using target quantity"
     );
 
     assert_eq!(
@@ -265,7 +265,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_2,
-        "Wrong amount of first fee received"
+        "Wrong amount of fee received when estimating when using target quantity"
     );
 }
 
@@ -314,7 +314,7 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
     assert_eq!(
         input_swap_estimate.expected_fees.len(),
         1,
-        "Wrong number of fee entries received"
+        "Wrong number of fee entries received when using source quantity"
     );
 
     let expected_usdt_fee_amount = human_to_dec("31.872509960159", Decimals::Six);
@@ -331,7 +331,7 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_2,
-        "Wrong amount of first fee received"
+        "Wrong amount of first fee received when using source quantity"
     );
 
     let output_swap_estimate = estimate_swap_result(
@@ -354,7 +354,7 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
     assert_eq!(
         output_swap_estimate.expected_fees.len(),
         1,
-        "Wrong number of fee entries received"
+        "Wrong number of fee entries received when using target quantity"
     );
 
     assert_eq!(
@@ -363,7 +363,7 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
             FPDecimal::must_from_str("0.000001")
         ),
         expected_fee_2,
-        "Wrong amount of first fee received"
+        "Wrong amount of first fee received when using target quantity"
     );
 }
 
@@ -396,7 +396,7 @@ fn test_calculate_swap_price_target_quantity() {
         &mock_env(),
         "eth".to_string(),
         "inj".to_string(),
-        SwapQuantity::OutputQuantity(FPDecimal::from_str("2888.78").unwrap()),
+        SwapQuantity::OutputQuantity(FPDecimal::from_str("2879.743675898814381036").unwrap()),
     )
     .unwrap();
 
