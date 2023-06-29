@@ -339,7 +339,9 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
         &mock_env(),
         "usdt".to_string(),
         "eth".to_string(),
-        SwapQuantity::OutputQuantity(expected_eth_result_quantity),
+        SwapQuantity::OutputQuantity(FPDecimal::must_from_str(
+            "3988478991263248735.07482743547106647",
+        )),
     )
     .unwrap();
 

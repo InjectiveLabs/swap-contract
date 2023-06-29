@@ -196,20 +196,24 @@ fn estimate_execution_buy(
             available_funds.unwrap(),
             |l| l.q * l.p,
             market.min_quantity_tick_size,
+            is_estimating_from_source,
         )?
     } else {
+        let rounded_input_amount =
+            round_to_min_tick(amount_coin.amount, market.min_quantity_tick_size);
         let orders = querier.query_spot_market_orderbook(
             &market.market_id,
             OrderSide::Sell,
-            Some(amount_coin.amount),
+            Some(rounded_input_amount),
             None,
         )?;
         get_minimum_liquidity_levels(
             deps,
             &orders.sells_price_level,
-            amount_coin.amount,
+            rounded_input_amount,
             |l| l.q,
             market.min_quantity_tick_size,
+            is_estimating_from_source,
         )?
     };
 
@@ -224,10 +228,17 @@ fn estimate_execution_buy(
         (expected_quantity, result_quantity, fee_estimate)
     } else {
         let expected_exchange_quantity = amount_coin.amount * average_price;
-        let fee_estimate = expected_exchange_quantity * fee_percent;
-        let result_quantity = expected_exchange_quantity + fee_estimate;
 
-        (expected_exchange_quantity, result_quantity, fee_estimate)
+        // add smallest precision as buffer for precision losses
+        let fee_estimate = expected_exchange_quantity * fee_percent + FPDecimal::SMALLEST_PRECISION;
+        let required_input_quantity =
+            expected_exchange_quantity + fee_estimate + FPDecimal::SMALLEST_PRECISION;
+
+        (
+            expected_exchange_quantity,
+            required_input_quantity,
+            fee_estimate,
+        )
     };
 
     // check if user funds + contract funds are enough to create order
@@ -282,6 +293,7 @@ fn estimate_execution_sell_from_source(
         amount_coin.amount,
         |l| l.q,
         market.min_quantity_tick_size,
+        true,
     )?;
 
     let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
@@ -325,7 +337,8 @@ fn estimate_execution_sell_from_target(
         &orders.buys_price_level,
         required_swap_quantity_in_quote,
         |l| l.q * l.p,
-        market.min_price_tick_size,
+        market.min_quantity_tick_size,
+        false,
     )?;
 
     let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
@@ -377,6 +390,7 @@ pub fn get_minimum_liquidity_levels(
     total: FPDecimal,
     calc: fn(&PriceLevel) -> FPDecimal,
     min_quantity_tick_size: FPDecimal,
+    is_estimating_from_source: bool,
 ) -> StdResult<Vec<PriceLevel>> {
     let mut sum = FPDecimal::zero();
     let mut orders: Vec<PriceLevel> = Vec::new();
@@ -387,9 +401,16 @@ pub fn get_minimum_liquidity_levels(
         let order_to_add = if sum + value > total {
             let excess = value + sum - total;
 
+            // we only take a part of this price level
+            let quantity = if is_estimating_from_source {
+                round_to_min_tick(((value - excess) / value) * level.q, min_quantity_tick_size)
+            } else {
+                round_up_to_min_tick(((value - excess) / value) * level.q, min_quantity_tick_size)
+            };
+
             PriceLevel {
                 p: level.p,
-                q: round_to_min_tick(((value - excess) / value) * level.q, min_quantity_tick_size), // we only take a part of this price level
+                q: quantity,
             }
         } else {
             level.clone() // take fully
@@ -421,6 +442,7 @@ fn get_average_price_from_orders(
         .fold((FPDecimal::zero(), FPDecimal::zero()), |acc, pl| {
             (acc.0 + pl.q, acc.1 + pl.p * pl.q)
         });
+
     round_to_min_tick(total_notional / total_quantity, min_price_tick_size)
 }
 
@@ -490,6 +512,7 @@ mod tests {
             FPDecimal::from(1000u128),
             |l| l.q,
             FPDecimal::must_from_str("0.01"),
+            true,
         );
         assert!(result.is_err());
         assert_eq!(
@@ -512,6 +535,7 @@ mod tests {
             FPDecimal::from(800u128),
             |l| l.q,
             FPDecimal::must_from_str("0.01"),
+            true,
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
@@ -535,6 +559,7 @@ mod tests {
             FPDecimal::from(450u128),
             |l| l.q,
             FPDecimal::must_from_str("0.01"),
+            true,
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
@@ -561,6 +586,7 @@ mod tests {
             FPDecimal::from(3450u128),
             |l| l.q * l.p,
             FPDecimal::must_from_str("0.01"),
+            true,
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
