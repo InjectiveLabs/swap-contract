@@ -240,19 +240,6 @@ fn estimate_execution_buy(
         )
     };
 
-    println!("---------------------------------");
-    println!("---------------------------------");
-    println!("BUY");
-    println!("is_estimating_from_source: {}", is_estimating_from_source);
-    println!("is_rounding_up: {}", is_estimating_from_source);
-    println!("top_orders: {:?}", top_orders);
-    println!("amount_coin.amount: {}", amount_coin.amount);
-    println!("average_price: {}", average_price);
-    println!("expected_quantity: {}", expected_quantity);
-    println!("result_quantity: {}", result_quantity);
-    println!("---------------------------------");
-    println!("---------------------------------");
-
     // check if user funds + contract funds are enough to create order
     let required_funds = worst_price * expected_quantity * (FPDecimal::one() + fee_percent);
     let funds_in_contract: FPDecimal = deps
@@ -316,19 +303,6 @@ fn estimate_execution_sell_from_source(
 
     let worst_price = get_worst_price_from_orders(&top_orders);
 
-    println!("---------------------------------");
-    println!("---------------------------------");
-    println!("SELL");
-    println!("is_estimating_from_source: true");
-    println!("is_rounding_up: false");
-    println!("top_orders: {:?}", top_orders);
-    println!("amount_coin.amount: {}", amount_coin.amount);
-    println!("average_price: {}", average_price);
-    println!("expected_exchange_quantity: {}", expected_exchange_quantity);
-    println!("expected_quantity: {}", expected_quantity);
-    println!("---------------------------------");
-    println!("---------------------------------");
-
     Ok(StepExecutionEstimate {
         worst_price,
         result_quantity: expected_quantity,
@@ -369,22 +343,6 @@ fn estimate_execution_sell_from_target(
 
     let expected_input_quantity = required_swap_quantity_in_quote / average_price;
     let worst_price = get_worst_price_from_orders(&top_orders);
-
-    println!("---------------------------------");
-    println!("---------------------------------");
-    println!("SELL");
-    println!("is_estimating_from_source: false");
-    println!("is_rounding_up: true");
-    println!("top_orders: {:?}", top_orders);
-    println!("amount_coin.amount: {}", amount_coin.amount);
-    println!("average_price: {}", average_price);
-    println!("expected_input_quantity: {}", expected_input_quantity);
-    println!(
-        "result_quantity: {}",
-        round_up_to_min_tick(expected_input_quantity, market.min_quantity_tick_size,)
-    );
-    println!("---------------------------------");
-    println!("---------------------------------");
 
     Ok(StepExecutionEstimate {
         worst_price,
