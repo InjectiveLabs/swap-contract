@@ -197,7 +197,6 @@ fn estimate_execution_buy(
             available_funds.unwrap(),
             |l| l.q * l.p,
             market.min_quantity_tick_size,
-            is_estimating_from_source,
         )?
     } else {
         let rounded_input_amount =
@@ -214,11 +213,11 @@ fn estimate_execution_buy(
             rounded_input_amount,
             |l| l.q,
             market.min_quantity_tick_size,
-            is_estimating_from_source,
         )?
     };
 
     let worst_price = get_worst_price_from_orders(&top_orders);
+
     let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
 
     let (expected_quantity, result_quantity, fee_estimate) = if is_estimating_from_source {
@@ -241,6 +240,19 @@ fn estimate_execution_buy(
             fee_estimate,
         )
     };
+
+    println!("---------------------------------");
+    println!("---------------------------------");
+    println!("BUY");
+    println!("is_estimating_from_source: {}", is_estimating_from_source);
+    println!("is_rounding_up: {}", is_estimating_from_source);
+    println!("top_orders: {:?}", top_orders);
+    println!("amount_coin.amount: {}", amount_coin.amount);
+    println!("average_price: {}", average_price);
+    println!("expected_quantity: {}", expected_quantity);
+    println!("result_quantity: {}", result_quantity);
+    println!("---------------------------------");
+    println!("---------------------------------");
 
     // check if user funds + contract funds are enough to create order
     let required_funds = worst_price * expected_quantity * (FPDecimal::one() + fee_percent);
@@ -294,16 +306,29 @@ fn estimate_execution_sell_from_source(
         amount_coin.amount,
         |l| l.q,
         market.min_quantity_tick_size,
-        true,
     )?;
 
-    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
+    let average_price: FPDecimal =
+        get_average_price_from_orders(&top_orders, market.min_price_tick_size);
     let expected_exchange_quantity = amount_coin.amount * average_price;
     let fee_estimate = expected_exchange_quantity * fee_percent;
 
     let expected_quantity = expected_exchange_quantity - fee_estimate;
 
     let worst_price = get_worst_price_from_orders(&top_orders);
+
+    println!("---------------------------------");
+    println!("---------------------------------");
+    println!("SELL");
+    println!("is_estimating_from_source: true");
+    println!("is_rounding_up: false");
+    println!("top_orders: {:?}", top_orders);
+    println!("amount_coin.amount: {}", amount_coin.amount);
+    println!("average_price: {}", average_price);
+    println!("expected_exchange_quantity: {}", expected_exchange_quantity);
+    println!("expected_quantity: {}", expected_quantity);
+    println!("---------------------------------");
+    println!("---------------------------------");
 
     Ok(StepExecutionEstimate {
         worst_price,
@@ -324,7 +349,7 @@ fn estimate_execution_sell_from_target(
     amount_coin: FPCoin,
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
-    let required_fee = amount_coin.amount * fee_percent;
+    let required_fee = amount_coin.amount * fee_percent / (FPDecimal::one() - fee_percent);
     let required_swap_quantity_in_quote = amount_coin.amount + required_fee;
 
     let orders = querier.query_spot_market_orderbook(
@@ -339,12 +364,28 @@ fn estimate_execution_sell_from_target(
         required_swap_quantity_in_quote,
         |l| l.q * l.p,
         market.min_quantity_tick_size,
-        false,
     )?;
 
     let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
+
     let expected_input_quantity = required_swap_quantity_in_quote / average_price;
     let worst_price = get_worst_price_from_orders(&top_orders);
+
+    println!("---------------------------------");
+    println!("---------------------------------");
+    println!("SELL");
+    println!("is_estimating_from_source: false");
+    println!("is_rounding_up: true");
+    println!("top_orders: {:?}", top_orders);
+    println!("amount_coin.amount: {}", amount_coin.amount);
+    println!("average_price: {}", average_price);
+    println!("expected_input_quantity: {}", expected_input_quantity);
+    println!(
+        "result_quantity: {}",
+        round_up_to_min_tick(expected_input_quantity, market.min_quantity_tick_size,)
+    );
+    println!("---------------------------------");
+    println!("---------------------------------");
 
     Ok(StepExecutionEstimate {
         worst_price,
@@ -391,28 +432,28 @@ pub fn get_minimum_liquidity_levels(
     total: FPDecimal,
     calc: fn(&PriceLevel) -> FPDecimal,
     min_quantity_tick_size: FPDecimal,
-    is_estimating_from_source: bool,
 ) -> StdResult<Vec<PriceLevel>> {
     let mut sum = FPDecimal::zero();
     let mut orders: Vec<PriceLevel> = Vec::new();
 
     for level in levels {
         let value = calc(level);
-        assert_ne!(value, FPDecimal::zero(), "Price level with zero value, this should not happen");
+        assert_ne!(
+            value,
+            FPDecimal::zero(),
+            "Price level with zero value, this should not happen"
+        );
 
         let order_to_add = if sum + value > total {
             let excess = value + sum - total;
 
             // we only take a part of this price level
-            let quantity = if is_estimating_from_source {
-                round_to_min_tick(((value - excess) / value) * level.q, min_quantity_tick_size)
-            } else {
-                round_up_to_min_tick(((value - excess) / value) * level.q, min_quantity_tick_size)
-            };
+            let raw_quantity = ((value - excess) / value) * level.q;
+            let rounded_quantity = round_up_to_min_tick(raw_quantity, min_quantity_tick_size);
 
             PriceLevel {
                 p: level.p,
-                q: quantity,
+                q: rounded_quantity,
             }
         } else {
             level.clone() // take fully
@@ -445,7 +486,11 @@ fn get_average_price_from_orders(
             (acc.0 + pl.q, acc.1 + pl.p * pl.q)
         });
 
-    assert_ne!(total_quantity, FPDecimal::zero(), "total_quantity was zero and would result in division by zero");
+    assert_ne!(
+        total_quantity,
+        FPDecimal::zero(),
+        "total_quantity was zero and would result in division by zero"
+    );
     round_to_min_tick(total_notional / total_quantity, min_price_tick_size)
 }
 
@@ -515,7 +560,6 @@ mod tests {
             FPDecimal::from(1000u128),
             |l| l.q,
             FPDecimal::must_from_str("0.01"),
-            true,
         );
         assert!(result.is_err());
         assert_eq!(
@@ -538,7 +582,6 @@ mod tests {
             FPDecimal::from(800u128),
             |l| l.q,
             FPDecimal::must_from_str("0.01"),
-            true,
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
@@ -562,7 +605,6 @@ mod tests {
             FPDecimal::from(450u128),
             |l| l.q,
             FPDecimal::must_from_str("0.01"),
-            true,
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
@@ -589,7 +631,6 @@ mod tests {
             FPDecimal::from(3450u128),
             |l| l.q * l.p,
             FPDecimal::must_from_str("0.01"),
-            true,
         );
         assert!(result.is_ok());
         let min_orders = result.unwrap();
