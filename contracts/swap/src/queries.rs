@@ -397,6 +397,7 @@ pub fn get_minimum_liquidity_levels(
 
     for level in levels {
         let value = calc(level);
+        assert_ne!(value, FPDecimal::zero(), "Price level with zero value, this should not happen");
 
         let order_to_add = if sum + value > total {
             let excess = value + sum - total;
@@ -443,6 +444,7 @@ fn get_average_price_from_orders(
             (acc.0 + pl.q, acc.1 + pl.p * pl.q)
         });
 
+    assert_ne!(total_quantity, FPDecimal::zero(), "total_quantity was zero and would result in division by zero");
     round_to_min_tick(total_notional / total_quantity, min_price_tick_size)
 }
 

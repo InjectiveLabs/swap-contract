@@ -103,16 +103,16 @@ pub fn mock_deps_eth_inj(
         let mut orderbooks = HashMap::new();
         let eth_buy_orderbook = vec![
             PriceLevel {
-                p: FPDecimal::must_from_str("0.000000002107200000"),
-                q: FPDecimal::from_str("784000000000000000.000000000000000000").unwrap(),
+                p: 201000u128.into(),
+                q: FPDecimal::from_str("5").unwrap(),
             },
             PriceLevel {
-                p: FPDecimal::must_from_str("0.000000001978000000"),
-                q: FPDecimal::from_str("1230000000000000000.000000000000000000").unwrap(),
+                p: 195000u128.into(),
+                q: FPDecimal::from_str("4").unwrap(),
             },
             PriceLevel {
-                p: FPDecimal::must_from_str("0.000000001966660000"),
-                q: FPDecimal::from_str("2070000000000000000.000000000000000000").unwrap(),
+                p: 192000u128.into(),
+                q: FPDecimal::from_str("3").unwrap(),
             },
         ];
         orderbooks.insert(MarketId::new(TEST_MARKET_ID_1).unwrap(), eth_buy_orderbook);
@@ -157,26 +157,6 @@ pub fn mock_deps_eth_inj(
                 create_spot_error_multiplier_handler()
         }
     })
-}
-
-fn create_mock_spot_market(
-    base: &str,
-    min_price_tick_size: FPDecimal,
-    min_quantity_tick_size: FPDecimal,
-    idx: u32,
-) -> SpotMarket {
-    SpotMarket {
-        ticker: format!("{base}usdt"),
-        base_denom: base.to_string(),
-        quote_denom: "usdt".to_string(),
-        maker_fee_rate: FPDecimal::from_str("0.001").unwrap(),
-        taker_fee_rate: FPDecimal::from_str("0.002").unwrap(),
-        relayer_fee_share_rate: FPDecimal::from_str("0.4").unwrap(),
-        market_id: test_market_ids()[idx as usize].clone(),
-        status: 1,
-        min_price_tick_size,
-        min_quantity_tick_size,
-    }
 }
 
 pub fn mock_realistic_deps_eth_inj(
@@ -261,6 +241,26 @@ pub fn mock_realistic_deps_eth_inj(
                 create_spot_error_multiplier_handler()
         }
     })
+}
+
+fn create_mock_spot_market(
+    base: &str,
+    min_price_tick_size: FPDecimal,
+    min_quantity_tick_size: FPDecimal,
+    idx: u32,
+) -> SpotMarket {
+    SpotMarket {
+        ticker: format!("{base}usdt"),
+        base_denom: base.to_string(),
+        quote_denom: "usdt".to_string(),
+        maker_fee_rate: FPDecimal::from_str("0.001").unwrap(),
+        taker_fee_rate: FPDecimal::from_str("0.002").unwrap(),
+        relayer_fee_share_rate: FPDecimal::from_str("0.4").unwrap(),
+        market_id: test_market_ids()[idx as usize].clone(),
+        status: 1,
+        min_price_tick_size,
+        min_quantity_tick_size,
+    }
 }
 
 pub fn wasm_file(contract_name: String) -> String {
