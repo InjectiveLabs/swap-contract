@@ -75,9 +75,7 @@ pub fn estimate_swap_result(
             true,
         )?;
 
-        let new_amount = swap_estimate.result_quantity;
-
-        current_swap.amount = new_amount;
+        current_swap.amount = swap_estimate.result_quantity;
         current_swap.denom = swap_estimate.result_denom;
 
         let step_fee = swap_estimate
@@ -156,93 +154,41 @@ pub fn estimate_single_swap_execution(
     }
 }
 
-fn estimate_execution_buy(
+fn estimate_execution_buy_from_source(
     deps: &Deps<InjectiveQueryWrapper>,
     querier: &InjectiveQuerier,
     contract_address: &Addr,
     market: &SpotMarket,
-    swap_estimation_amount: SwapEstimationAmount,
+    amount_coin: FPCoin,
     fee_percent: FPDecimal,
     is_simulation: bool,
 ) -> StdResult<StepExecutionEstimate> {
-    let amount_coin = match swap_estimation_amount.to_owned() {
-        SwapEstimationAmount::InputQuantity(fp) => fp,
-        SwapEstimationAmount::ReceiveQuantity(fp) => fp,
-    };
+    let available_funds = amount_coin.amount / (FPDecimal::one() + fee_percent);
 
-    let is_estimating_from_source = matches!(
-        swap_estimation_amount,
-        SwapEstimationAmount::InputQuantity(_)
-    );
-
-    let available_funds = if is_estimating_from_source {
-        // keep reserve for fee
-        Some(amount_coin.amount / (FPDecimal::one() + fee_percent))
-    } else {
-        // unknown when estimating from target
-        None
-    };
-
-    let top_orders = if is_estimating_from_source {
-        let orders = querier.query_spot_market_orderbook(
-            &market.market_id,
-            OrderSide::Sell,
-            None,
-            available_funds,
-        )?;
-        get_minimum_liquidity_levels(
-            deps,
-            &orders.sells_price_level,
-            available_funds.unwrap(),
-            |l| l.q * l.p,
-            market.min_quantity_tick_size,
-        )?
-    } else {
-        let rounded_input_amount =
-            round_to_min_tick(amount_coin.amount, market.min_quantity_tick_size);
-        let orders = querier.query_spot_market_orderbook(
-            &market.market_id,
-            OrderSide::Sell,
-            Some(rounded_input_amount),
-            None,
-        )?;
-        get_minimum_liquidity_levels(
-            deps,
-            &orders.sells_price_level,
-            rounded_input_amount,
-            |l| l.q,
-            market.min_quantity_tick_size,
-        )?
-    };
+    let orders = querier.query_spot_market_orderbook(
+        &market.market_id,
+        OrderSide::Sell,
+        None,
+        Some(available_funds),
+    )?;
+    let top_orders = get_minimum_liquidity_levels(
+        deps,
+        &orders.sells_price_level,
+        available_funds,
+        |l| l.q * l.p,
+        market.min_quantity_tick_size,
+    )?;
 
     let worst_price = get_worst_price_from_orders(&top_orders);
-
     let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
 
-    let (expected_quantity, result_quantity, fee_estimate) = if is_estimating_from_source {
-        let expected_quantity = available_funds.unwrap() / average_price;
-        let result_quantity = round_to_min_tick(expected_quantity, market.min_quantity_tick_size);
-        let fee_estimate = amount_coin.amount - available_funds.unwrap();
-
-        (expected_quantity, result_quantity, fee_estimate)
-    } else {
-        let expected_exchange_quantity = amount_coin.amount * average_price;
-
-        // add smallest precision as buffer for precision losses
-        let fee_estimate = expected_exchange_quantity * fee_percent + FPDecimal::SMALLEST_PRECISION;
-        let required_input_quantity =
-            expected_exchange_quantity + fee_estimate + FPDecimal::SMALLEST_PRECISION;
-
-        (
-            expected_exchange_quantity,
-            required_input_quantity,
-            fee_estimate,
-        )
-    };
+    let expected_quantity = available_funds / average_price;
+    let result_quantity = round_to_min_tick(expected_quantity, market.min_quantity_tick_size);
+    let fee_estimate = amount_coin.amount - available_funds;
 
     // check if user funds + contract funds are enough to create order
     let required_funds = worst_price * expected_quantity * (FPDecimal::one() + fee_percent);
-    let funds_in_contract: FPDecimal = deps
+    let funds_in_contract = deps
         .querier
         .query_balance(contract_address, &market.quote_denom)
         .expect("query own balance should not fail")
@@ -251,7 +197,7 @@ fn estimate_execution_buy(
 
     let funds_for_margin = match is_simulation {
         false => funds_in_contract, // in execution mode funds_in_contract already contain user funds so we don't want to count them double
-        true => funds_in_contract + available_funds.unwrap_or_default(),
+        true => funds_in_contract + available_funds,
     };
 
     if required_funds > funds_for_margin {
@@ -270,6 +216,113 @@ fn estimate_execution_buy(
             amount: fee_estimate,
         }),
     })
+}
+
+fn estimate_execution_buy_from_target(
+    deps: &Deps<InjectiveQueryWrapper>,
+    querier: &InjectiveQuerier,
+    contract_address: &Addr,
+    market: &SpotMarket,
+    amount_coin: FPCoin,
+    fee_percent: FPDecimal,
+    is_simulation: bool,
+) -> StdResult<StepExecutionEstimate> {
+    let rounded_input_amount = round_to_min_tick(amount_coin.amount, market.min_quantity_tick_size);
+
+    let orders = querier.query_spot_market_orderbook(
+        &market.market_id,
+        OrderSide::Sell,
+        Some(rounded_input_amount),
+        None,
+    )?;
+    let top_orders = get_minimum_liquidity_levels(
+        deps,
+        &orders.sells_price_level,
+        rounded_input_amount,
+        |l| l.q,
+        market.min_quantity_tick_size,
+    )?;
+
+    let worst_price = get_worst_price_from_orders(&top_orders);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
+
+    let expected_exchange_quantity = amount_coin.amount * average_price;
+    let fee_estimate = expected_exchange_quantity * fee_percent;
+    let required_input_quantity = expected_exchange_quantity + fee_estimate;
+
+    // check if user funds + contract funds are enough to create order
+    let required_funds =
+        worst_price * expected_exchange_quantity * (FPDecimal::one() + fee_percent);
+    let funds_in_contract = deps
+        .querier
+        .query_balance(contract_address, &market.quote_denom)
+        .expect("query own balance should not fail")
+        .amount
+        .into();
+
+    let funds_for_margin = match is_simulation {
+        false => funds_in_contract, // in execution mode funds_in_contract already contain user funds so we don't want to count them double
+        true => funds_in_contract + required_input_quantity,
+    };
+
+    if required_funds > funds_for_margin {
+        return Err(StdError::generic_err(format!(
+            "Swap amount too high, required funds: {required_funds}, available funds: {funds_for_margin}",
+        )));
+    }
+
+    Ok(StepExecutionEstimate {
+        worst_price,
+        result_quantity: required_input_quantity,
+        result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
+        is_buy_order: true,
+        fee_estimate: Some(FPCoin {
+            denom: market.quote_denom.clone(),
+            amount: fee_estimate,
+        }),
+    })
+}
+
+fn estimate_execution_buy(
+    deps: &Deps<InjectiveQueryWrapper>,
+    querier: &InjectiveQuerier,
+    contract_address: &Addr,
+    market: &SpotMarket,
+    swap_estimation_amount: SwapEstimationAmount,
+    fee_percent: FPDecimal,
+    is_simulation: bool,
+) -> StdResult<StepExecutionEstimate> {
+    let amount_coin = match swap_estimation_amount.to_owned() {
+        SwapEstimationAmount::InputQuantity(fp) => fp,
+        SwapEstimationAmount::ReceiveQuantity(fp) => fp,
+    };
+
+    let is_estimating_from_target = matches!(
+        swap_estimation_amount,
+        SwapEstimationAmount::ReceiveQuantity(_)
+    );
+
+    if is_estimating_from_target {
+        estimate_execution_buy_from_target(
+            deps,
+            querier,
+            contract_address,
+            market,
+            amount_coin,
+            fee_percent,
+            is_simulation,
+        )
+    } else {
+        estimate_execution_buy_from_source(
+            deps,
+            querier,
+            contract_address,
+            market,
+            amount_coin,
+            fee_percent,
+            is_simulation,
+        )
+    }
 }
 
 fn estimate_execution_sell_from_source(
@@ -294,8 +347,7 @@ fn estimate_execution_sell_from_source(
         market.min_quantity_tick_size,
     )?;
 
-    let average_price: FPDecimal =
-        get_average_price_from_orders(&top_orders, market.min_price_tick_size);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
     let expected_exchange_quantity = amount_coin.amount * average_price;
     let fee_estimate = expected_exchange_quantity * fee_percent;
 
@@ -324,6 +376,12 @@ fn estimate_execution_sell_from_target(
 ) -> StdResult<StepExecutionEstimate> {
     let required_fee = amount_coin.amount * fee_percent / (FPDecimal::one() - fee_percent);
     let required_swap_quantity_in_quote = amount_coin.amount + required_fee;
+
+    // TODO double check with unit tests if below code also works (it should)
+    // let required_swap_quantity_in_quote = amount_coin.amount / (FPDecimal::one() - fee_percent);
+    // let required_fee = required_swap_quantity_in_quote - amount_coin.amount;
+
+    // TODO check why estimate_execution_buy_from_source `available_funds` calculation is slightly different
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,

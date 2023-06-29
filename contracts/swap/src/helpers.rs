@@ -59,6 +59,7 @@ pub fn dec_scale_factor() -> FPDecimal {
     FPDecimal::one().scaled(18)
     // FPDecimal::from(1000000000000000000_i128)
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -34,7 +34,7 @@ cosmwasm-storage   = "1.0.0"
 cw-storage-plus    = "0.14.0"
 cw-utils           = "0.14.0"
 cw2                = "0.14.0"
-injective-cosmwasm = { version = "0.1.101" }
+injective-cosmwasm = { version = "0.2.2" }
 injective-math     = { version = "0.1.16" }
 injective-protobuf = { version = "0.1", git = "https://github.com/InjectiveLabs/cw-injective", branch = "dev" }
 num-traits         = "0.2.15"
