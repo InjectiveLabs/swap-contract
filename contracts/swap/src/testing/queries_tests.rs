@@ -108,7 +108,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
             admin: admin.to_owned(),
         },
     )
-        .unwrap();
+    .unwrap();
     set_route(
         deps.as_mut_deps(),
         &Addr::unchecked(TEST_USER_ADDR),
@@ -116,16 +116,16 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
         "inj".to_string(),
         vec![TEST_MARKET_ID_1.into(), TEST_MARKET_ID_2.into()],
     )
-        .unwrap();
+    .unwrap();
 
     let actual_swap_result = estimate_swap_result(
         deps.as_ref(),
         &mock_env(),
         "eth".to_string(),
         "inj".to_string(),
-        SwapQuantity::OutputQuantity(FPDecimal::from_str("2879.743675898814381036").unwrap()),
+        SwapQuantity::OutputQuantity(FPDecimal::from_str("2879.74").unwrap()),
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(
         actual_swap_result.result_quantity,
@@ -261,7 +261,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
             admin: admin.to_owned(),
         },
     )
-        .unwrap();
+    .unwrap();
 
     set_route(
         deps.as_mut_deps(),
@@ -270,7 +270,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
         "inj".to_string(),
         vec![TEST_MARKET_ID_1.into(), TEST_MARKET_ID_2.into()],
     )
-        .unwrap();
+    .unwrap();
 
     let actual_swap_result = estimate_swap_result(
         deps.as_ref(),
@@ -279,7 +279,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
         "inj".to_string(),
         SwapQuantity::OutputQuantity(FPDecimal::from_str("2888.8").unwrap()),
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(
         actual_swap_result.result_quantity,

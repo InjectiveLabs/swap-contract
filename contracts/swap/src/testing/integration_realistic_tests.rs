@@ -176,7 +176,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
 
     assert_eq!(
         query_result.result_quantity,
-        human_to_dec("2893.888", Decimals::Six),
+        human_to_dec("2893.886", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
 
@@ -219,6 +219,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
+
     assert_eq!(
         from_balance,
         FPDecimal::zero(),

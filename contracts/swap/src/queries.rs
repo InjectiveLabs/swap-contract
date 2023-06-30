@@ -5,7 +5,7 @@ use injective_cosmwasm::{
 use injective_math::utils::round_to_min_tick;
 use injective_math::FPDecimal;
 
-use crate::helpers::{counter_denom, round_up_to_min_tick};
+use crate::helpers::round_up_to_min_tick;
 use crate::state::{read_swap_route, CONFIG};
 use crate::types::{FPCoin, StepExecutionEstimate, SwapEstimationAmount, SwapEstimationResult};
 
@@ -159,35 +159,37 @@ fn estimate_execution_buy_from_source(
     querier: &InjectiveQuerier,
     contract_address: &Addr,
     market: &SpotMarket,
-    amount_coin: FPCoin,
+    input_quote_quantity: FPDecimal,
     fee_percent: FPDecimal,
     is_simulation: bool,
 ) -> StdResult<StepExecutionEstimate> {
-    let available_funds = amount_coin.amount / (FPDecimal::one() + fee_percent);
+    let available_swap_quote_funds = input_quote_quantity / (FPDecimal::one() + fee_percent);
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
         OrderSide::Sell,
         None,
-        Some(available_funds),
+        Some(available_swap_quote_funds),
     )?;
     let top_orders = get_minimum_liquidity_levels(
         deps,
         &orders.sells_price_level,
-        available_funds,
+        available_swap_quote_funds,
         |l| l.q * l.p,
         market.min_quantity_tick_size,
     )?;
 
+    // lets overestimate amount for buys means rounding average price up -> higher buy price -> worse
+    let average_price =
+        get_average_price_from_orders(&top_orders, market.min_price_tick_size, true);
     let worst_price = get_worst_price_from_orders(&top_orders);
-    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
 
-    let expected_quantity = available_funds / average_price;
-    let result_quantity = round_to_min_tick(expected_quantity, market.min_quantity_tick_size);
-    let fee_estimate = amount_coin.amount - available_funds;
+    let expected_base_quantity = available_swap_quote_funds / average_price;
+    let result_quantity = round_to_min_tick(expected_base_quantity, market.min_quantity_tick_size);
+    let fee_estimate = input_quote_quantity - available_swap_quote_funds;
 
     // check if user funds + contract funds are enough to create order
-    let required_funds = worst_price * expected_quantity * (FPDecimal::one() + fee_percent);
+    let required_funds = worst_price * expected_base_quantity * (FPDecimal::one() + fee_percent);
     let funds_in_contract = deps
         .querier
         .query_balance(contract_address, &market.quote_denom)
@@ -197,7 +199,7 @@ fn estimate_execution_buy_from_source(
 
     let funds_for_margin = match is_simulation {
         false => funds_in_contract, // in execution mode funds_in_contract already contain user funds so we don't want to count them double
-        true => funds_in_contract + available_funds,
+        true => funds_in_contract + available_swap_quote_funds,
     };
 
     if required_funds > funds_for_margin {
@@ -209,7 +211,7 @@ fn estimate_execution_buy_from_source(
     Ok(StepExecutionEstimate {
         worst_price,
         result_quantity,
-        result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
+        result_denom: market.base_denom.to_string(),
         is_buy_order: true,
         fee_estimate: Some(FPCoin {
             denom: market.quote_denom.clone(),
@@ -223,36 +225,43 @@ fn estimate_execution_buy_from_target(
     querier: &InjectiveQuerier,
     contract_address: &Addr,
     market: &SpotMarket,
-    amount_coin: FPCoin,
+    target_base_output_quantity: FPDecimal,
     fee_percent: FPDecimal,
     is_simulation: bool,
 ) -> StdResult<StepExecutionEstimate> {
-    let rounded_input_amount = round_to_min_tick(amount_coin.amount, market.min_quantity_tick_size);
+    if !(target_base_output_quantity.num % market.min_quantity_tick_size.num).is_zero() {
+        return Err(StdError::generic_err(
+            "Target quantity must be a multiple of min_quantity_tick_size",
+        ));
+    }
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
         OrderSide::Sell,
-        Some(rounded_input_amount),
+        Some(target_base_output_quantity),
         None,
     )?;
     let top_orders = get_minimum_liquidity_levels(
         deps,
         &orders.sells_price_level,
-        rounded_input_amount,
+        target_base_output_quantity,
         |l| l.q,
         market.min_quantity_tick_size,
     )?;
 
+    // lets overestimate amount for buys means rounding average price up -> higher buy price -> worse
+    let average_price =
+        get_average_price_from_orders(&top_orders, market.min_price_tick_size, true);
     let worst_price = get_worst_price_from_orders(&top_orders);
-    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
 
-    let expected_exchange_quantity = amount_coin.amount * average_price;
-    let fee_estimate = expected_exchange_quantity * fee_percent;
-    let required_input_quantity = expected_exchange_quantity + fee_estimate;
+    let expected_exchange_quote_quantity = target_base_output_quantity * average_price;
+    let fee_estimate = expected_exchange_quote_quantity * fee_percent;
+    let required_input_quote_quantity = expected_exchange_quote_quantity + fee_estimate;
 
     // check if user funds + contract funds are enough to create order
     let required_funds =
-        worst_price * expected_exchange_quantity * (FPDecimal::one() + fee_percent);
+        worst_price * target_base_output_quantity * (FPDecimal::one() + fee_percent);
+
     let funds_in_contract = deps
         .querier
         .query_balance(contract_address, &market.quote_denom)
@@ -262,7 +271,7 @@ fn estimate_execution_buy_from_target(
 
     let funds_for_margin = match is_simulation {
         false => funds_in_contract, // in execution mode funds_in_contract already contain user funds so we don't want to count them double
-        true => funds_in_contract + required_input_quantity,
+        true => funds_in_contract + required_input_quote_quantity,
     };
 
     if required_funds > funds_for_margin {
@@ -273,8 +282,8 @@ fn estimate_execution_buy_from_target(
 
     Ok(StepExecutionEstimate {
         worst_price,
-        result_quantity: required_input_quantity,
-        result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
+        result_quantity: required_input_quote_quantity,
+        result_denom: market.quote_denom.to_string(),
         is_buy_order: true,
         fee_estimate: Some(FPCoin {
             denom: market.quote_denom.clone(),
@@ -308,7 +317,7 @@ fn estimate_execution_buy(
             querier,
             contract_address,
             market,
-            amount_coin,
+            amount_coin.amount,
             fee_percent,
             is_simulation,
         )
@@ -318,7 +327,7 @@ fn estimate_execution_buy(
             querier,
             contract_address,
             market,
-            amount_coin,
+            amount_coin.amount,
             fee_percent,
             is_simulation,
         )
@@ -329,36 +338,37 @@ fn estimate_execution_sell_from_source(
     deps: &Deps<InjectiveQueryWrapper>,
     querier: &InjectiveQuerier,
     market: &SpotMarket,
-    amount_coin: FPCoin,
+    input_base_quantity: FPDecimal,
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
         OrderSide::Buy,
-        Some(amount_coin.amount),
+        Some(input_base_quantity),
         None,
     )?;
 
     let top_orders = get_minimum_liquidity_levels(
         deps,
         &orders.buys_price_level,
-        amount_coin.amount,
+        input_base_quantity,
         |l| l.q,
         market.min_quantity_tick_size,
     )?;
 
-    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
-    let expected_exchange_quantity = amount_coin.amount * average_price;
-    let fee_estimate = expected_exchange_quantity * fee_percent;
-
-    let expected_quantity = expected_exchange_quantity - fee_estimate;
-
+    // lets overestimate amount for sells means rounding average price down -> lower sell price -> worse
+    let average_price =
+        get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
     let worst_price = get_worst_price_from_orders(&top_orders);
+
+    let expected_exchange_quantity = input_base_quantity * average_price;
+    let fee_estimate = expected_exchange_quantity * fee_percent;
+    let expected_quantity = expected_exchange_quantity - fee_estimate;
 
     Ok(StepExecutionEstimate {
         worst_price,
         result_quantity: expected_quantity,
-        result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
+        result_denom: market.quote_denom.to_string(),
         is_buy_order: false,
         fee_estimate: Some(FPCoin {
             denom: market.quote_denom.clone(),
@@ -371,17 +381,12 @@ fn estimate_execution_sell_from_target(
     deps: &Deps<InjectiveQueryWrapper>,
     querier: &InjectiveQuerier,
     market: &SpotMarket,
-    amount_coin: FPCoin,
+    target_quote_output_quantity: FPDecimal,
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
-    let required_fee = amount_coin.amount * fee_percent / (FPDecimal::one() - fee_percent);
-    let required_swap_quantity_in_quote = amount_coin.amount + required_fee;
-
-    // TODO double check with unit tests if below code also works (it should)
-    // let required_swap_quantity_in_quote = amount_coin.amount / (FPDecimal::one() - fee_percent);
-    // let required_fee = required_swap_quantity_in_quote - amount_coin.amount;
-
-    // TODO check why estimate_execution_buy_from_source `available_funds` calculation is slightly different
+    let required_swap_quantity_in_quote =
+        target_quote_output_quantity / (FPDecimal::one() - fee_percent);
+    let required_fee = required_swap_quantity_in_quote - target_quote_output_quantity;
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
@@ -397,10 +402,12 @@ fn estimate_execution_sell_from_target(
         market.min_quantity_tick_size,
     )?;
 
-    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size);
+    // lets overestimate amount for sells means rounding average price down -> lower sell price -> worse
+    let average_price =
+        get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
+    let worst_price = get_worst_price_from_orders(&top_orders);
 
     let expected_input_quantity = required_swap_quantity_in_quote / average_price;
-    let worst_price = get_worst_price_from_orders(&top_orders);
 
     Ok(StepExecutionEstimate {
         worst_price,
@@ -408,7 +415,7 @@ fn estimate_execution_sell_from_target(
             expected_input_quantity,
             market.min_quantity_tick_size,
         ),
-        result_denom: counter_denom(market, &amount_coin.denom)?.to_string(),
+        result_denom: market.base_denom.to_string(),
         is_buy_order: false,
         fee_estimate: Some(FPCoin {
             denom: market.quote_denom.clone(),
@@ -435,9 +442,9 @@ fn estimate_execution_sell(
     );
 
     if is_estimating_from_target {
-        estimate_execution_sell_from_target(deps, querier, market, amount_coin, fee_percent)
+        estimate_execution_sell_from_target(deps, querier, market, amount_coin.amount, fee_percent)
     } else {
-        estimate_execution_sell_from_source(deps, querier, market, amount_coin, fee_percent)
+        estimate_execution_sell_from_source(deps, querier, market, amount_coin.amount, fee_percent)
     }
 }
 
@@ -464,7 +471,7 @@ pub fn get_minimum_liquidity_levels(
 
             // we only take a part of this price level
             let raw_quantity = ((value - excess) / value) * level.q;
-            let rounded_quantity = round_to_min_tick(raw_quantity, min_quantity_tick_size);
+            let rounded_quantity = round_up_to_min_tick(raw_quantity, min_quantity_tick_size);
 
             PriceLevel {
                 p: level.p,
@@ -494,6 +501,7 @@ pub fn get_minimum_liquidity_levels(
 fn get_average_price_from_orders(
     levels: &[PriceLevel],
     min_price_tick_size: FPDecimal,
+    is_rounding_up: bool,
 ) -> FPDecimal {
     let (total_quantity, total_notional) = levels
         .iter()
@@ -506,7 +514,13 @@ fn get_average_price_from_orders(
         FPDecimal::zero(),
         "total_quantity was zero and would result in division by zero"
     );
-    round_up_to_min_tick(total_notional / total_quantity, min_price_tick_size)
+    let average_price = total_notional / total_quantity;
+
+    if is_rounding_up {
+        round_up_to_min_tick(average_price, min_price_tick_size)
+    } else {
+        round_to_min_tick(average_price, min_price_tick_size)
+    }
 }
 
 fn get_worst_price_from_orders(levels: &[PriceLevel]) -> FPDecimal {
@@ -537,7 +551,7 @@ mod tests {
             create_price_level(3, 200),
         ];
 
-        let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"));
+        let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"), false);
         assert_eq!(avg, FPDecimal::from(2u128));
     }
 
@@ -549,7 +563,7 @@ mod tests {
             create_price_level(3, 100),
         ];
 
-        let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"));
+        let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"), false);
         assert_eq!(avg, FPDecimal::from(1000u128) / FPDecimal::from(600u128));
     }
 
