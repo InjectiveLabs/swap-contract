@@ -1,3 +1,4 @@
+use std::ops::Neg;
 use std::str::FromStr;
 
 use cosmwasm_std::testing::{mock_env, mock_info};
@@ -7,6 +8,7 @@ use crate::admin::set_route;
 use crate::contract::instantiate;
 use injective_cosmwasm::{OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 use injective_math::FPDecimal;
+use crate::helpers::Scaled;
 
 use crate::msg::{FeeRecipient, InstantiateMsg};
 use crate::queries::{estimate_swap_result, SwapQuantity};
@@ -378,8 +380,8 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     )
     .unwrap();
 
-    // TODO slightly higher value than in the spreadsheet: 0.76 vs 0.17; that makes no sense, user is getting more, not less
-    let expected_usdt_result_quantity = human_to_dec("8127.7650216", Decimals::Six);
+    // TODO slightly higher value than in the spreadsheet: 0.73 vs 0.17; that makes no sense, user is getting more, not less
+    let expected_usdt_result_quantity = human_to_dec("8127.7324632", Decimals::Six);
 
     assert_eq!(
         input_swap_estimate.result_quantity, expected_usdt_result_quantity,
@@ -426,7 +428,9 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     // estimating from source quantity
     assert!(
         output_swap_estimate.result_quantity > eth_input_amount,
-        "Swap execution estimate when using target quantity wasn't higher than when using source quantity"
+        "Swap execution estimate when using target quantity wasn't higher than when using source quantity. Target amount: {} ETH, source amount: {} ETH",
+        output_swap_estimate.result_quantity.scaled(Decimals::Eighteen.get_decimals().neg()),
+        eth_input_amount.scaled(Decimals::Eighteen.get_decimals().neg())
     );
 
     assert!(
@@ -543,7 +547,9 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
     // estimating from source quantity
     assert!(
         output_swap_estimate.result_quantity > usdt_input_amount,
-        "Swap execution estimate when using target quantity wasn't higher than when using source quantity"
+        "Swap execution estimate when using target quantity wasn't higher than when using source quantity. Target amount: {} USDT, source amount: {} USDT",
+        output_swap_estimate.result_quantity.scaled(Decimals::Six.get_decimals().neg()),
+        usdt_input_amount.scaled(Decimals::Six.get_decimals().neg())
     );
 
     assert!(

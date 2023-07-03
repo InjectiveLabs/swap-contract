@@ -226,6 +226,7 @@ fn happy_path_two_hops_swap_realistic_scales_self_relaying_source_quantity() {
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
+
     assert_eq!(
         from_balance,
         FPDecimal::zero(),

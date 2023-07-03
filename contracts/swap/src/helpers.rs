@@ -1,6 +1,6 @@
-use cosmwasm_std::{CosmosMsg, StdError, StdResult, SubMsg};
+use cosmwasm_std::{CosmosMsg, SubMsg};
 
-use injective_cosmwasm::{InjectiveMsgWrapper, SpotMarket};
+use injective_cosmwasm::InjectiveMsgWrapper;
 use injective_math::FPDecimal;
 use num_traits::pow::Pow;
 
@@ -17,18 +17,6 @@ pub fn get_message_data(
         _ => panic!("No wrapped message found"),
     };
     sth
-}
-
-pub fn counter_denom<'a>(market: &'a SpotMarket, denom: &str) -> StdResult<&'a str> {
-    if market.quote_denom == denom {
-        Ok(&market.base_denom)
-    } else if market.base_denom == denom {
-        Ok(&market.quote_denom)
-    } else {
-        Err(StdError::generic_err(
-            "Denom must be either base or quote denom of this market!",
-        ))
-    }
 }
 
 pub fn round_up_to_min_tick(num: FPDecimal, min_tick: FPDecimal) -> FPDecimal {
@@ -59,6 +47,7 @@ pub fn dec_scale_factor() -> FPDecimal {
     FPDecimal::one().scaled(18)
     // FPDecimal::from(1000000000000000000_i128)
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

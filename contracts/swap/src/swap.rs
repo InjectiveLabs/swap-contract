@@ -72,18 +72,24 @@ pub fn start_swap_flow(
 
         let querier = InjectiveQuerier::new(&deps.querier);
         let first_market_id = steps[0].to_owned();
-        let market = querier
+        let first_market = querier
             .query_spot_market(&first_market_id)?
             .market
             .expect("market should be available");
 
-        let required_input =
-            round_up_to_min_tick(estimation.result_quantity, market.min_quantity_tick_size);
+        let is_input_quote = first_market.quote_denom == *source_denom;
+
+        let required_input = if is_input_quote {
+            estimation.result_quantity.int() + FPDecimal::one()
+        } else {
+            round_up_to_min_tick(
+                estimation.result_quantity,
+                first_market.min_quantity_tick_size,
+            )
+        };
 
         if required_input > coin_provided.amount.into() {
-            return Err(ContractError::MaxInputAmountExceeded(
-                estimation.result_quantity,
-            ));
+            return Err(ContractError::MaxInputAmountExceeded(required_input));
         }
 
         current_balance = FPCoin {

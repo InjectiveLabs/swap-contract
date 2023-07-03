@@ -1050,21 +1050,12 @@ mod tests {
     }
 }
 
-// pub fn round_usd_like_fee(raw_fee: &FPCoin, min_price_tick_size: FPDecimal) -> FPCoin {
-//     FPCoin {
-//         amount: round_up_to_min_tick(raw_fee.amount, min_price_tick_size),
-//         denom: raw_fee.denom.clone(),
-//     }
-// }
-
 pub fn are_fpdecimals_approximately_equal(
     first: FPDecimal,
     second: FPDecimal,
     max_diff: FPDecimal,
 ) -> bool {
-    let a = (first - second).abs() <= max_diff;
-    println!("diff: {}", (first - second).abs());
-    a
+    (first - second).abs() <= max_diff
 }
 
 pub fn assert_fee_is_as_expected(
