@@ -1049,7 +1049,9 @@ mod tests {
 // }
 
 pub fn are_fpdecimals_approximately_equal(first: FPDecimal, second: FPDecimal, max_diff: FPDecimal) -> bool {
-    return (first - second).abs() <= max_diff;
+    let a = (first - second).abs() <= max_diff;
+    println!("diff: {}", (first - second).abs());
+    a
 }
 
 pub fn assert_fee_is_as_expected(

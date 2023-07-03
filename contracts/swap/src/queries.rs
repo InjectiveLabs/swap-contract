@@ -251,6 +251,7 @@ fn estimate_execution_buy(
     println!("average_price: {}", average_price);
     println!("expected_quantity: {}", expected_quantity);
     println!("result_quantity: {}", result_quantity);
+    println!("fee_estimate: {}", fee_estimate);
     println!("---------------------------------");
     println!("---------------------------------");
 
@@ -327,6 +328,7 @@ fn estimate_execution_sell_from_source(
     println!("average_price: {}", average_price);
     println!("expected_exchange_quantity: {}", expected_exchange_quantity);
     println!("expected_quantity: {}", expected_quantity);
+    println!("fee_estimate: {}", fee_estimate);
     println!("---------------------------------");
     println!("---------------------------------");
 
@@ -380,6 +382,7 @@ fn estimate_execution_sell_from_target(
     println!("amount_coin.amount: {}", amount_coin.amount);
     println!("average_price: {}", average_price);
     println!("expected_input_quantity: {}", expected_input_quantity);
+    println!("fee_estimate: {}", required_fee);
     println!(
         "result_quantity: {}",
         round_up_to_min_tick(expected_input_quantity, market.min_quantity_tick_size,)
