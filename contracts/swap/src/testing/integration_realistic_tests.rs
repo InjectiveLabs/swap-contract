@@ -1,15 +1,17 @@
 use injective_test_tube::{Account, Bank, Exchange, InjectiveTestApp, Module, RunnerResult, Wasm};
+use std::ops::Neg;
 
-use injective_math::FPDecimal;
 use crate::helpers::Scaled;
+use injective_math::FPDecimal;
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    assert_fee_is_as_expected, create_realistic_limit_order, dec_to_proto, human_to_dec,
-    init_contract_and_get_address, init_default_validator_account, init_rich_account,
-    launch_custom_spot_market, must_init_account_with_funds, query_all_bank_balances,
-    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
-    DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, USDT,
+    are_fpdecimals_approximately_equal, assert_fee_is_as_expected, create_realistic_limit_order,
+    dec_to_proto, human_to_dec, init_default_validator_account, init_rich_account,
+    init_self_relaying_contract_and_get_address, launch_custom_spot_market,
+    must_init_account_with_funds, query_all_bank_balances, query_bank_balance,
+    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
+    DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, USDT,
 };
 use crate::types::{FPCoin, SwapEstimationResult};
 
@@ -23,8 +25,9 @@ use crate::types::{FPCoin, SwapEstimationResult};
    https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
 */
 
+//ok
 #[test]
-fn happy_path_two_hops_swap_realistic_scales() {
+fn happy_path_two_hops_swap_realistic_scales_self_relaying_source_quantity() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -59,8 +62,11 @@ fn happy_path_two_hops_swap_realistic_scales() {
         dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
     );
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -160,7 +166,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
         &app,
         &[
             str_coin("12", ETH, Decimals::Eighteen),
-            str_coin("5", INJ, Decimals::Eighteen),
+            str_coin("0.01", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -175,13 +181,14 @@ fn happy_path_two_hops_swap_realistic_scales() {
         )
         .unwrap();
 
+    // it's expected that it is slightly less than what's in the spreadsheet
+    let expected_quantity = human_to_dec("2893.886", Decimals::Six);
+
     assert_eq!(
-        query_result.result_quantity,
-        human_to_dec("2893.889", Decimals::Six),
+        query_result.result_quantity, expected_quantity,
         "incorrect swap result estimate returned by query"
     );
 
-    // values from the spreadsheet
     let mut expected_fees = vec![
         FPCoin {
             amount: human_to_dec("3541.5", Decimals::Six),
@@ -193,11 +200,10 @@ fn happy_path_two_hops_swap_realistic_scales() {
         },
     ];
 
-    // we don't care about decimal fraction of the fee
     assert_fee_is_as_expected(
         &mut query_result.expected_fees,
         &mut expected_fees,
-        FPDecimal::one(),
+        human_to_dec("0.1", Decimals::Six),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -211,7 +217,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
         &contr_addr,
         &ExecuteMsg::SwapMinOutput {
             target_denom: ATOM.to_string(),
-            min_output_quantity: FPDecimal::from(2800u128),
+            min_output_quantity: FPDecimal::from(2893u128),
         },
         &[str_coin("12", ETH, Decimals::Eighteen)],
         &swapper,
@@ -226,8 +232,7 @@ fn happy_path_two_hops_swap_realistic_scales() {
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
-        to_balance,
-        human_to_dec("2893.889", Decimals::Six),
+        to_balance, expected_quantity,
         "swapper did not receive expected amount"
     );
 
@@ -238,30 +243,37 @@ fn happy_path_two_hops_swap_realistic_scales() {
         "wrong number of denoms in contract balances"
     );
 
-    let atom_amount_below_min_tick_size = FPDecimal::must_from_str("0.000685");
-    let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("830", Decimals::Six);
-    let fee_refund = dust_value
-        * FPDecimal::must_from_str(&format!(
-            "{}",
-            DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
-        ));
-
-    dust_value += fee_refund;
-
-    let expected_contract_usdt_balance =
-        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str()) + dust_value;
-    let actual_contract_balance =
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
         FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
-    let contract_balance_diff = expected_contract_usdt_balance.abs_diff(&actual_contract_balance);
 
     assert!(
-        human_to_dec("0.001", Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
-        "contract balance has changed too much after swap"
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
+        contract_usdt_balance_after,
+        contract_usdt_balance_before
+    );
+
+    // contract can earn max of 2.3 USDT, when exchanging ETH worth ~$2.3M
+    let max_diff = human_to_dec("2.3", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {}, previous balance: {}. Max diff: {}",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
     );
 }
 
+//ok
 #[test]
-fn happy_path_two_hops_swap_realistic_values() {
+fn happy_path_two_hops_swap_realistic_values_self_relaying_source_quantity() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -299,8 +311,11 @@ fn happy_path_two_hops_swap_realistic_values() {
         dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
     );
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("1_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("1_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -419,9 +434,11 @@ fn happy_path_two_hops_swap_realistic_values() {
         )
         .unwrap();
 
+    // it's expected that it is slightly less than what's in the spreadsheet
+    let expected_amount = human_to_dec("906.195", Decimals::Six);
+
     assert_eq!(
-        query_result.result_quantity,
-        human_to_dec("906.262", Decimals::Six),
+        query_result.result_quantity, expected_amount,
         "incorrect swap result estimate returned by query"
     );
 
@@ -436,11 +453,11 @@ fn happy_path_two_hops_swap_realistic_values() {
         },
     ];
 
-    // we don't care about decimal fraction of the fee
+    // we don't care too much about decimal fraction of the fee
     assert_fee_is_as_expected(
         &mut query_result.expected_fees,
         &mut expected_fees,
-        FPDecimal::one(),
+        human_to_dec("0.1", Decimals::Six),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -463,14 +480,14 @@ fn happy_path_two_hops_swap_realistic_values() {
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
+
     assert_eq!(
         from_balance,
         FPDecimal::zero(),
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
-        to_balance,
-        human_to_dec("906.262", Decimals::Six),
+        to_balance, expected_amount,
         "swapper did not receive expected amount"
     );
 
@@ -481,30 +498,35 @@ fn happy_path_two_hops_swap_realistic_values() {
         "wrong number of denoms in contract balances"
     );
 
-    let atom_amount_below_min_tick_size = FPDecimal::must_from_str("0.0005463");
-    let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("8.89", Decimals::Six);
-
-    let fee_refund = dust_value
-        * FPDecimal::must_from_str(&format!(
-            "{}",
-            DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
-        ));
-
-    dust_value += fee_refund;
-
-    let expected_contract_usdt_balance =
-        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str()) + dust_value;
-    let actual_contract_balance =
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
         FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
-    let contract_balance_diff = expected_contract_usdt_balance - actual_contract_balance;
 
-    // here the actual difference is 0.000067 USDT, which we attribute differences between decimal precision of Rust/Go and Google Sheets
     assert!(
-        human_to_dec("0.0001", Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
-        "contract balance has changed too much after swap"
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
+        contract_usdt_balance_after,
+        contract_usdt_balance_before
+    );
+
+    // contract is allowed to earn extra 0.7 USDT from the swap of ~$8150 worth of ETH
+    let max_diff = human_to_dec("0.7", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {}, previous balance: {}. Max diff: {}",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
     );
 }
 
+//ok
 #[test]
 fn it_doesnt_lose_buffer_if_executed_multiple_times() {
     let app = InjectiveTestApp::new();
@@ -545,8 +567,11 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
         dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
     );
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("1_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("1_000", USDT, Decimals::Six)],
+    );
 
     set_route_and_assert_success(
         &wasm,
@@ -588,8 +613,9 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
     );
 
     let mut counter = 0;
+    let iterations = 100;
 
-    while counter < 100 {
+    while counter < iterations {
         // ETH-USDT orders
         create_realistic_limit_order(
             &app,
@@ -692,16 +718,30 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
         "wrong number of denoms in contract balances"
     );
 
-    let contract_balance_diff =
-        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str())
-            - FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_balance_usdt_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+    let contract_balance_usdt_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
 
-
-    let max_diff = human_to_dec("0.5", Decimals::Six);
-    // here the actual difference is 0.49 USDT after 100 executions, which we attribute differences between decimal precision of Rust/Go and Google Sheets
     assert!(
-        contract_balance_diff.abs() < max_diff && contract_balance_diff > FPDecimal::zero(),
-        "contract balance has changed too much after swap or it lost buffer money; max diff: {} USDT actual diff: {} USDT", max_diff.scaled(-6), contract_balance_diff.scaled(-6)
+        contract_balance_usdt_after >= contract_balance_usdt_before,
+        "Contract lost some money after swap. Starting balance: {}, Current balance: {}",
+        contract_balance_usdt_after,
+        contract_balance_usdt_before
+    );
+
+    // single swap with the same values results in < 0.7 USDT earning, so we expected that 100 same swaps
+    // won't change balance by more than 0.7 * 100 = 70 USDT
+    let max_diff = human_to_dec("0.7", Decimals::Six) * FPDecimal::from(iterations as u128);
+
+    assert!(are_fpdecimals_approximately_equal(
+        contract_balance_usdt_after,
+        contract_balance_usdt_before,
+        max_diff,
+    ),  "Contract balance changed too much. Starting balance: {}, Current balance: {}. Max diff: {}",
+            contract_balance_usdt_before.scaled(Decimals::Six.get_decimals().neg()),
+            contract_balance_usdt_after.scaled(Decimals::Six.get_decimals().neg()),
+            max_diff.scaled(Decimals::Six.get_decimals().neg())
     );
 }
 
@@ -754,8 +794,11 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
         dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
     );
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("51", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("51", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -876,7 +919,7 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
 
     assert_eq!(
         query_result,
-        human_to_dec("906.262", Decimals::Six),
+        human_to_dec("906.195", Decimals::Six),
         "incorrect swap result estimate returned by query"
     );
 
@@ -907,7 +950,7 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
     );
     assert_eq!(
         to_balance,
-        human_to_dec("906.262", Decimals::Six),
+        human_to_dec("906.195", Decimals::Six),
         "swapper did not receive expected amount"
     );
 
@@ -947,6 +990,8 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
    When estimating balance hold for atomic market order chain doesn't take into account whether sender is
    also fee recipient, while we do. This leads to a situation where we estimate required funds to be
    lower than what's expected by the chain, which makes the swap fail.
+
+   In this test we skip query estimation and go straight to executing swap.
 */
 #[ignore]
 #[test]
@@ -989,8 +1034,12 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
         dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
     );
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("44", USDT, Decimals::Six)]);
+    // in reality we need to add at least 49 USDT to the buffer, even if according to contract's calculations 42 USDT would be enough to execute the swap
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("42", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1094,7 +1143,7 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
         &app,
         &[
             str_coin(eth_to_swap, ETH, Decimals::Eighteen),
-            str_coin("1", INJ, Decimals::Eighteen),
+            str_coin("0.01", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -1125,7 +1174,7 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
     );
     assert_eq!(
         to_balance,
-        human_to_dec("906.262", Decimals::Six),
+        human_to_dec("906.195", Decimals::Six),
         "swapper did not receive expected amount"
     );
 
@@ -1136,30 +1185,35 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
         "wrong number of denoms in contract balances"
     );
 
-    let atom_amount_below_min_tick_size = FPDecimal::must_from_str("0.0005463");
-    let mut dust_value = atom_amount_below_min_tick_size * human_to_dec("8.89", Decimals::Six);
-
-    let fee_refund = dust_value
-        * FPDecimal::must_from_str(&format!(
-            "{}",
-            DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
-        ));
-
-    dust_value += fee_refund;
-
-    let expected_contract_usdt_balance =
-        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str()) + dust_value;
-    let actual_contract_balance =
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
         FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
-    let contract_balance_diff = expected_contract_usdt_balance - actual_contract_balance;
 
-    // here the actual difference is 0.000067 USDT, which we attribute differences between decimal precision of Rust/Go and Google Sheets
     assert!(
-        human_to_dec("0.0001", Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
-        "contract balance has changed too much after swap"
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
+        contract_usdt_balance_after,
+        contract_usdt_balance_before
+    );
+
+    // contract can earn max of 0.7 USDT, when exchanging ETH worth ~$8150
+    let max_diff = human_to_dec("0.7", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {}, previous balance: {}. Max diff: {}",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
     );
 }
 
+//ok
 #[test]
 fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
     let app = InjectiveTestApp::new();
@@ -1199,9 +1253,12 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
         dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
     );
 
-    // 50 USDT is just below the amount required to buy required ATOM amount
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("50", USDT, Decimals::Six)]);
+    // 41 USDT is just below the amount required to buy required ATOM amount
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("41", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,

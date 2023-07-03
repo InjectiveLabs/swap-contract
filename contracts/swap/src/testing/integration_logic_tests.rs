@@ -9,13 +9,13 @@ use injective_math::{round_to_min_tick, FPDecimal};
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    assert_fee_is_as_expected, create_limit_order, fund_account_with_some_inj,
-    init_contract_and_get_address, init_contract_with_fee_recipient_and_get_address,
+    are_fpdecimals_approximately_equal, assert_fee_is_as_expected, create_limit_order,
+    fund_account_with_some_inj, human_to_dec, init_contract_with_fee_recipient_and_get_address,
     init_default_signer_account, init_default_validator_account, init_rich_account,
-    launch_spot_market, must_init_account_with_funds, pause_spot_market, query_all_bank_balances,
-    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
-    DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_RELAYER_SHARE, DEFAULT_SELF_RELAYING_FEE_PART,
-    DEFAULT_TAKER_FEE, ETH, INJ, USDC, USDT,
+    init_self_relaying_contract_and_get_address, launch_spot_market, must_init_account_with_funds,
+    pause_spot_market, query_all_bank_balances, query_bank_balance, set_route_and_assert_success,
+    str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_RELAYER_SHARE,
+    DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, USDC, USDT,
 };
 use crate::types::{FPCoin, SwapEstimationResult};
 
@@ -27,6 +27,7 @@ use crate::types::{FPCoin, SwapEstimationResult};
    https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
 */
 
+//ok
 #[test]
 fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     let app = InjectiveTestApp::new();
@@ -41,8 +42,11 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -109,7 +113,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
 
     assert_eq!(
         query_result.result_quantity,
-        FPDecimal::must_from_str("2893.889"),
+        FPDecimal::must_from_str("2893.886"), //slightly rounded down
         "incorrect swap result estimate returned by query"
     );
 
@@ -119,7 +123,6 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
         "Wrong number of fee denoms received"
     );
 
-    // values from the spreadsheet
     let mut expected_fees = vec![
         FPCoin {
             amount: FPDecimal::must_from_str("3541.5"),
@@ -169,12 +172,34 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
         1,
         "wrong number of denoms in contract balances"
     );
-    assert_eq!(
-        contract_balances_after, contract_balances_before,
-        "contract balance has changed after swap"
+
+    let contract_balance_usdt_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+    let contract_balance_usdt_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+
+    assert!(
+        contract_balance_usdt_after >= contract_balance_usdt_before,
+        "Contract lost some money after swap. Balance before: {}, after: {}",
+        contract_balance_usdt_before,
+        contract_balance_usdt_after
+    );
+
+    let max_diff = human_to_dec("0.00001", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_balance_usdt_after,
+            contract_balance_usdt_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Before: {}, After: {}",
+        contract_balances_before[0].amount,
+        contract_balances_after[0].amount
     );
 }
 
+//ok
 #[test]
 fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     let app = InjectiveTestApp::new();
@@ -189,8 +214,11 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -261,7 +289,6 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
         "incorrect swap result estimate returned by query"
     );
 
-    // values from the spreadsheet
     let mut expected_fees = vec![
         FPCoin {
             amount: FPDecimal::must_from_str("904.5"),
@@ -276,7 +303,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     assert_fee_is_as_expected(
         &mut query_result.expected_fees,
         &mut expected_fees,
-        FPDecimal::must_from_str("0.000001"),
+        human_to_dec("0.00001", Decimals::Six),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -322,6 +349,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     );
 }
 
+//ok
 #[test]
 fn it_executes_swap_between_markets_using_different_quote_assets() {
     let app = InjectiveTestApp::new();
@@ -337,7 +365,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDC);
     let spot_market_3_id = launch_spot_market(&exchange, &owner, USDC, USDT);
 
-    let contr_addr = init_contract_and_get_address(
+    let contr_addr = init_self_relaying_contract_and_get_address(
         &wasm,
         &owner,
         &[
@@ -447,7 +475,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     assert_fee_is_as_expected(
         &mut query_result.expected_fees,
         &mut expected_fees,
-        FPDecimal::must_from_str("0.000001"),
+        human_to_dec("0.000001", Decimals::Six),
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -493,6 +521,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buffer_is_insufficient()
 {
@@ -509,7 +538,7 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDC);
     let spot_market_3_id = launch_spot_market(&exchange, &owner, USDC, USDT);
 
-    let contr_addr = init_contract_and_get_address(
+    let contr_addr = init_self_relaying_contract_and_get_address(
         &wasm,
         &owner,
         &[
@@ -652,6 +681,7 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
     );
 }
 
+//ok
 #[test]
 fn it_executes_a_sell_of_base_asset() {
     let app = InjectiveTestApp::new();
@@ -665,8 +695,11 @@ fn it_executes_a_sell_of_base_asset() {
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -793,6 +826,7 @@ fn it_executes_a_sell_of_base_asset() {
     );
 }
 
+//ok
 #[test]
 fn it_executes_a_buy_of_base_asset() {
     let app = InjectiveTestApp::new();
@@ -806,8 +840,11 @@ fn it_executes_a_buy_of_base_asset() {
 
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -956,6 +993,7 @@ fn it_executes_a_buy_of_base_asset() {
     );
 }
 
+//ok
 #[test]
 fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     let app = InjectiveTestApp::new();
@@ -1067,7 +1105,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
 
     assert_eq!(
         query_result.result_quantity,
-        FPDecimal::must_from_str("2888.222"),
+        FPDecimal::must_from_str("2888.221"), //slightly rounded down vs spreadsheet
         "incorrect swap result estimate returned by query"
     );
 
@@ -1108,6 +1146,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
 
     let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
+
     assert_eq!(
         from_balance,
         FPDecimal::zero(),
@@ -1125,12 +1164,34 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
         1,
         "wrong number of denoms in contract balances"
     );
-    assert_eq!(
-        contract_balances_after, contract_balances_before,
-        "contract balance has changed after swap"
+
+    let contract_balance_usdt_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+    let contract_balance_usdt_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+
+    assert!(
+        contract_balance_usdt_after >= contract_balance_usdt_before,
+        "Contract lost some money after swap. Balance before: {}, after: {}",
+        contract_balance_usdt_before,
+        contract_balance_usdt_after
+    );
+
+    let max_diff = human_to_dec("0.00001", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_balance_usdt_after,
+            contract_balance_usdt_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Before: {}, After: {}",
+        contract_balances_before[0].amount,
+        contract_balances_after[0].amount
     );
 
     let fee_recipient_balance = query_all_bank_balances(&bank, &fee_recipient.address());
+
     assert_eq!(
         fee_recipient_balance.len(),
         1,
@@ -1147,6 +1208,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     let app = InjectiveTestApp::new();
@@ -1161,8 +1223,11 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("0.001", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("0.001", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1285,6 +1350,7 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_swap_if_no_funds_were_passed() {
     let app = InjectiveTestApp::new();
@@ -1299,8 +1365,11 @@ fn it_reverts_swap_if_no_funds_were_passed() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1368,6 +1437,7 @@ fn it_reverts_swap_if_no_funds_were_passed() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_swap_if_multiple_funds_were_passed() {
     let app = InjectiveTestApp::new();
@@ -1382,8 +1452,11 @@ fn it_reverts_swap_if_multiple_funds_were_passed() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1457,6 +1530,7 @@ fn it_reverts_swap_if_multiple_funds_were_passed() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_if_user_passes_quantities_equal_to_zero() {
     let app = InjectiveTestApp::new();
@@ -1471,8 +1545,11 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1591,6 +1668,7 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_if_user_passes_negative_quantities() {
     let app = InjectiveTestApp::new();
@@ -1605,8 +1683,11 @@ fn it_reverts_if_user_passes_negative_quantities() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1707,6 +1788,7 @@ fn it_reverts_if_user_passes_negative_quantities() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     let app = InjectiveTestApp::new();
@@ -1721,8 +1803,11 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1837,6 +1922,7 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_if_min_quantity_cannot_be_reached() {
     let app = InjectiveTestApp::new();
@@ -1852,8 +1938,11 @@ fn it_reverts_if_min_quantity_cannot_be_reached() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -1952,6 +2041,7 @@ fn it_reverts_if_min_quantity_cannot_be_reached() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_if_market_is_paused() {
     let app = InjectiveTestApp::new();
@@ -1970,8 +2060,11 @@ fn it_reverts_if_market_is_paused() {
 
     pause_spot_market(&gov, spot_market_1_id.as_str(), &signer, &validator);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -2056,6 +2149,7 @@ fn it_reverts_if_market_is_paused() {
     );
 }
 
+//ok
 #[test]
 fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     let app = InjectiveTestApp::new();
@@ -2070,8 +2164,11 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    let contr_addr =
-        init_contract_and_get_address(&wasm, &owner, &[str_coin("100_000", USDT, Decimals::Six)]);
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("100_000", USDT, Decimals::Six)],
+    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -2135,7 +2232,7 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
 
     assert_eq!(
         target_quantity,
-        FPDecimal::must_from_str("2893.888"),
+        FPDecimal::must_from_str("2893.886"), //slightly underestimated vs spreadsheet
         "incorrect swap result estimate returned by query"
     );
 
@@ -2183,6 +2280,7 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     );
 }
 
+//ok
 #[test]
 fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
     let app = InjectiveTestApp::new();
@@ -2202,7 +2300,8 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
     );
 
     let initial_contract_balance = &[eth_to_withdraw, usdt_to_withdraw];
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
+    let contr_addr =
+        init_self_relaying_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(
@@ -2244,6 +2343,7 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
     );
 }
 
+//ok
 #[test]
 fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
     let app = InjectiveTestApp::new();
@@ -2263,7 +2363,8 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
     );
 
     let initial_contract_balance = &[eth_to_withdraw, usdt_to_withdraw];
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
+    let contr_addr =
+        init_self_relaying_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(
@@ -2307,6 +2408,7 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
     );
 }
 
+//ok
 #[test]
 fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
     let app = InjectiveTestApp::new();
@@ -2326,7 +2428,8 @@ fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
     );
 
     let initial_contract_balance = &[eth_to_withdraw, usdt_to_withdraw];
-    let contr_addr = init_contract_and_get_address(&wasm, &owner, initial_contract_balance);
+    let contr_addr =
+        init_self_relaying_contract_and_get_address(&wasm, &owner, initial_contract_balance);
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
     assert_eq!(

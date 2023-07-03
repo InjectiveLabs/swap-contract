@@ -2,7 +2,10 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult, ContractResult, to_binary};
+use cosmwasm_std::{
+    coin, to_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
+    SystemResult,
+};
 use injective_std::shim::Any;
 use injective_std::types::cosmos::bank::v1beta1::{
     MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
@@ -18,9 +21,15 @@ use injective_test_tube::{
     Account, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
 };
 
-use crate::helpers::{round_up_to_min_tick, Scaled};
-use injective_cosmwasm::{create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids, HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, SpotMarket, WasmMockQuerier, TEST_MARKET_ID_1, TEST_MARKET_ID_2, QueryMarketAtomicExecutionFeeMultiplierResponse};
-use injective_math::{round_to_min_tick, FPDecimal};
+use crate::helpers::Scaled;
+use injective_cosmwasm::{
+    create_orderbook_response_handler, create_spot_multi_market_handler,
+    get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids,
+    HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel,
+    QueryMarketAtomicExecutionFeeMultiplierResponse, SpotMarket, WasmMockQuerier, TEST_MARKET_ID_1,
+    TEST_MARKET_ID_2,
+};
+use injective_math::FPDecimal;
 use prost::Message;
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
@@ -483,7 +492,7 @@ pub fn create_realistic_limit_order(
         .unwrap();
 }
 
-pub fn init_contract_and_get_address(
+pub fn init_self_relaying_contract_and_get_address(
     wasm: &Wasm<InjectiveTestApp>,
     owner: &SigningAccount,
     initial_balance: &[Coin],
@@ -1048,7 +1057,11 @@ mod tests {
 //     }
 // }
 
-pub fn are_fpdecimals_approximately_equal(first: FPDecimal, second: FPDecimal, max_diff: FPDecimal) -> bool {
+pub fn are_fpdecimals_approximately_equal(
+    first: FPDecimal,
+    second: FPDecimal,
+    max_diff: FPDecimal,
+) -> bool {
     let a = (first - second).abs() <= max_diff;
     println!("diff: {}", (first - second).abs());
     a
@@ -1069,13 +1082,12 @@ pub fn assert_fee_is_as_expected(
     expected_fees.sort_by_key(|f| f.denom.clone());
 
     for (raw_fee, expected_fee) in raw_fees.iter().zip(expected_fees.iter()) {
-        assert!(are_fpdecimals_approximately_equal(
+        assert!(
+            are_fpdecimals_approximately_equal(expected_fee.amount, raw_fee.amount, max_diff,),
+            "Wrong amount of trx fee received. Expected: {}, Actual: {}, Max diff: {}",
             expected_fee.amount,
             raw_fee.amount,
-            max_diff,
-        ),  "Wrong amount of trx fee received. Expected: {}, Actual: {}",
-                expected_fee.amount,
-                raw_fee.amount
+            max_diff
         );
     }
 }

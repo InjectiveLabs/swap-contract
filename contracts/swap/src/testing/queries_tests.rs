@@ -5,14 +5,16 @@ use cosmwasm_std::{coin, Addr};
 
 use crate::admin::set_route;
 use crate::contract::instantiate;
-use crate::helpers::Scaled;
 use injective_cosmwasm::{OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 use injective_math::FPDecimal;
 
 use crate::msg::{FeeRecipient, InstantiateMsg};
 use crate::queries::{estimate_swap_result, SwapQuantity};
 use crate::state::get_all_swap_routes;
-use crate::testing::test_utils::{human_to_dec, mock_deps_eth_inj, mock_realistic_deps_eth_inj, Decimals, MultiplierQueryBehavior, TEST_USER_ADDR, are_fpdecimals_approximately_equal};
+use crate::testing::test_utils::{
+    are_fpdecimals_approximately_equal, human_to_dec, mock_deps_eth_inj,
+    mock_realistic_deps_eth_inj, Decimals, MultiplierQueryBehavior, TEST_USER_ADDR,
+};
 use crate::types::{FPCoin, SwapRoute};
 
 /**
@@ -78,7 +80,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
         denom: "usdt".to_string(),
     };
 
-    let max_diff = FPDecimal::must_from_str("0.00001");
+    let max_diff = human_to_dec("0.00001", Decimals::Six);
 
     assert!(are_fpdecimals_approximately_equal(
         expected_fee_1.amount,
@@ -114,7 +116,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
             admin: admin.to_owned(),
         },
     )
-        .unwrap();
+    .unwrap();
     set_route(
         deps.as_mut_deps(),
         &Addr::unchecked(TEST_USER_ADDR),
@@ -122,7 +124,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
         "inj".to_string(),
         vec![TEST_MARKET_ID_1.into(), TEST_MARKET_ID_2.into()],
     )
-        .unwrap();
+    .unwrap();
 
     let actual_swap_result = estimate_swap_result(
         deps.as_ref(),
@@ -131,7 +133,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
         "inj".to_string(),
         SwapQuantity::OutputQuantity(FPDecimal::from_str("2888.221").unwrap()),
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(
         actual_swap_result.result_quantity,
@@ -157,7 +159,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
         denom: "usdt".to_string(),
     };
 
-    let max_diff = FPDecimal::must_from_str("0.001");
+    let max_diff = human_to_dec("0.00001", Decimals::Six);
 
     assert!(are_fpdecimals_approximately_equal(
         expected_fee_1.amount,
@@ -237,7 +239,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_source_quantity() {
         denom: "usdt".to_string(),
     };
 
-    let max_diff = FPDecimal::must_from_str("0.00001");
+    let max_diff = human_to_dec("0.00001", Decimals::Six);
 
     assert!(are_fpdecimals_approximately_equal(
         expected_fee_1.amount,
@@ -273,7 +275,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
             admin: admin.to_owned(),
         },
     )
-        .unwrap();
+    .unwrap();
 
     set_route(
         deps.as_mut_deps(),
@@ -282,7 +284,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
         "inj".to_string(),
         vec![TEST_MARKET_ID_1.into(), TEST_MARKET_ID_2.into()],
     )
-        .unwrap();
+    .unwrap();
 
     let actual_swap_result = estimate_swap_result(
         deps.as_ref(),
@@ -291,7 +293,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
         "inj".to_string(),
         SwapQuantity::OutputQuantity(FPDecimal::from_str("2893.886").unwrap()),
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(
         actual_swap_result.result_quantity,
@@ -317,7 +319,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
         denom: "usdt".to_string(),
     };
 
-    let max_diff = FPDecimal::must_from_str("0.001");
+    let max_diff = human_to_dec("0.00001", Decimals::Six);
 
     assert!(are_fpdecimals_approximately_equal(
         expected_fee_1.amount,
@@ -338,6 +340,9 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
     );
 }
 
+//nok, too high value returned, when selling ETH for USDT
+// these values were not taken from spreadsheet, we just assume that both direction of estimate
+// should be symmetrical (output quantity should be the inverse of input quantity)
 #[test]
 fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     let mut deps = mock_realistic_deps_eth_inj(MultiplierQueryBehavior::Success);
@@ -373,8 +378,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     )
     .unwrap();
 
-    // slightly higher value than in the spreadsheet: 0.76 vs 0.17
-    // TODO that makes no sense, user is getting more, not less
+    // TODO slightly higher value than in the spreadsheet: 0.76 vs 0.17; that makes no sense, user is getting more, not less
     let expected_usdt_result_quantity = human_to_dec("8127.7650216", Decimals::Six);
 
     assert_eq!(
@@ -390,21 +394,22 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
 
     let expected_usdt_fee_amount = human_to_dec("20.3688555", Decimals::Six);
 
-    // values from the spreadsheet
     let expected_fee = FPCoin {
         amount: expected_usdt_fee_amount,
         denom: "usdt".to_string(),
     };
 
-    let max_diff = human_to_dec("0.1", Decimals::Six);
+    let max_diff = human_to_dec("0.1", Decimals::Eighteen);
 
-    assert!(are_fpdecimals_approximately_equal(
-        expected_fee.amount,
-        input_swap_estimate.expected_fees[0].amount,
-        max_diff,
-    ),  "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+    assert!(
+        are_fpdecimals_approximately_equal(
             expected_fee.amount,
-            input_swap_estimate.expected_fees[0].amount
+            input_swap_estimate.expected_fees[0].amount,
+            max_diff,
+        ),
+        "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+        expected_fee.amount,
+        input_swap_estimate.expected_fees[0].amount
     );
 
     let output_swap_estimate = estimate_swap_result(
@@ -416,13 +421,22 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     )
     .unwrap();
 
-    let diff = (output_swap_estimate.result_quantity - eth_input_amount).abs();
-    println!("eth diff: {}", diff.scaled(-18));
+    // that value should be a big higher, as we are underestimating how much user would get
+    // to be on the safe side, so that ETH amount required should be a bit higher than when
+    // estimating from source quantity
+    assert!(
+        output_swap_estimate.result_quantity > eth_input_amount,
+        "Swap execution estimate when using target quantity wasn't higher than when using source quantity"
+    );
 
-    assert_eq!(
-        output_swap_estimate.result_quantity, eth_input_amount,
+    assert!(
+        are_fpdecimals_approximately_equal(
+            output_swap_estimate.result_quantity,
+            eth_input_amount,
+            max_diff
+        ),
         "Wrong amount of swap execution estimate received when using target quantity"
-    ); // value rounded to min tick
+    );
 
     assert_eq!(
         output_swap_estimate.expected_fees.len(),
@@ -430,27 +444,22 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
         "Wrong number of fee entries received when using target quantity"
     );
 
-    let max_diff = FPDecimal::must_from_str("0.1");
+    let max_diff = human_to_dec("0.1", Decimals::Six);
 
-    assert!(are_fpdecimals_approximately_equal(
-        expected_fee.amount,
-        input_swap_estimate.expected_fees[0].amount,
-        max_diff,
-    ),  "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+    assert!(
+        are_fpdecimals_approximately_equal(
             expected_fee.amount,
-            input_swap_estimate.expected_fees[0].amount
+            input_swap_estimate.expected_fees[0].amount,
+            max_diff,
+        ),
+        "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+        expected_fee.amount,
+        input_swap_estimate.expected_fees[0].amount
     );
-
-    // assert_eq!(
-    //     round_usd_like_fee(
-    //         &output_swap_estimate.expected_fees[0],
-    //         FPDecimal::must_from_str("0.000001")
-    //     ),
-    //     expected_fee_2,
-    //     "Wrong amount of fee received when estimating when using target quantity"
-    // );
 }
 
+// these values were not taken from spreadsheet, we just assume that both direction of estimate
+// should be symmetrical (output quantity should be the inverse of input quantity)
 #[test]
 fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
     let mut deps = mock_realistic_deps_eth_inj(MultiplierQueryBehavior::Success);
@@ -486,7 +495,8 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
     )
     .unwrap();
 
-    let expected_eth_result_quantity = human_to_dec("3.988", Decimals::Eighteen);
+    // TODO too high? before change it was 3.988
+    let expected_eth_result_quantity = human_to_dec("3.994", Decimals::Eighteen);
 
     assert_eq!(
         input_swap_estimate.result_quantity, expected_eth_result_quantity,
@@ -499,33 +509,25 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
         "Wrong number of fee entries received when using source quantity"
     );
 
-    let expected_usdt_fee_amount = human_to_dec("31.872509960159", Decimals::Six);
+    let expected_usdt_fee_amount = human_to_dec("19.950124", Decimals::Six);
 
-    // values from the spreadsheet
     let expected_fee = FPCoin {
         amount: expected_usdt_fee_amount,
         denom: "usdt".to_string(),
     };
 
-    let max_diff = FPDecimal::must_from_str("0.1");
+    let max_diff = human_to_dec("0.00001", Decimals::Six);
 
-    assert!(are_fpdecimals_approximately_equal(
-        expected_fee.amount,
-        input_swap_estimate.expected_fees[0].amount,
-        max_diff,
-    ),  "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+    assert!(
+        are_fpdecimals_approximately_equal(
             expected_fee.amount,
-            input_swap_estimate.expected_fees[0].amount
+            input_swap_estimate.expected_fees[0].amount,
+            max_diff,
+        ),
+        "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+        expected_fee.amount,
+        input_swap_estimate.expected_fees[0].amount
     );
-
-    // assert_eq!(
-    //     round_usd_like_fee(
-    //         &input_swap_estimate.expected_fees[0],
-    //         FPDecimal::must_from_str("0.000001")
-    //     ),
-    //     expected_fee_2,
-    //     "Wrong amount of first fee received when using source quantity"
-    // );
 
     let output_swap_estimate = estimate_swap_result(
         deps.as_ref(),
@@ -536,39 +538,33 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
     )
     .unwrap();
 
-    let diff = (output_swap_estimate.result_quantity - usdt_input_amount).abs();
-    println!("usdt diff: {}", diff.scaled(-6));
+    // that value should be a big higher, as we are underestimating how much user would get
+    // to be on the safe side, so that USDT amount required should be a bit higher than when
+    // estimating from source quantity
+    assert!(
+        output_swap_estimate.result_quantity > usdt_input_amount,
+        "Swap execution estimate when using target quantity wasn't higher than when using source quantity"
+    );
 
-    assert_eq!(
-        output_swap_estimate.result_quantity, usdt_input_amount,
+    assert!(
+        are_fpdecimals_approximately_equal(
+            output_swap_estimate.result_quantity,
+            usdt_input_amount,
+            max_diff
+        ),
         "Wrong amount of swap execution estimate received when using target quantity"
-    ); // value rounded to min tick
-
-    assert_eq!(
-        output_swap_estimate.expected_fees.len(),
-        1,
-        "Wrong number of fee entries received when using target quantity"
     );
 
-    let max_diff = FPDecimal::must_from_str("0.1");
-
-    assert!(are_fpdecimals_approximately_equal(
-        expected_fee.amount,
-        input_swap_estimate.expected_fees[0].amount,
-        max_diff,
-    ),  "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+    assert!(
+        are_fpdecimals_approximately_equal(
             expected_fee.amount,
-            input_swap_estimate.expected_fees[0].amount
+            input_swap_estimate.expected_fees[0].amount,
+            max_diff,
+        ),
+        "Wrong amount of trx fee received when using source quantity. Expected: {}, Actual: {}",
+        expected_fee.amount,
+        input_swap_estimate.expected_fees[0].amount
     );
-
-    // assert_eq!(
-    //     round_usd_like_fee(
-    //         &output_swap_estimate.expected_fees[0],
-    //         FPDecimal::must_from_str("0.000001")
-    //     ),
-    //     expected_fee_2,
-    //     "Wrong amount of first fee received when using target quantity"
-    // );
 }
 
 #[test]

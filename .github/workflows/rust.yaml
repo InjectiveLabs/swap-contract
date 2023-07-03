@@ -58,7 +58,7 @@ jobs:
         run: |
           cargo cw-optimizoor
 
-      - name: Run unit tests
+      - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
