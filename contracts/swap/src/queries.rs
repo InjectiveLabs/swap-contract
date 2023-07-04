@@ -408,12 +408,12 @@ fn estimate_execution_sell_from_target(
         get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
     let worst_price = get_worst_price_from_orders(&top_orders);
 
-    let expected_input_quantity = required_swap_quantity_in_quote / average_price;
+    let required_swap_input_quantity_in_base = required_swap_quantity_in_quote / average_price;
 
     Ok(StepExecutionEstimate {
         worst_price,
         result_quantity: round_up_to_min_tick(
-            expected_input_quantity,
+            required_swap_input_quantity_in_base,
             market.min_quantity_tick_size,
         ),
         result_denom: market.base_denom.to_string(),
