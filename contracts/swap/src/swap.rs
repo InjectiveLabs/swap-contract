@@ -15,7 +15,7 @@ use injective_math::FPDecimal;
 use injective_protobuf::proto::tx;
 
 use crate::error::ContractError;
-use crate::helpers::{dec_scale_factor, round_up_to_min_tick};
+use crate::helpers::{dec_scale_factor, round_up_to_min_tick, Scaled};
 
 use crate::queries::{estimate_single_swap_execution, estimate_swap_result, SwapQuantity};
 use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS};
@@ -88,8 +88,10 @@ pub fn start_swap_flow(
             )
         };
 
-        if required_input > coin_provided.amount.into() {
-            return Err(ContractError::MaxInputAmountExceeded(required_input));
+        let fp_coins: FPDecimal = coin_provided.amount.into();
+
+        if required_input > fp_coins {
+            return Err(ContractError::InsufficientFundsProvided(fp_coins, required_input));
         }
 
         current_balance = FPCoin {

@@ -25,6 +25,6 @@ pub enum ContractError {
     #[error("Min expected swap amount ({0}) not reached")]
     MinOutputAmountNotReached(FPDecimal),
 
-    #[error("Max input swap amount ({0}) exceeded")]
-    MaxInputAmountExceeded(FPDecimal),
+    #[error("Provided amount of {0} is below required amount of {1}")]
+    InsufficientFundsProvided(FPDecimal, FPDecimal),
 }

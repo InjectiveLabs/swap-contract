@@ -43,6 +43,7 @@ pub const ATOM: &str = "atom";
 pub const USDT: &str = "usdt";
 pub const USDC: &str = "usdc";
 pub const INJ: &str = "inj";
+pub const INJ_2: &str = "inj_2";
 
 pub const DEFAULT_TAKER_FEE: f64 = 0.001;
 pub const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
@@ -385,6 +386,164 @@ pub fn get_spot_market_id(exchange: &Exchange<InjectiveTestApp>, ticker: String)
     let market = spot_markets.iter().find(|m| m.ticker == ticker).unwrap();
 
     market.market_id.to_string()
+}
+
+pub fn launch_realistic_inj_usdt_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        &exchange,
+        &signer,
+        INJ_2,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+    )
+}
+
+pub fn launch_realistic_weth_usdt_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        &exchange,
+        &signer,
+        ETH,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.0000000000001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+    )
+}
+
+pub fn launch_realistic_atom_usdt_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        &exchange,
+        &signer,
+        ATOM,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("10000")).as_str(),
+    )
+}
+
+pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(app: &InjectiveTestApp, market_id: &str, trader1: &SigningAccount, trader2: &SigningAccount) {
+    create_realistic_limit_order(
+        &app,
+        &trader1,
+        market_id,
+        OrderSide::Buy,
+        "2107.2",
+        "0.78",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader2,
+        market_id,
+        OrderSide::Buy,
+        "1978",
+        "1.23",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader2,
+        market_id,
+        OrderSide::Buy,
+        "1966.6",
+        "2.07",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+}
+
+pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(app: &InjectiveTestApp, market_id: &str, trader1: &SigningAccount, trader2: &SigningAccount) {
+    create_realistic_limit_order(
+        &app,
+        &trader1,
+        market_id,
+        OrderSide::Buy,
+        "8.91",
+        "282.001",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader2,
+        market_id,
+        OrderSide::Buy,
+        "8.78",
+        "283.65",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader2,
+        market_id,
+        OrderSide::Buy,
+        "8.56",
+        "407.607",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+}
+
+pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(app: &InjectiveTestApp, market_id: &str, trader1: &SigningAccount, trader2: &SigningAccount, trader3: &SigningAccount) {
+    create_realistic_limit_order(
+        &app,
+        &trader1,
+        market_id,
+        OrderSide::Sell,
+        "8.89",
+        "197.89",
+        Decimals::Six,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader2,
+        market_id,
+        OrderSide::Sell,
+        "8.93",
+        "181.02",
+        Decimals::Six,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader3,
+        market_id,
+        OrderSide::Sell,
+        "8.99",
+        "203.12",
+        Decimals::Six,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader1,
+        market_id,
+        OrderSide::Sell,
+        "9.01",
+        "421.11",
+        Decimals::Six,
+        Decimals::Six,
+    );
 }
 
 #[derive(PartialEq)]
