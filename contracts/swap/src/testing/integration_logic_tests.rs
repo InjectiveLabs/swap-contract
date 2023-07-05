@@ -153,9 +153,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
 
     assert!(
         contract_balance_usdt_after >= contract_balance_usdt_before,
-        "Contract lost some money after swap. Balance before: {}, after: {}",
-        contract_balance_usdt_before,
-        contract_balance_usdt_after
+        "Contract lost some money after swap. Balance before: {contract_balance_usdt_before}, after: {contract_balance_usdt_after}",        
     );
 
     let max_diff = human_to_dec("0.00001", Decimals::Six);
@@ -1004,9 +1002,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
 
     assert!(
         contract_balance_usdt_after >= contract_balance_usdt_before,
-        "Contract lost some money after swap. Balance before: {}, after: {}",
-        contract_balance_usdt_before,
-        contract_balance_usdt_after
+        "Contract lost some money after swap. Balance before: {contract_balance_usdt_before}, after: {contract_balance_usdt_after}",
     );
 
     let max_diff = human_to_dec("0.00001", Decimals::Six);

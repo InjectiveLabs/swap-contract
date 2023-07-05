@@ -230,9 +230,7 @@ fn it_correctly_swaps_eth_to_get_very_high_exact_amount_of_atom() {
 
     assert!(
         contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
-        contract_usdt_balance_after,
-        contract_usdt_balance_before
+        "Contract lost some money after swap. Actual balance: {contract_usdt_balance_after}, previous balance: {contract_usdt_balance_before}",        
     );
 
     // contract is allowed to earn extra 0.73 USDT from the swap of ~$8450 worth of ETH
@@ -449,9 +447,7 @@ fn it_correctly_swaps_inj_to_get_very_high_exact_amount_of_atom() {
 
     assert!(
         contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
-        contract_usdt_balance_after,
-        contract_usdt_balance_before
+        "Contract lost some money after swap. Actual balance: {contract_usdt_balance_after}, previous balance: {contract_usdt_balance_before}",    
     );
 
     // contract is allowed to earn extra 0.7 USDT from the swap of ~$8150 worth of INJ
@@ -666,9 +662,7 @@ fn it_swaps_inj_to_get_very_high_exact_amount_of_eth() {
 
     assert!(
         contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
-        contract_usdt_balance_after,
-        contract_usdt_balance_before
+        "Contract lost some money after swap. Actual balance: {contract_usdt_balance_after}, previous balance: {contract_usdt_balance_before}",
     );
 
     // contract is allowed to earn extra 1.6 USDT from the swap of ~$23500 worth of INJ
@@ -806,9 +800,7 @@ fn it_doesnt_lose_buffer_if_exact_swap_of_eth_to_atom_is_executed_multiple_times
 
     assert!(
         contract_balance_usdt_after >= contract_balance_usdt_before,
-        "Contract lost some money after swap. Starting balance: {}, Current balance: {}",
-        contract_balance_usdt_after,
-        contract_balance_usdt_before
+        "Contract lost some money after swap. Starting balance: {contract_balance_usdt_after}, Current balance: {contract_balance_usdt_before}",
     );
 
     // single swap with the same values results in < 0.7 USDT earning, so we expected that 100 same swaps
@@ -1119,9 +1111,7 @@ fn exact_two_hop_eth_atom_swap_test_template(
 
     assert!(
         contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
-        contract_usdt_balance_after,
-        contract_usdt_balance_before
+        "Contract lost some money after swap. Actual balance: {contract_usdt_balance_after}, previous balance: {contract_usdt_balance_before}",
     );
 
     // contract is allowed to earn extra 0.7 USDT from the swap of ~$8150 worth of ETH
@@ -1292,9 +1282,7 @@ fn exact_two_hop_inj_atom_swap_test_template(
 
     assert!(
         contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
-        contract_usdt_balance_after,
-        contract_usdt_balance_before
+        "Contract lost some money after swap. Actual balance: {contract_usdt_balance_after}, previous balance: {contract_usdt_balance_before}",
     );
 
     // contract is allowed to earn extra 0.7 USDT from the swap of ~$8150 worth of INJ
@@ -1464,9 +1452,7 @@ fn exact_two_hop_inj_eth_swap_test_template(
 
     assert!(
         contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
-        contract_usdt_balance_after,
-        contract_usdt_balance_before
+        "Contract lost some money after swap. Actual balance: {contract_usdt_balance_after}, previous balance: {contract_usdt_balance_before}",
     );
 
     // contract is allowed to earn extra 0.7 USDT from the swap of ~$8500 worth of INJ
