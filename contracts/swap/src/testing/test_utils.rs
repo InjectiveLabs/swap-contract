@@ -182,7 +182,7 @@ pub fn mock_deps_eth_inj(
     })
 }
 
-pub fn mock_realistic_deps_eth_inj(
+pub fn mock_realistic_deps_eth_atom(
     multiplier_query_behavior: MultiplierQueryBehavior,
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier, InjectiveQueryWrapper> {
     inj_mock_deps(|querier| {
@@ -199,9 +199,9 @@ pub fn mock_realistic_deps_eth_inj(
         markets.insert(
             MarketId::new(TEST_MARKET_ID_2).unwrap(),
             create_mock_spot_market(
-                "inj",
+                "atom",
                 FPDecimal::must_from_str("0.001"),
-                FPDecimal::must_from_str("1000"),
+                FPDecimal::must_from_str("10000"),
                 1,
             ),
         );
