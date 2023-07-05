@@ -393,8 +393,8 @@ pub fn launch_realistic_inj_usdt_spot_market(
     signer: &SigningAccount,
 ) -> String {
     launch_custom_spot_market(
-        &exchange,
-        &signer,
+        exchange,
+        signer,
         INJ_2,
         USDT,
         dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
@@ -407,8 +407,8 @@ pub fn launch_realistic_weth_usdt_spot_market(
     signer: &SigningAccount,
 ) -> String {
     launch_custom_spot_market(
-        &exchange,
-        &signer,
+        exchange,
+        signer,
         ETH,
         USDT,
         dec_to_proto(FPDecimal::must_from_str("0.0000000000001")).as_str(),
@@ -421,8 +421,8 @@ pub fn launch_realistic_atom_usdt_spot_market(
     signer: &SigningAccount,
 ) -> String {
     launch_custom_spot_market(
-        &exchange,
-        &signer,
+        exchange,
+        signer,
         ATOM,
         USDT,
         dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
@@ -437,8 +437,8 @@ pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(
     trader2: &SigningAccount,
 ) {
     create_realistic_limit_order(
-        &app,
-        &trader1,
+        app,
+        trader1,
         market_id,
         OrderSide::Buy,
         "2107.2",
@@ -448,8 +448,8 @@ pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader2,
+        app,
+        trader2,
         market_id,
         OrderSide::Buy,
         "1978",
@@ -459,8 +459,8 @@ pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader2,
+        app,
+        trader2,
         market_id,
         OrderSide::Buy,
         "1966.6",
@@ -478,8 +478,8 @@ pub fn create_realistic_eth_usdt_sell_orders_from_spreadsheet(
     trader3: &SigningAccount,
 ) {
     create_realistic_limit_order(
-        &app,
-        &trader1,
+        app,
+        trader1,
         market_id,
         OrderSide::Sell,
         "2115.2",
@@ -489,8 +489,8 @@ pub fn create_realistic_eth_usdt_sell_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader2,
+        app,
+        trader2,
         market_id,
         OrderSide::Sell,
         "2118.9",
@@ -500,8 +500,8 @@ pub fn create_realistic_eth_usdt_sell_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader2,
+        app,
+        trader2,
         market_id,
         OrderSide::Sell,
         "2120.1",
@@ -511,8 +511,8 @@ pub fn create_realistic_eth_usdt_sell_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader3,
+        app,
+        trader3,
         market_id,
         OrderSide::Sell,
         "2121",
@@ -529,8 +529,8 @@ pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(
     trader2: &SigningAccount,
 ) {
     create_realistic_limit_order(
-        &app,
-        &trader1,
+        app,
+        trader1,
         market_id,
         OrderSide::Buy,
         "8.91",
@@ -540,8 +540,8 @@ pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader2,
+        app,
+        trader2,
         market_id,
         OrderSide::Buy,
         "8.78",
@@ -551,8 +551,8 @@ pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader2,
+        app,
+        trader2,
         market_id,
         OrderSide::Buy,
         "8.56",
@@ -570,8 +570,8 @@ pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
     trader3: &SigningAccount,
 ) {
     create_realistic_limit_order(
-        &app,
-        &trader1,
+        app,
+        trader1,
         market_id,
         OrderSide::Sell,
         "8.89",
@@ -581,8 +581,8 @@ pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader2,
+        app,
+        trader2,
         market_id,
         OrderSide::Sell,
         "8.93",
@@ -592,8 +592,8 @@ pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader3,
+        app,
+        trader3,
         market_id,
         OrderSide::Sell,
         "8.99",
@@ -603,8 +603,8 @@ pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
     );
 
     create_realistic_limit_order(
-        &app,
-        &trader1,
+        app,
+        trader1,
         market_id,
         OrderSide::Sell,
         "9.01",

@@ -10,25 +10,29 @@ use crate::testing::test_utils::{
     create_realistic_atom_usdt_sell_orders_from_spreadsheet,
     create_realistic_eth_usdt_buy_orders_from_spreadsheet,
     create_realistic_eth_usdt_sell_orders_from_spreadsheet,
-    create_realistic_inj_usdt_buy_orders_from_spreadsheet, create_realistic_limit_order,
-    dec_to_proto, human_to_dec, init_default_validator_account, init_rich_account,
-    init_self_relaying_contract_and_get_address, launch_custom_spot_market,
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet,
+     human_to_dec, init_rich_account,
+    init_self_relaying_contract_and_get_address,
     launch_realistic_atom_usdt_spot_market, launch_realistic_inj_usdt_spot_market,
     launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, query_all_bank_balances,
-    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
+    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, ATOM,
     DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, INJ_2,
     USDT,
 };
 use crate::types::{FPCoin, SwapEstimationResult};
 
 /*
-   This test suite focuses on using using realistic values both for spot markets and for orders.
-   ATOM/USDT market parameters was taken from mainnet. ETH/USDT market parameters in reality
-   mirror INJ/USDT spot market on mainnet (we did not want to use INJ/USDT market so that we don't
-   mix balances changes coming from swap with those related to gas payment for contract execution).
+   This test suite focuses on using using realistic values both for spot markets and for orders and
+   focuses on swaps requesting minimum amount.
+
+   ATOM/USDT market parameters was taken from mainnet. ETH/USDT market parameters mirror WETH/USDT
+   spot market on mainnet. INJ_2/USDT mirrors mainnet's INJ/USDT market (we used a different denom
+   to avoid mixing balance changes related to gas payments).
 
    Hardcoded values used in these tests come from the second tab of this spreadsheet:
    https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
+
+   In all tests contract is configured to self-relay trades and thus receive a 60% fee discount.
 */
 
 //ok

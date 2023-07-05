@@ -2,7 +2,8 @@ use cosmwasm_std::{coin, Addr};
 
 use injective_test_tube::RunnerError::{ExecuteError, QueryError};
 use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult, Wasm,
+    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult,
+    SigningAccount, Wasm,
 };
 
 use injective_math::{round_to_min_tick, FPDecimal};
@@ -63,35 +64,8 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     app.increase_time(1);
 
@@ -235,35 +209,8 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     app.increase_time(1);
 
@@ -390,37 +337,8 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    //ETH-USDT
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    //ATOM-USDC
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     //USDT-USDC
     create_limit_order(
@@ -563,37 +481,8 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    //ETH-USDT
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    //ATOM-USDC
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     //USDT-USDC
     create_limit_order(
@@ -683,7 +572,7 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
 
 //ok
 #[test]
-fn it_executes_a_sell_of_base_asset() {
+fn it_executes_a_sell_of_base_asset_to_receive_min_output_quantity() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -712,30 +601,7 @@ fn it_executes_a_sell_of_base_asset() {
     let trader1 = init_rich_account(&app);
     let trader2 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
 
     app.increase_time(1);
 
@@ -828,7 +694,7 @@ fn it_executes_a_sell_of_base_asset() {
 
 //ok
 #[test]
-fn it_executes_a_buy_of_base_asset() {
+fn it_executes_a_buy_of_base_asset_to_receive_min_output_quantity() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -1031,30 +897,8 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     // calculate relayer's share of the fee based on assumptions that all orders are matched
     let buy_orders_nominal_total_value = FPDecimal::from(201_000u128) * FPDecimal::from(5u128)
@@ -1065,11 +909,6 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
             "{}",
             DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_RELAYER_SHARE
         ));
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
 
     // calculate relayer's share of the fee based on assumptions that some of orders are matched
     let expected_nominal_buy_most_expensive_match_quantity =
@@ -1244,35 +1083,8 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     app.increase_time(1);
 
@@ -1562,40 +1374,6 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
         ],
     );
 
-    let trader1 = init_rich_account(&app);
-    let trader2 = init_rich_account(&app);
-    let trader3 = init_rich_account(&app);
-
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
-
     app.increase_time(1);
 
     let swapper = must_init_account_with_funds(
@@ -1712,40 +1490,6 @@ fn it_reverts_if_user_passes_negative_quantities() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let trader1 = init_rich_account(&app);
-    let trader2 = init_rich_account(&app);
-    let trader3 = init_rich_account(&app);
-
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
-
     app.increase_time(1);
 
     let execute_result = wasm.execute(
@@ -1824,30 +1568,7 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
 
     create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
     create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
@@ -1959,35 +1680,8 @@ fn it_reverts_if_min_quantity_cannot_be_reached() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     app.increase_time(1);
 
@@ -2187,35 +1881,8 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        201_000,
-        5,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        195_000,
-        4,
-    );
-    create_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        192_000,
-        3,
-    );
-
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 800, 800);
-    create_limit_order(&app, &trader2, &spot_market_2_id, OrderSide::Sell, 810, 800);
-    create_limit_order(&app, &trader3, &spot_market_2_id, OrderSide::Sell, 820, 800);
-    create_limit_order(&app, &trader1, &spot_market_2_id, OrderSide::Sell, 830, 800);
+    create_eth_buy_orders(&app, &spot_market_1_id, &trader1, &trader2);
+    create_atom_sell_orders(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     app.increase_time(1);
 
@@ -2473,4 +2140,28 @@ fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
         FPDecimal::zero(),
         "random dude has some usdt balance after failed withdraw"
     );
+}
+
+fn create_eth_buy_orders(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+) {
+    create_limit_order(app, trader1, market_id, OrderSide::Buy, 201_000, 5);
+    create_limit_order(app, trader2, market_id, OrderSide::Buy, 195_000, 4);
+    create_limit_order(app, trader2, market_id, OrderSide::Buy, 192_000, 3);
+}
+
+fn create_atom_sell_orders(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+    trader3: &SigningAccount,
+) {
+    create_limit_order(app, trader1, market_id, OrderSide::Sell, 800, 800);
+    create_limit_order(app, trader2, market_id, OrderSide::Sell, 810, 800);
+    create_limit_order(app, trader3, market_id, OrderSide::Sell, 820, 800);
+    create_limit_order(app, trader1, market_id, OrderSide::Sell, 830, 800);
 }

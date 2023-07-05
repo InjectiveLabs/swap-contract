@@ -15,7 +15,7 @@ use injective_math::FPDecimal;
 use injective_protobuf::proto::tx;
 
 use crate::error::ContractError;
-use crate::helpers::{dec_scale_factor, round_up_to_min_tick, Scaled};
+use crate::helpers::{dec_scale_factor, round_up_to_min_tick};
 
 use crate::queries::{estimate_single_swap_execution, estimate_swap_result, SwapQuantity};
 use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS};
