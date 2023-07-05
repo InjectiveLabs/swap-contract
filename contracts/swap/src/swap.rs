@@ -91,7 +91,10 @@ pub fn start_swap_flow(
         let fp_coins: FPDecimal = coin_provided.amount.into();
 
         if required_input > fp_coins {
-            return Err(ContractError::InsufficientFundsProvided(fp_coins, required_input));
+            return Err(ContractError::InsufficientFundsProvided(
+                fp_coins,
+                required_input,
+            ));
         }
 
         current_balance = FPCoin {

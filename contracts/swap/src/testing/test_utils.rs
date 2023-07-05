@@ -430,7 +430,12 @@ pub fn launch_realistic_atom_usdt_spot_market(
     )
 }
 
-pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(app: &InjectiveTestApp, market_id: &str, trader1: &SigningAccount, trader2: &SigningAccount) {
+pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+) {
     create_realistic_limit_order(
         &app,
         &trader1,
@@ -465,7 +470,64 @@ pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(app: &InjectiveTest
     );
 }
 
-pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(app: &InjectiveTestApp, market_id: &str, trader1: &SigningAccount, trader2: &SigningAccount) {
+pub fn create_realistic_eth_usdt_sell_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+    trader3: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        &app,
+        &trader1,
+        market_id,
+        OrderSide::Sell,
+        "2115.2",
+        "0.5",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader2,
+        market_id,
+        OrderSide::Sell,
+        "2118.9",
+        "1.22",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader2,
+        market_id,
+        OrderSide::Sell,
+        "2120.1",
+        "1.72",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        &app,
+        &trader3,
+        market_id,
+        OrderSide::Sell,
+        "2121",
+        "2.11",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+}
+
+pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+) {
     create_realistic_limit_order(
         &app,
         &trader1,
@@ -500,7 +562,13 @@ pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(app: &InjectiveTest
     );
 }
 
-pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(app: &InjectiveTestApp, market_id: &str, trader1: &SigningAccount, trader2: &SigningAccount, trader3: &SigningAccount) {
+pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+    trader3: &SigningAccount,
+) {
     create_realistic_limit_order(
         &app,
         &trader1,

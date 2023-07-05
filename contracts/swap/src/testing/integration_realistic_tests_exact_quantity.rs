@@ -9,6 +9,7 @@ use crate::testing::test_utils::{
     are_fpdecimals_approximately_equal, assert_fee_is_as_expected,
     create_realistic_atom_usdt_sell_orders_from_spreadsheet,
     create_realistic_eth_usdt_buy_orders_from_spreadsheet,
+    create_realistic_eth_usdt_sell_orders_from_spreadsheet,
     create_realistic_inj_usdt_buy_orders_from_spreadsheet, create_realistic_limit_order,
     dec_to_proto, human_to_dec, init_default_validator_account, init_rich_account,
     init_self_relaying_contract_and_get_address, launch_custom_spot_market,
@@ -477,6 +478,228 @@ fn it_correctly_swaps_inj_to_get_very_high_exact_amount_of_atom() {
     );
 }
 
+//here we get exact amount of eth
+#[test]
+fn it_swaps_inj_to_get_minimum_exact_amount_of_eth() {
+    exact_two_hop_inj_eth_swap_test_template(
+        human_to_dec("0.001", Decimals::Eighteen),
+        Percent("0"),
+    )
+}
+
+//here we get exact amount of eth
+#[test]
+fn it_swaps_inj_to_get_low_exact_amount_of_eth() {
+    exact_two_hop_inj_eth_swap_test_template(
+        human_to_dec("0.012", Decimals::Eighteen),
+        Percent("0"),
+    )
+}
+
+//here we get exact amount of eth
+#[test]
+fn it_swaps_inj_to_get_normal_exact_amount_of_eth() {
+    exact_two_hop_inj_eth_swap_test_template(human_to_dec("0.1", Decimals::Eighteen), Percent("0"))
+}
+
+//here we get exact amount of eth
+#[test]
+fn it_swaps_inj_to_get_high_exact_amount_of_eth() {
+    exact_two_hop_inj_eth_swap_test_template(human_to_dec("3.1", Decimals::Eighteen), Percent("0"))
+}
+
+//here we get exact amount of eth
+#[test]
+fn it_swaps_inj_to_get_very_high_exact_amount_of_eth() {
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+    let exchange = Exchange::new(&app);
+    let bank = Bank::new(&app);
+
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+
+    let _validator = app
+        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap();
+    let owner = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1", ETH, Decimals::Eighteen),
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
+            str_coin("10_000", INJ_2, Decimals::Eighteen),
+        ],
+    );
+
+    let spot_market_1_id = launch_realistic_inj_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("1_000", USDT, Decimals::Six)],
+    );
+    set_route_and_assert_success(
+        &wasm,
+        &owner,
+        &contr_addr,
+        INJ_2,
+        ETH,
+        vec![
+            spot_market_1_id.as_str().into(),
+            spot_market_2_id.as_str().into(),
+        ],
+    );
+
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
+
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet(
+        &app,
+        &spot_market_1_id,
+        &trader1,
+        &trader2,
+    );
+    create_realistic_limit_order(
+        &app,
+        &trader1,
+        &spot_market_1_id,
+        OrderSide::Buy,
+        "8.99",
+        "1882.001",
+        Decimals::Eighteen,
+        Decimals::Six,
+    ); //order not present in the spreadsheet
+    create_realistic_eth_usdt_sell_orders_from_spreadsheet(
+        &app,
+        &spot_market_2_id,
+        &trader1,
+        &trader2,
+        &trader3,
+    );
+    create_realistic_limit_order(
+        &app,
+        &trader3,
+        &spot_market_2_id,
+        OrderSide::Sell,
+        "2123.1",
+        "18.11",
+        Decimals::Eighteen,
+        Decimals::Six,
+    ); //order not present in the spreadsheet
+
+    app.increase_time(1);
+
+    let inj_to_swap = "2855.259";
+    let exact_quantity_to_receive = human_to_dec("11.2", Decimals::Eighteen);
+
+    let swapper = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            str_coin("1", INJ, Decimals::Eighteen),
+        ],
+    );
+
+    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
+    assert_eq!(
+        contract_balances_before.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    let query_result: SwapEstimationResult = wasm
+        .query(
+            &contr_addr,
+            &QueryMsg::GetInputQuantity {
+                source_denom: INJ_2.to_string(),
+                target_denom: ETH.to_string(),
+                to_quantity: exact_quantity_to_receive,
+            },
+        )
+        .unwrap();
+
+    wasm.execute(
+        &contr_addr,
+        &ExecuteMsg::SwapExactOutput {
+            target_denom: ETH.to_string(),
+            target_output_quantity: exact_quantity_to_receive,
+        },
+        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen)],
+        &swapper,
+    )
+    .unwrap();
+
+    let expected_difference =
+        human_to_dec(inj_to_swap, Decimals::Eighteen) - query_result.result_quantity;
+    let swapper_inj_balance_after = query_bank_balance(&bank, INJ_2, swapper.address().as_str());
+    let swapper_atom_balance_after = query_bank_balance(&bank, ETH, swapper.address().as_str());
+
+    assert_eq!(
+        swapper_inj_balance_after, expected_difference,
+        "wrong amount of INJ was exchanged"
+    );
+
+    assert!(
+        swapper_atom_balance_after >= exact_quantity_to_receive,
+        "swapper got less than exact amount required -> expected: {} ETH, actual: {} ETH",
+        exact_quantity_to_receive.scaled(Decimals::Eighteen.get_decimals().neg()),
+        swapper_atom_balance_after.scaled(Decimals::Eighteen.get_decimals().neg())
+    );
+
+    let max_diff_percent = Percent("0");
+    let one_percent_diff = exact_quantity_to_receive
+        * (FPDecimal::must_from_str(max_diff_percent.0) / FPDecimal::from(100u128));
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            swapper_atom_balance_after,
+            exact_quantity_to_receive,
+            one_percent_diff,
+        ),
+        "swapper did not receive expected exact ETH amount +/- {}% -> expected: {} ETH, actual: {} ETH, max diff: {} ETH",
+        max_diff_percent.0,
+        exact_quantity_to_receive.scaled(Decimals::Eighteen.get_decimals().neg()),
+        swapper_atom_balance_after.scaled(Decimals::Eighteen.get_decimals().neg()),
+        one_percent_diff.scaled(Decimals::Eighteen.get_decimals().neg())
+    );
+
+    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
+    assert_eq!(
+        contract_balances_after.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+
+    assert!(
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
+        contract_usdt_balance_after,
+        contract_usdt_balance_before
+    );
+
+    // contract is allowed to earn extra 1.6 USDT from the swap of ~$23500 worth of INJ
+    let max_diff = human_to_dec("1.6", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {} USDT, previous balance: {} USDT. Max diff: {} USDT",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+}
+
 //ok
 #[test]
 fn it_doesnt_lose_buffer_if_exact_swap_of_eth_to_atom_is_executed_multiple_times() {
@@ -711,16 +934,17 @@ fn it_reverts_when_funds_provided_are_below_required_to_get_exact_amount() {
         )
         .unwrap();
 
-    let execute_result = wasm.execute(
-        &contr_addr,
-        &ExecuteMsg::SwapExactOutput {
-            target_denom: ATOM.to_string(),
-            target_output_quantity: exact_quantity_to_receive,
-        },
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen)],
-        &swapper,
-    )
-    .unwrap_err();
+    let execute_result = wasm
+        .execute(
+            &contr_addr,
+            &ExecuteMsg::SwapExactOutput {
+                target_denom: ATOM.to_string(),
+                target_output_quantity: exact_quantity_to_receive,
+            },
+            &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen)],
+            &swapper,
+        )
+        .unwrap_err();
 
     assert!(execute_result.to_string().contains("Provided amount of 608000000000000000000 is below required amount of 609714000000000000000"), "wrong error message");
 
@@ -733,7 +957,8 @@ fn it_reverts_when_funds_provided_are_below_required_to_get_exact_amount() {
     );
 
     assert_eq!(
-        FPDecimal::zero(), swapper_atom_balance_after,
+        FPDecimal::zero(),
+        swapper_atom_balance_after,
         "swapper received some ATOM"
     );
 
@@ -757,6 +982,7 @@ fn it_reverts_when_funds_provided_are_below_required_to_get_exact_amount() {
 
 // TEST TEMPLATES
 
+// source much more expensive than target
 fn exact_two_hop_eth_atom_swap_test_template(
     exact_quantity_to_receive: FPDecimal,
     max_diff_percentage: Percent,
@@ -928,6 +1154,7 @@ fn exact_two_hop_eth_atom_swap_test_template(
     );
 }
 
+// source more or less similarly priced as target
 fn exact_two_hop_inj_atom_swap_test_template(
     exact_quantity_to_receive: FPDecimal,
     max_diff_percentage: Percent,
@@ -1086,6 +1313,178 @@ fn exact_two_hop_inj_atom_swap_test_template(
 
     // contract is allowed to earn extra 0.7 USDT from the swap of ~$8150 worth of INJ
     let max_diff = human_to_dec("0.7", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {} USDT, previous balance: {} USDT. Max diff: {} USDT",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+}
+
+// source much cheaper than target
+fn exact_two_hop_inj_eth_swap_test_template(
+    exact_quantity_to_receive: FPDecimal,
+    max_diff_percentage: Percent,
+) {
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+    let exchange = Exchange::new(&app);
+    let bank = Bank::new(&app);
+
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+
+    let _validator = app
+        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap();
+    let owner = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1", ETH, Decimals::Eighteen),
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
+            str_coin("10_000", INJ_2, Decimals::Eighteen),
+        ],
+    );
+
+    let spot_market_1_id = launch_realistic_inj_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("1_000", USDT, Decimals::Six)],
+    );
+    set_route_and_assert_success(
+        &wasm,
+        &owner,
+        &contr_addr,
+        INJ_2,
+        ETH,
+        vec![
+            spot_market_1_id.as_str().into(),
+            spot_market_2_id.as_str().into(),
+        ],
+    );
+
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
+
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet(
+        &app,
+        &spot_market_1_id,
+        &trader1,
+        &trader2,
+    );
+    create_realistic_eth_usdt_sell_orders_from_spreadsheet(
+        &app,
+        &spot_market_2_id,
+        &trader1,
+        &trader2,
+        &trader3,
+    );
+
+    app.increase_time(1);
+
+    let inj_to_swap = "973.258";
+
+    let swapper = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            str_coin("1", INJ, Decimals::Eighteen),
+        ],
+    );
+
+    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
+    assert_eq!(
+        contract_balances_before.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    let query_result: SwapEstimationResult = wasm
+        .query(
+            &contr_addr,
+            &QueryMsg::GetInputQuantity {
+                source_denom: INJ_2.to_string(),
+                target_denom: ETH.to_string(),
+                to_quantity: exact_quantity_to_receive,
+            },
+        )
+        .unwrap();
+
+    wasm.execute(
+        &contr_addr,
+        &ExecuteMsg::SwapExactOutput {
+            target_denom: ETH.to_string(),
+            target_output_quantity: exact_quantity_to_receive,
+        },
+        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen)],
+        &swapper,
+    )
+    .unwrap();
+
+    let expected_difference =
+        human_to_dec(inj_to_swap, Decimals::Eighteen) - query_result.result_quantity;
+    let swapper_inj_balance_after = query_bank_balance(&bank, INJ_2, swapper.address().as_str());
+    let swapper_atom_balance_after = query_bank_balance(&bank, ETH, swapper.address().as_str());
+
+    assert_eq!(
+        swapper_inj_balance_after, expected_difference,
+        "wrong amount of INJ was exchanged"
+    );
+
+    assert!(
+        swapper_atom_balance_after >= exact_quantity_to_receive,
+        "swapper got less than exact amount required -> expected: {} ETH, actual: {} ETH",
+        exact_quantity_to_receive.scaled(Decimals::Eighteen.get_decimals().neg()),
+        swapper_atom_balance_after.scaled(Decimals::Eighteen.get_decimals().neg())
+    );
+
+    let one_percent_diff = exact_quantity_to_receive
+        * (FPDecimal::must_from_str(max_diff_percentage.0) / FPDecimal::from(100u128));
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            swapper_atom_balance_after,
+            exact_quantity_to_receive,
+            one_percent_diff,
+        ),
+        "swapper did not receive expected exact ETH amount +/- {}% -> expected: {} ETH, actual: {} ETH, max diff: {} ETH",
+        max_diff_percentage.0,
+        exact_quantity_to_receive.scaled(Decimals::Eighteen.get_decimals().neg()),
+        swapper_atom_balance_after.scaled(Decimals::Eighteen.get_decimals().neg()),
+        one_percent_diff.scaled(Decimals::Eighteen.get_decimals().neg())
+    );
+
+    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
+    assert_eq!(
+        contract_balances_after.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+
+    assert!(
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
+        contract_usdt_balance_after,
+        contract_usdt_balance_before
+    );
+
+    // contract is allowed to earn extra 0.7 USDT from the swap of ~$8500 worth of INJ
+    let max_diff = human_to_dec("0.82", Decimals::Six);
 
     assert!(
         are_fpdecimals_approximately_equal(

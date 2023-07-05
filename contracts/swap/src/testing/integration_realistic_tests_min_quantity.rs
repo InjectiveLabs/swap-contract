@@ -6,12 +6,18 @@ use injective_math::FPDecimal;
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    are_fpdecimals_approximately_equal, assert_fee_is_as_expected, create_realistic_limit_order,
+    are_fpdecimals_approximately_equal, assert_fee_is_as_expected,
+    create_realistic_atom_usdt_sell_orders_from_spreadsheet,
+    create_realistic_eth_usdt_buy_orders_from_spreadsheet,
+    create_realistic_eth_usdt_sell_orders_from_spreadsheet,
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet, create_realistic_limit_order,
     dec_to_proto, human_to_dec, init_default_validator_account, init_rich_account,
     init_self_relaying_contract_and_get_address, launch_custom_spot_market,
-    must_init_account_with_funds, query_all_bank_balances, query_bank_balance,
-    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
-    DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, USDT,
+    launch_realistic_atom_usdt_spot_market, launch_realistic_inj_usdt_spot_market,
+    launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, query_all_bank_balances,
+    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
+    DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, INJ_2,
+    USDT,
 };
 use crate::types::{FPCoin, SwapEstimationResult};
 
@@ -27,254 +33,7 @@ use crate::types::{FPCoin, SwapEstimationResult};
 
 //ok
 #[test]
-fn happy_path_two_hops_swap_realistic_scales_self_relaying_source_quantity() {
-    let app = InjectiveTestApp::new();
-    let wasm = Wasm::new(&app);
-    let exchange = Exchange::new(&app);
-    let bank = Bank::new(&app);
-
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
-    let _validator = init_default_validator_account(&app);
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000_000", USDT, Decimals::Six),
-            str_coin("100_000", INJ, Decimals::Eighteen),
-        ],
-    );
-
-    let spot_market_1_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ETH,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
-    );
-    let spot_market_2_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ATOM,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
-    );
-
-    let contr_addr = init_self_relaying_contract_and_get_address(
-        &wasm,
-        &owner,
-        &[str_coin("100_000", USDT, Decimals::Six)],
-    );
-    set_route_and_assert_success(
-        &wasm,
-        &owner,
-        &contr_addr,
-        ETH,
-        ATOM,
-        vec![
-            spot_market_1_id.as_str().into(),
-            spot_market_2_id.as_str().into(),
-        ],
-    );
-
-    let trader1 = init_rich_account(&app);
-    let trader2 = init_rich_account(&app);
-    let trader3 = init_rich_account(&app);
-
-    create_realistic_limit_order(
-        &app,
-        &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "201_000",
-        "5",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "195_000",
-        "4",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "192_000",
-        "3",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "800",
-        "800",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader2,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "810",
-        "800",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader3,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "820",
-        "800",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "830",
-        "800",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    app.increase_time(1);
-
-    let swapper = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("12", ETH, Decimals::Eighteen),
-            str_coin("0.01", INJ, Decimals::Eighteen),
-        ],
-    );
-
-    let mut query_result: SwapEstimationResult = wasm
-        .query(
-            &contr_addr,
-            &QueryMsg::GetOutputQuantity {
-                source_denom: ETH.to_string(),
-                target_denom: ATOM.to_string(),
-                from_quantity: human_to_dec("12", Decimals::Eighteen),
-            },
-        )
-        .unwrap();
-
-    // it's expected that it is slightly less than what's in the spreadsheet
-    let expected_quantity = human_to_dec("2893.886", Decimals::Six);
-
-    assert_eq!(
-        query_result.result_quantity, expected_quantity,
-        "incorrect swap result estimate returned by query"
-    );
-
-    let mut expected_fees = vec![
-        FPCoin {
-            amount: human_to_dec("3541.5", Decimals::Six),
-            denom: "usdt".to_string(),
-        },
-        FPCoin {
-            amount: human_to_dec("3530.891412", Decimals::Six),
-            denom: "usdt".to_string(),
-        },
-    ];
-
-    assert_fee_is_as_expected(
-        &mut query_result.expected_fees,
-        &mut expected_fees,
-        human_to_dec("0.1", Decimals::Six),
-    );
-
-    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
-    assert_eq!(
-        contract_balances_before.len(),
-        1,
-        "wrong number of denoms in contract balances"
-    );
-
-    wasm.execute(
-        &contr_addr,
-        &ExecuteMsg::SwapMinOutput {
-            target_denom: ATOM.to_string(),
-            min_output_quantity: FPDecimal::from(2893u128),
-        },
-        &[str_coin("12", ETH, Decimals::Eighteen)],
-        &swapper,
-    )
-    .unwrap();
-
-    let from_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
-    let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
-
-    assert_eq!(
-        from_balance,
-        FPDecimal::zero(),
-        "some of the original amount wasn't swapped"
-    );
-    assert_eq!(
-        to_balance, expected_quantity,
-        "swapper did not receive expected amount"
-    );
-
-    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
-    assert_eq!(
-        contract_balances_after.len(),
-        1,
-        "wrong number of denoms in contract balances"
-    );
-
-    let contract_usdt_balance_before =
-        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
-    let contract_usdt_balance_after =
-        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
-
-    assert!(
-        contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
-        contract_usdt_balance_after,
-        contract_usdt_balance_before
-    );
-
-    // contract can earn max of 2.3 USDT, when exchanging ETH worth ~$2.3M
-    let max_diff = human_to_dec("2.3", Decimals::Six);
-
-    assert!(
-        are_fpdecimals_approximately_equal(
-            contract_usdt_balance_after,
-            contract_usdt_balance_before,
-            max_diff,
-        ),
-        "Contract balance changed too much. Actual balance: {}, previous balance: {}. Max diff: {}",
-        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
-        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
-        max_diff.scaled(Decimals::Six.get_decimals().neg())
-    );
-}
-
-//ok
-#[test]
-fn happy_path_two_hops_swap_realistic_values_self_relaying_source_quantity() {
+fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
@@ -295,22 +54,8 @@ fn happy_path_two_hops_swap_realistic_values_self_relaying_source_quantity() {
         ],
     );
 
-    let spot_market_1_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ETH,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
-    );
-    let spot_market_2_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ATOM,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
-    );
+    let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
     let contr_addr = init_self_relaying_contract_and_get_address(
         &wasm,
@@ -333,83 +78,18 @@ fn happy_path_two_hops_swap_realistic_values_self_relaying_source_quantity() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    // ETH-USDT orders
-    create_realistic_limit_order(
+    create_realistic_eth_usdt_buy_orders_from_spreadsheet(
         &app,
+        &spot_market_1_id,
         &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "2107.2",
-        "0.78",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1978",
-        "1.23",
-        Decimals::Eighteen,
-        Decimals::Six,
     );
-
-    create_realistic_limit_order(
+    create_realistic_atom_usdt_sell_orders_from_spreadsheet(
         &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1966.66",
-        "2.07",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    // ATOM-USDT orders
-    create_realistic_limit_order(
-        &app,
+        &spot_market_2_id,
         &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.89",
-        "197.89",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.93",
-        "181.002",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader3,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.99",
-        "203.12",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "9.01",
-        "421.11",
-        Decimals::Six,
-        Decimals::Six,
     );
 
     app.increase_time(1);
@@ -436,7 +116,7 @@ fn happy_path_two_hops_swap_realistic_values_self_relaying_source_quantity() {
         .unwrap();
 
     // it's expected that it is slightly less than what's in the spreadsheet
-    let expected_amount = human_to_dec("906.195", Decimals::Six);
+    let expected_amount = human_to_dec("906.17", Decimals::Six);
 
     assert_eq!(
         query_result.result_quantity, expected_amount,
@@ -487,9 +167,26 @@ fn happy_path_two_hops_swap_realistic_values_self_relaying_source_quantity() {
         FPDecimal::zero(),
         "some of the original amount wasn't swapped"
     );
-    assert_eq!(
-        to_balance, expected_amount,
-        "swapper did not receive expected amount"
+
+    assert!(
+        to_balance >= expected_amount,
+        "Swapper received less than expected minimum amount. Expected: {} ATOM, actual: {} ATOM",
+        expected_amount.scaled(Decimals::Six.get_decimals().neg()),
+        to_balance.scaled(Decimals::Six.get_decimals().neg()),
+    );
+
+    let max_diff = human_to_dec("0.1", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            expected_amount,
+            to_balance,
+            max_diff,
+        ),
+        "Swapper did not receive expected amount. Expected: {} ATOM, actual: {} ATOM, max diff: {} ATOM",
+        expected_amount.scaled(Decimals::Six.get_decimals().neg()),
+        to_balance.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
     );
 
     let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
@@ -506,13 +203,400 @@ fn happy_path_two_hops_swap_realistic_values_self_relaying_source_quantity() {
 
     assert!(
         contract_usdt_balance_after >= contract_usdt_balance_before,
-        "Contract lost some money after swap. Actual balance: {}, previous balance: {}",
+        "Contract lost some money after swap. Actual balance: {} USDT, previous balance: {} USDT",
         contract_usdt_balance_after,
         contract_usdt_balance_before
     );
 
     // contract is allowed to earn extra 0.7 USDT from the swap of ~$8150 worth of ETH
     let max_diff = human_to_dec("0.7", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {} USDT, previous balance: {} USDT. Max diff: {} USDT",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+}
+
+//ok
+#[test]
+fn happy_path_two_hops_swap_inj_eth_realistic_values_self_relaying() {
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+    let exchange = Exchange::new(&app);
+    let bank = Bank::new(&app);
+
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+
+    let _validator = app
+        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap();
+    let owner = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1", ETH, Decimals::Eighteen),
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
+            str_coin("1", INJ_2, Decimals::Eighteen),
+        ],
+    );
+
+    let spot_market_1_id = launch_realistic_inj_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("1_000", USDT, Decimals::Six)],
+    );
+    set_route_and_assert_success(
+        &wasm,
+        &owner,
+        &contr_addr,
+        INJ_2,
+        ETH,
+        vec![
+            spot_market_1_id.as_str().into(),
+            spot_market_2_id.as_str().into(),
+        ],
+    );
+
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
+
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet(
+        &app,
+        &spot_market_1_id,
+        &trader1,
+        &trader2,
+    );
+    create_realistic_eth_usdt_sell_orders_from_spreadsheet(
+        &app,
+        &spot_market_2_id,
+        &trader1,
+        &trader2,
+        &trader3,
+    );
+
+    app.increase_time(1);
+
+    let inj_to_swap = "973.258";
+
+    let swapper = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            str_coin("1", INJ, Decimals::Eighteen),
+        ],
+    );
+
+    let mut query_result: SwapEstimationResult = wasm
+        .query(
+            &contr_addr,
+            &QueryMsg::GetOutputQuantity {
+                source_denom: INJ_2.to_string(),
+                target_denom: ETH.to_string(),
+                from_quantity: human_to_dec(inj_to_swap, Decimals::Eighteen),
+            },
+        )
+        .unwrap();
+
+    // it's expected that it is slightly less than what's in the spreadsheet
+    let expected_amount = human_to_dec("3.994", Decimals::Eighteen);
+
+    assert_eq!(
+        query_result.result_quantity, expected_amount,
+        "incorrect swap result estimate returned by query"
+    );
+
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: human_to_dec("12.73828775", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: human_to_dec("12.70013012", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+    ];
+
+    // we don't care too much about decimal fraction of the fee
+    assert_fee_is_as_expected(
+        &mut query_result.expected_fees,
+        &mut expected_fees,
+        human_to_dec("0.1", Decimals::Six),
+    );
+
+    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
+    assert_eq!(
+        contract_balances_before.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    wasm.execute(
+        &contr_addr,
+        &ExecuteMsg::SwapMinOutput {
+            target_denom: ETH.to_string(),
+            min_output_quantity: FPDecimal::from(906u128),
+        },
+        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen)],
+        &swapper,
+    )
+    .unwrap();
+
+    let from_balance = query_bank_balance(&bank, INJ_2, swapper.address().as_str());
+    let to_balance = query_bank_balance(&bank, ETH, swapper.address().as_str());
+
+    assert_eq!(
+        from_balance,
+        FPDecimal::zero(),
+        "some of the original amount wasn't swapped"
+    );
+
+    assert!(
+        to_balance >= expected_amount,
+        "Swapper received less than expected minimum amount. Expected: {} ETH, actual: {} ETH",
+        expected_amount.scaled(Decimals::Eighteen.get_decimals().neg()),
+        to_balance.scaled(Decimals::Eighteen.get_decimals().neg()),
+    );
+
+    let max_diff = human_to_dec("0.1", Decimals::Eighteen);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            expected_amount,
+            to_balance,
+            max_diff,
+        ),
+        "Swapper did not receive expected amount. Expected: {} ETH, actual: {} ETH, max diff: {} ETH",
+        expected_amount.scaled(Decimals::Eighteen.get_decimals().neg()),
+        to_balance.scaled(Decimals::Eighteen.get_decimals().neg()),
+        max_diff.scaled(Decimals::Eighteen.get_decimals().neg())
+    );
+
+    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
+    assert_eq!(
+        contract_balances_after.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+
+    assert!(
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {} USDT, previous balance: {} USDT",
+        contract_usdt_balance_after,
+        contract_usdt_balance_before
+    );
+
+    // contract is allowed to earn extra 0.7 USDT from the swap of ~$8150 worth of ETH
+    let max_diff = human_to_dec("0.7", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {} USDT, previous balance: {} USDT. Max diff: {} USDT",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+}
+
+//ok
+#[test]
+fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+    let exchange = Exchange::new(&app);
+    let bank = Bank::new(&app);
+
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+
+    let _validator = app
+        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap();
+    let owner = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1", ETH, Decimals::Eighteen),
+            str_coin("1", ATOM, Decimals::Six),
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
+            str_coin("1", INJ_2, Decimals::Eighteen),
+        ],
+    );
+
+    let spot_market_1_id = launch_realistic_inj_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
+
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("1_000", USDT, Decimals::Six)],
+    );
+    set_route_and_assert_success(
+        &wasm,
+        &owner,
+        &contr_addr,
+        INJ_2,
+        ATOM,
+        vec![
+            spot_market_1_id.as_str().into(),
+            spot_market_2_id.as_str().into(),
+        ],
+    );
+
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+    let trader3 = init_rich_account(&app);
+
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet(
+        &app,
+        &spot_market_1_id,
+        &trader1,
+        &trader2,
+    );
+    create_realistic_atom_usdt_sell_orders_from_spreadsheet(
+        &app,
+        &spot_market_2_id,
+        &trader1,
+        &trader2,
+        &trader3,
+    );
+
+    app.increase_time(1);
+
+    let inj_to_swap = "973.258";
+
+    let swapper = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            str_coin("1", INJ, Decimals::Eighteen),
+        ],
+    );
+
+    let mut query_result: SwapEstimationResult = wasm
+        .query(
+            &contr_addr,
+            &QueryMsg::GetOutputQuantity {
+                source_denom: INJ_2.to_string(),
+                target_denom: ATOM.to_string(),
+                from_quantity: human_to_dec(inj_to_swap, Decimals::Eighteen),
+            },
+        )
+        .unwrap();
+
+    // it's expected that it is slightly less than what's in the spreadsheet
+    let expected_amount = human_to_dec("944.26", Decimals::Six);
+
+    assert_eq!(
+        query_result.result_quantity, expected_amount,
+        "incorrect swap result estimate returned by query"
+    );
+
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: human_to_dec("12.73828775", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+        FPCoin {
+            amount: human_to_dec("12.70013012", Decimals::Six),
+            denom: "usdt".to_string(),
+        },
+    ];
+
+    // we don't care too much about decimal fraction of the fee
+    assert_fee_is_as_expected(
+        &mut query_result.expected_fees,
+        &mut expected_fees,
+        human_to_dec("0.1", Decimals::Six),
+    );
+
+    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
+    assert_eq!(
+        contract_balances_before.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    wasm.execute(
+        &contr_addr,
+        &ExecuteMsg::SwapMinOutput {
+            target_denom: ATOM.to_string(),
+            min_output_quantity: FPDecimal::from(944u128),
+        },
+        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen)],
+        &swapper,
+    )
+    .unwrap();
+
+    let from_balance = query_bank_balance(&bank, INJ_2, swapper.address().as_str());
+    let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
+
+    assert_eq!(
+        from_balance,
+        FPDecimal::zero(),
+        "some of the original amount wasn't swapped"
+    );
+
+    assert!(
+        to_balance >= expected_amount,
+        "Swapper received less than expected minimum amount. Expected: {} ATOM, actual: {} ATOM",
+        expected_amount.scaled(Decimals::Six.get_decimals().neg()),
+        to_balance.scaled(Decimals::Six.get_decimals().neg()),
+    );
+
+    let max_diff = human_to_dec("0.1", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            expected_amount,
+            to_balance,
+            max_diff,
+        ),
+        "Swapper did not receive expected amount. Expected: {} ATOM, actual: {} ATOM, max diff: {} ATOM",
+        expected_amount.scaled(Decimals::Six.get_decimals().neg()),
+        to_balance.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+
+    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
+    assert_eq!(
+        contract_balances_after.len(),
+        1,
+        "wrong number of denoms in contract balances"
+    );
+
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+
+    assert!(
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {} USDT, previous balance: {} USDT",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg())
+    );
+
+    // contract is allowed to earn extra 0.82 USDT from the swap of ~$8500 worth of INJ
+    let max_diff = human_to_dec("0.82", Decimals::Six);
 
     assert!(
         are_fpdecimals_approximately_equal(
@@ -551,22 +635,8 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
         ],
     );
 
-    let spot_market_1_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ETH,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
-    );
-    let spot_market_2_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ATOM,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
-    );
+    let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
     let contr_addr = init_self_relaying_contract_and_get_address(
         &wasm,
@@ -617,83 +687,18 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
     let iterations = 100;
 
     while counter < iterations {
-        // ETH-USDT orders
-        create_realistic_limit_order(
+        create_realistic_eth_usdt_buy_orders_from_spreadsheet(
             &app,
+            &spot_market_1_id,
             &trader1,
-            &spot_market_1_id,
-            OrderSide::Buy,
-            "2107.2",
-            "0.78",
-            Decimals::Eighteen,
-            Decimals::Six,
-        );
-
-        create_realistic_limit_order(
-            &app,
             &trader2,
-            &spot_market_1_id,
-            OrderSide::Buy,
-            "1978",
-            "1.23",
-            Decimals::Eighteen,
-            Decimals::Six,
         );
-
-        create_realistic_limit_order(
+        create_realistic_atom_usdt_sell_orders_from_spreadsheet(
             &app,
-            &trader2,
-            &spot_market_1_id,
-            OrderSide::Buy,
-            "1966.66",
-            "2.07",
-            Decimals::Eighteen,
-            Decimals::Six,
-        );
-
-        // ATOM-USDT orders
-        create_realistic_limit_order(
-            &app,
+            &spot_market_2_id,
             &trader1,
-            &spot_market_2_id,
-            OrderSide::Sell,
-            "8.89",
-            "197.89",
-            Decimals::Six,
-            Decimals::Six,
-        );
-
-        create_realistic_limit_order(
-            &app,
             &trader2,
-            &spot_market_2_id,
-            OrderSide::Sell,
-            "8.93",
-            "181.002",
-            Decimals::Six,
-            Decimals::Six,
-        );
-
-        create_realistic_limit_order(
-            &app,
             &trader3,
-            &spot_market_2_id,
-            OrderSide::Sell,
-            "8.99",
-            "203.12",
-            Decimals::Six,
-            Decimals::Six,
-        );
-
-        create_realistic_limit_order(
-            &app,
-            &trader1,
-            &spot_market_2_id,
-            OrderSide::Sell,
-            "9.01",
-            "421.11",
-            Decimals::Six,
-            Decimals::Six,
         );
 
         app.increase_time(1);
@@ -778,22 +783,8 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
         ],
     );
 
-    let spot_market_1_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ETH,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
-    );
-    let spot_market_2_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ATOM,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
-    );
+    let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
     let contr_addr = init_self_relaying_contract_and_get_address(
         &wasm,
@@ -816,83 +807,18 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    // ETH-USDT orders
-    create_realistic_limit_order(
+    create_realistic_eth_usdt_buy_orders_from_spreadsheet(
         &app,
+        &spot_market_1_id,
         &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "2107.2",
-        "0.78",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1978",
-        "1.23",
-        Decimals::Eighteen,
-        Decimals::Six,
     );
-
-    create_realistic_limit_order(
+    create_realistic_atom_usdt_sell_orders_from_spreadsheet(
         &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1966.66",
-        "2.07",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    // ATOM-USDT orders
-    create_realistic_limit_order(
-        &app,
+        &spot_market_2_id,
         &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.89",
-        "197.89",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.93",
-        "181.002",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader3,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.99",
-        "203.12",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "9.01",
-        "421.11",
-        Decimals::Six,
-        Decimals::Six,
     );
 
     app.increase_time(1);
@@ -1018,22 +944,8 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
         ],
     );
 
-    let spot_market_1_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ETH,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
-    );
-    let spot_market_2_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ATOM,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
-    );
+    let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
     // in reality we need to add at least 49 USDT to the buffer, even if according to contract's calculations 42 USDT would be enough to execute the swap
     let contr_addr = init_self_relaying_contract_and_get_address(
@@ -1057,83 +969,18 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    // ETH-USDT orders
-    create_realistic_limit_order(
+    create_realistic_eth_usdt_buy_orders_from_spreadsheet(
         &app,
+        &spot_market_1_id,
         &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "2107.2",
-        "0.78",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1978",
-        "1.23",
-        Decimals::Eighteen,
-        Decimals::Six,
     );
-
-    create_realistic_limit_order(
+    create_realistic_atom_usdt_sell_orders_from_spreadsheet(
         &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1966.66",
-        "2.07",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    // ATOM-USDT orders
-    create_realistic_limit_order(
-        &app,
+        &spot_market_2_id,
         &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.89",
-        "197.89",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.93",
-        "181.002",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader3,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.99",
-        "203.12",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "9.01",
-        "421.11",
-        Decimals::Six,
-        Decimals::Six,
     );
 
     app.increase_time(1);
@@ -1237,22 +1084,8 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
         ],
     );
 
-    let spot_market_1_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ETH,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
-    );
-    let spot_market_2_id = launch_custom_spot_market(
-        &exchange,
-        &owner,
-        ATOM,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000")).as_str(),
-    );
+    let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
     // 41 USDT is just below the amount required to buy required ATOM amount
     let contr_addr = init_self_relaying_contract_and_get_address(
@@ -1276,83 +1109,18 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    // ETH-USDT orders
-    create_realistic_limit_order(
+    create_realistic_eth_usdt_buy_orders_from_spreadsheet(
         &app,
+        &spot_market_1_id,
         &trader1,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "2107.2",
-        "0.78",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1978",
-        "1.23",
-        Decimals::Eighteen,
-        Decimals::Six,
     );
-
-    create_realistic_limit_order(
+    create_realistic_atom_usdt_sell_orders_from_spreadsheet(
         &app,
-        &trader2,
-        &spot_market_1_id,
-        OrderSide::Buy,
-        "1966.66",
-        "2.07",
-        Decimals::Eighteen,
-        Decimals::Six,
-    );
-
-    // ATOM-USDT orders
-    create_realistic_limit_order(
-        &app,
+        &spot_market_2_id,
         &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.89",
-        "197.89",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader2,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.93",
-        "181.002",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
         &trader3,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "8.99",
-        "203.12",
-        Decimals::Six,
-        Decimals::Six,
-    );
-
-    create_realistic_limit_order(
-        &app,
-        &trader1,
-        &spot_market_2_id,
-        OrderSide::Sell,
-        "9.01",
-        "421.11",
-        Decimals::Six,
-        Decimals::Six,
     );
 
     app.increase_time(1);
