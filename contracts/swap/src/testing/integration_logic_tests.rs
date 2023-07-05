@@ -28,7 +28,6 @@ use crate::types::{FPCoin, SwapEstimationResult};
    https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
 */
 
-//ok
 #[test]
 fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     let app = InjectiveTestApp::new();
@@ -173,7 +172,6 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     );
 }
 
-//ok
 #[test]
 fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     let app = InjectiveTestApp::new();
@@ -296,7 +294,6 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     );
 }
 
-//ok
 #[test]
 fn it_executes_swap_between_markets_using_different_quote_assets() {
     let app = InjectiveTestApp::new();
@@ -439,7 +436,6 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buffer_is_insufficient()
 {
@@ -570,7 +566,6 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
     );
 }
 
-//ok
 #[test]
 fn it_executes_a_sell_of_base_asset_to_receive_min_output_quantity() {
     let app = InjectiveTestApp::new();
@@ -692,7 +687,6 @@ fn it_executes_a_sell_of_base_asset_to_receive_min_output_quantity() {
     );
 }
 
-//ok
 #[test]
 fn it_executes_a_buy_of_base_asset_to_receive_min_output_quantity() {
     let app = InjectiveTestApp::new();
@@ -859,7 +853,6 @@ fn it_executes_a_buy_of_base_asset_to_receive_min_output_quantity() {
     );
 }
 
-//ok
 #[test]
 fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     let app = InjectiveTestApp::new();
@@ -1047,7 +1040,6 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     let app = InjectiveTestApp::new();
@@ -1162,7 +1154,6 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_swap_if_no_funds_were_passed() {
     let app = InjectiveTestApp::new();
@@ -1249,7 +1240,6 @@ fn it_reverts_swap_if_no_funds_were_passed() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_swap_if_multiple_funds_were_passed() {
     let app = InjectiveTestApp::new();
@@ -1342,7 +1332,6 @@ fn it_reverts_swap_if_multiple_funds_were_passed() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_if_user_passes_quantities_equal_to_zero() {
     let app = InjectiveTestApp::new();
@@ -1446,7 +1435,6 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_if_user_passes_negative_quantities() {
     let app = InjectiveTestApp::new();
@@ -1532,7 +1520,6 @@ fn it_reverts_if_user_passes_negative_quantities() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     let app = InjectiveTestApp::new();
@@ -1643,7 +1630,6 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_if_min_quantity_cannot_be_reached() {
     let app = InjectiveTestApp::new();
@@ -1735,7 +1721,6 @@ fn it_reverts_if_min_quantity_cannot_be_reached() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_if_market_is_paused() {
     let app = InjectiveTestApp::new();
@@ -1843,7 +1828,6 @@ fn it_reverts_if_market_is_paused() {
     );
 }
 
-//ok
 #[test]
 fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     let app = InjectiveTestApp::new();
@@ -1947,7 +1931,6 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     );
 }
 
-//ok
 #[test]
 fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
     let app = InjectiveTestApp::new();
@@ -2010,7 +1993,6 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_his_address() {
     );
 }
 
-//ok
 #[test]
 fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
     let app = InjectiveTestApp::new();
@@ -2075,7 +2057,6 @@ fn it_allows_admin_to_withdraw_all_funds_from_contract_to_other_address() {
     );
 }
 
-//ok
 #[test]
 fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
     let app = InjectiveTestApp::new();

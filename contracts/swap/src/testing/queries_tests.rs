@@ -19,11 +19,11 @@ use crate::testing::test_utils::{
 };
 use crate::types::{FPCoin, SwapRoute};
 
-/**
-    Spreadsheet URL: https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
-**/
+/*
+    Tests focusing on queries with all values were taken from this spreadsheet:
+`   https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
+*/
 
-//ok
 #[test]
 fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
     let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
@@ -103,7 +103,6 @@ fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
     );
 }
 
-//ok
 #[test]
 fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
     let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
@@ -182,7 +181,6 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
     );
 }
 
-//ok
 #[test]
 fn test_calculate_swap_price_self_fee_recipient_from_source_quantity() {
     let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
@@ -262,7 +260,6 @@ fn test_calculate_swap_price_self_fee_recipient_from_source_quantity() {
     );
 }
 
-//ok
 #[test]
 fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
     let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);

@@ -35,7 +35,6 @@ use crate::types::{FPCoin, SwapEstimationResult};
    In all tests contract is configured to self-relay trades and thus receive a 60% fee discount.
 */
 
-//ok
 #[test]
 fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
     let app = InjectiveTestApp::new();
@@ -228,7 +227,6 @@ fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
     );
 }
 
-//ok
 #[test]
 fn happy_path_two_hops_swap_inj_eth_realistic_values_self_relaying() {
     let app = InjectiveTestApp::new();
@@ -421,7 +419,6 @@ fn happy_path_two_hops_swap_inj_eth_realistic_values_self_relaying() {
     );
 }
 
-//ok
 #[test]
 fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
     let app = InjectiveTestApp::new();
@@ -615,7 +612,6 @@ fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
     );
 }
 
-//ok
 #[test]
 fn it_doesnt_lose_buffer_if_executed_multiple_times() {
     let app = InjectiveTestApp::new();
@@ -1065,7 +1061,6 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
     );
 }
 
-//ok
 #[test]
 fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
     let app = InjectiveTestApp::new();

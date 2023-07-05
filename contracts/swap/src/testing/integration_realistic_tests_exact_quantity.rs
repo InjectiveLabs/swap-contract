@@ -39,37 +39,31 @@ use crate::types::SwapEstimationResult;
 
 struct Percent<'a>(&'a str);
 
-// actual difference is ~2200%
 #[test]
 fn it_swaps_eth_to_get_minimum_exact_amount_of_atom_by_mightly_rounding_up() {
     exact_two_hop_eth_atom_swap_test_template(human_to_dec("0.01", Decimals::Six), Percent("2200"))
 }
 
-// actual difference is ~110%
 #[test]
 fn it_swaps_eth_to_get_very_low_exact_amount_of_atom_by_heavily_rounding_up() {
     exact_two_hop_eth_atom_swap_test_template(human_to_dec("0.11", Decimals::Six), Percent("110"))
 }
 
-//ok
 #[test]
 fn it_swaps_eth_to_get_low_exact_amount_of_atom_by_rounding_up() {
     exact_two_hop_eth_atom_swap_test_template(human_to_dec("4.12", Decimals::Six), Percent("10"))
 }
 
-//ok
 #[test]
 fn it_correctly_swaps_eth_to_get_normal_exact_amount_of_atom() {
     exact_two_hop_eth_atom_swap_test_template(human_to_dec("12.05", Decimals::Six), Percent("1"))
 }
 
-//ok
 #[test]
 fn it_correctly_swaps_eth_to_get_high_exact_amount_of_atom() {
     exact_two_hop_eth_atom_swap_test_template(human_to_dec("612", Decimals::Six), Percent("1"))
 }
 
-//ok
 #[test]
 fn it_correctly_swaps_eth_to_get_very_high_exact_amount_of_atom() {
     let app = InjectiveTestApp::new();
@@ -260,31 +254,26 @@ fn it_correctly_swaps_eth_to_get_very_high_exact_amount_of_atom() {
     );
 }
 
-// here we get exact amount
 #[test]
 fn it_swaps_inj_to_get_minimum_exact_amount_of_atom_by_mightly_rounding_up() {
     exact_two_hop_inj_atom_swap_test_template(human_to_dec("0.01", Decimals::Six), Percent("0"))
 }
 
-// here we get exact amount
 #[test]
 fn it_swaps_inj_to_get_very_low_exact_amount_of_atom() {
     exact_two_hop_inj_atom_swap_test_template(human_to_dec("0.11", Decimals::Six), Percent("0"))
 }
 
-// here we get exact amount
 #[test]
 fn it_swaps_inj_to_get_low_exact_amount_of_atom() {
     exact_two_hop_inj_atom_swap_test_template(human_to_dec("4.12", Decimals::Six), Percent("0"))
 }
 
-// here we get exact amount
 #[test]
 fn it_correctly_swaps_inj_to_get_normal_exact_amount_of_atom() {
     exact_two_hop_inj_atom_swap_test_template(human_to_dec("12.05", Decimals::Six), Percent("0"))
 }
 
-//ok
 #[test]
 fn it_correctly_swaps_inj_to_get_high_exact_amount_of_atom() {
     exact_two_hop_inj_atom_swap_test_template(human_to_dec("612", Decimals::Six), Percent("0.01"))
@@ -484,7 +473,6 @@ fn it_correctly_swaps_inj_to_get_very_high_exact_amount_of_atom() {
     );
 }
 
-//here we get exact amount of eth
 #[test]
 fn it_swaps_inj_to_get_minimum_exact_amount_of_eth() {
     exact_two_hop_inj_eth_swap_test_template(
@@ -493,7 +481,6 @@ fn it_swaps_inj_to_get_minimum_exact_amount_of_eth() {
     )
 }
 
-//here we get exact amount of eth
 #[test]
 fn it_swaps_inj_to_get_low_exact_amount_of_eth() {
     exact_two_hop_inj_eth_swap_test_template(
@@ -502,19 +489,16 @@ fn it_swaps_inj_to_get_low_exact_amount_of_eth() {
     )
 }
 
-//here we get exact amount of eth
 #[test]
 fn it_swaps_inj_to_get_normal_exact_amount_of_eth() {
     exact_two_hop_inj_eth_swap_test_template(human_to_dec("0.1", Decimals::Eighteen), Percent("0"))
 }
 
-//here we get exact amount of eth
 #[test]
 fn it_swaps_inj_to_get_high_exact_amount_of_eth() {
     exact_two_hop_inj_eth_swap_test_template(human_to_dec("3.1", Decimals::Eighteen), Percent("0"))
 }
 
-//here we get exact amount of eth
 #[test]
 fn it_swaps_inj_to_get_very_high_exact_amount_of_eth() {
     let app = InjectiveTestApp::new();
@@ -706,7 +690,6 @@ fn it_swaps_inj_to_get_very_high_exact_amount_of_eth() {
     );
 }
 
-//ok
 #[test]
 fn it_doesnt_lose_buffer_if_exact_swap_of_eth_to_atom_is_executed_multiple_times() {
     let app = InjectiveTestApp::new();
