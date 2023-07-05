@@ -6,18 +6,15 @@ use injective_math::FPDecimal;
 
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
-    are_fpdecimals_approximately_equal,
-    create_realistic_atom_usdt_sell_orders_from_spreadsheet,
+    are_fpdecimals_approximately_equal, create_realistic_atom_usdt_sell_orders_from_spreadsheet,
     create_realistic_eth_usdt_buy_orders_from_spreadsheet,
     create_realistic_eth_usdt_sell_orders_from_spreadsheet,
     create_realistic_inj_usdt_buy_orders_from_spreadsheet, create_realistic_limit_order,
-    human_to_dec, init_rich_account,
-    init_self_relaying_contract_and_get_address,
+    human_to_dec, init_rich_account, init_self_relaying_contract_and_get_address,
     launch_realistic_atom_usdt_spot_market, launch_realistic_inj_usdt_spot_market,
     launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, query_all_bank_balances,
-    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
-    ETH, INJ, INJ_2,
-    USDT,
+    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, ETH,
+    INJ, INJ_2, USDT,
 };
 use crate::types::SwapEstimationResult;
 
