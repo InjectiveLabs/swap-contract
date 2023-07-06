@@ -112,6 +112,7 @@ pub fn start_swap_flow(
         swap_steps: steps,
         swap_quantity_mode,
         refund: Coin::new(refund_amount.into(), source_denom.to_owned()),
+        input_funds: coin_provided.to_owned(),
     };
 
     SWAP_RESULTS.save(deps.storage, &Vec::new())?;
@@ -230,7 +231,7 @@ pub fn handle_atomic_order_reply(
     swap_results.push(SwapResults {
         market_id: swap.swap_steps[(current_step.step_idx) as usize].to_owned(),
         price: average_price,
-        quantity,
+        quantity: new_quantity,
         fee,
     });
 
@@ -260,6 +261,10 @@ pub fn handle_atomic_order_reply(
     let swap_results_json = serde_json_wasm::to_string(&swap_results).unwrap();
     let swap_event = Event::new("atomic_swap_execution")
         .add_attribute("sender", swap.sender_address.to_owned())
+        .add_attribute("swap_input_amount", swap.input_funds.amount)
+        .add_attribute("swap_input_denom", swap.input_funds.denom)
+        .add_attribute("refund_amount", swap.refund.amount.to_owned())
+        .add_attribute("refund_denom", swap.refund.denom.to_owned())
         .add_attribute("swap_final_amount", new_balance.amount.to_string())
         .add_attribute("swap_final_denom", new_balance.denom)
         .add_attribute("swap_results", swap_results_json);

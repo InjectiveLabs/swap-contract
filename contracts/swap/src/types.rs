@@ -53,6 +53,7 @@ pub struct CurrentSwapOperation {
     pub sender_address: Addr,
     pub swap_steps: Vec<MarketId>,
     pub swap_quantity_mode: SwapQuantityMode,
+    pub input_funds: Coin,
     pub refund: Coin,
 }
 
