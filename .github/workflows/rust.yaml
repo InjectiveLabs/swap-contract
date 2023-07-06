@@ -123,11 +123,13 @@ jobs:
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
+          toolchain: 1.69.0
           command: fmt
           args: --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
+          toolchain: 1.69.0
           command: clippy
           args: --tests -- -D warnings
