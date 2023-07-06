@@ -37,7 +37,7 @@ use crate::types::SwapEstimationResult;
 struct Percent<'a>(&'a str);
 
 #[test]
-fn it_swaps_eth_to_get_minimum_exact_amount_of_atom_by_mightly_rounding_up() {
+fn it_swaps_eth_to_get_minimum_exact_amount_of_atom_by_mildly_rounding_up() {
     exact_two_hop_eth_atom_swap_test_template(human_to_dec("0.01", Decimals::Six), Percent("2200"))
 }
 
@@ -250,7 +250,7 @@ fn it_correctly_swaps_eth_to_get_very_high_exact_amount_of_atom() {
 }
 
 #[test]
-fn it_swaps_inj_to_get_minimum_exact_amount_of_atom_by_mightly_rounding_up() {
+fn it_swaps_inj_to_get_minimum_exact_amount_of_atom_by_mildly_rounding_up() {
     exact_two_hop_inj_atom_swap_test_template(human_to_dec("0.01", Decimals::Six), Percent("0"))
 }
 
