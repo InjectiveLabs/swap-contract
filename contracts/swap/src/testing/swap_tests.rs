@@ -1,18 +1,20 @@
 use cosmwasm_std::testing::mock_env;
-use cosmwasm_std::{Addr, Coin};
+use cosmwasm_std::Addr;
 
 use injective_cosmwasm::{MarketId, OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 
 use crate::admin::set_route;
 use crate::queries::estimate_single_swap_execution;
 use crate::state::CONFIG;
-use crate::testing::test_utils::{mock_deps_eth_inj, MultiplierQueryBehaviour, TEST_USER_ADDR};
-use crate::types::{Config, FPCoin};
+use crate::testing::test_utils::{
+    mock_deps_eth_inj, str_coin, Decimals, MultiplierQueryBehavior, TEST_USER_ADDR,
+};
+use crate::types::{Config, FPCoin, SwapEstimationAmount};
 
 #[test]
 fn it_reverts_if_atomic_fee_multiplier_query_fails() {
     let env = mock_env();
-    let deps_binding = mock_deps_eth_inj(MultiplierQueryBehaviour::Fail);
+    let deps_binding = mock_deps_eth_inj(MultiplierQueryBehavior::Fail);
     let mut deps = deps_binding;
 
     let config = Config {
@@ -36,7 +38,7 @@ fn it_reverts_if_atomic_fee_multiplier_query_fails() {
         &deps.as_mut_deps().as_ref(),
         &env,
         &MarketId::unchecked(TEST_MARKET_ID_1.to_string()),
-        FPCoin::from(Coin::new(1000000000000000000u128, "eth".to_string())),
+        SwapEstimationAmount::InputQuantity(FPCoin::from(str_coin("1", "eth", Decimals::Eighteen))),
         true, // is_simulation
     );
 

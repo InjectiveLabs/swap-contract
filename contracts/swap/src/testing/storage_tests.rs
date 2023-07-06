@@ -7,13 +7,13 @@ use injective_cosmwasm::{
 
 use crate::state::{read_swap_route, store_swap_route, CONFIG};
 use crate::testing::test_utils::{
-    mock_deps_eth_inj, MultiplierQueryBehaviour, TEST_CONTRACT_ADDR, TEST_USER_ADDR,
+    mock_deps_eth_inj, MultiplierQueryBehavior, TEST_CONTRACT_ADDR, TEST_USER_ADDR,
 };
 use crate::types::{Config, SwapRoute};
 
 #[test]
 fn it_can_store_and_read_swap_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth";
     let target_denom = "inj";
 
@@ -41,7 +41,7 @@ fn it_can_store_and_read_swap_route() {
 
 #[test]
 fn it_can_update_and_read_swap_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth";
     let target_denom = "usdt";
 
@@ -75,7 +75,7 @@ fn it_can_update_and_read_swap_route() {
 
 #[test]
 fn owner_can_set_valid_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "inj".to_string();
     let route = vec![
@@ -125,7 +125,7 @@ fn owner_can_set_valid_route() {
 
 #[test]
 fn owner_cannot_set_route_for_markets_using_target_denom_not_found_on_target_market() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "atom".to_string();
     let route = vec![
@@ -164,7 +164,7 @@ fn owner_cannot_set_route_for_markets_using_target_denom_not_found_on_target_mar
 
 #[test]
 fn owner_cannot_set_route_for_markets_using_source_denom_not_present_on_source_market() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "atom".to_string();
     let target_denom = "eth".to_string();
     let route = vec![
@@ -203,7 +203,7 @@ fn owner_cannot_set_route_for_markets_using_source_denom_not_present_on_source_m
 
 #[test]
 fn owner_can_set_route_single_step_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "usdt".to_string();
     let route = vec![MarketId::unchecked(TEST_MARKET_ID_1)];
@@ -250,7 +250,7 @@ fn owner_can_set_route_single_step_route() {
 
 #[test]
 fn owner_can_set_route_single_step_route_with_reverted_denoms() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "usdt".to_string();
     let target_denom = "eth".to_string();
     let route = vec![MarketId::unchecked(TEST_MARKET_ID_1)];
@@ -297,7 +297,7 @@ fn owner_can_set_route_single_step_route_with_reverted_denoms() {
 
 #[test]
 fn it_returns_error_when_setting_route_for_the_same_denom_as_target_and_source() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "eth".to_string();
     let route = vec![
@@ -343,7 +343,7 @@ fn it_returns_error_when_setting_route_for_the_same_denom_as_target_and_source()
 
 #[test]
 fn it_returns_error_when_setting_route_with_nonexistent_market_id() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "usdt".to_string();
     let route = vec![MarketId::unchecked(TEST_MARKET_ID_3)];
@@ -384,7 +384,7 @@ fn it_returns_error_when_setting_route_with_nonexistent_market_id() {
 
 #[test]
 fn it_returns_error_when_setting_route_with_no_market_ids() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "usdt".to_string();
     let route = vec![];
@@ -470,7 +470,7 @@ fn it_returns_error_when_setting_route_with_duplicated_market_ids() {
 
 #[test]
 fn it_returns_error_if_non_admin_tries_to_set_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "inj".to_string();
     let route = vec![
@@ -511,7 +511,7 @@ fn it_returns_error_if_non_admin_tries_to_set_route() {
 
 #[test]
 fn it_allows_admint_to_delete_existing_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "inj".to_string();
     let route = vec![
@@ -557,7 +557,7 @@ fn it_allows_admint_to_delete_existing_route() {
 
 #[test]
 fn it_doesnt_fail_if_admin_deletes_non_existent_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "inj".to_string();
     let route = vec![
@@ -598,7 +598,7 @@ fn it_doesnt_fail_if_admin_deletes_non_existent_route() {
 
 #[test]
 fn it_returns_error_if_non_admin_tries_to_delete_route() {
-    let mut deps = mock_deps_eth_inj(MultiplierQueryBehaviour::Success);
+    let mut deps = mock_deps_eth_inj(MultiplierQueryBehavior::Success);
     let source_denom = "eth".to_string();
     let target_denom = "inj".to_string();
     let route = vec![

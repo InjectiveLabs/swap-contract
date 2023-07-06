@@ -2,13 +2,17 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{coin, Addr, Coin, OwnedDeps, QuerierResult, SystemError, SystemResult};
+use cosmwasm_std::{
+    coin, to_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
+    SystemResult,
+};
 use injective_std::shim::Any;
 use injective_std::types::cosmos::bank::v1beta1::{
     MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
 };
 use injective_std::types::cosmos::base::v1beta1::Coin as TubeCoin;
-use injective_std::types::cosmos::gov::v1beta1::{MsgSubmitProposal, MsgVote};
+use injective_std::types::cosmos::gov::v1::MsgVote;
+use injective_std::types::cosmos::gov::v1beta1::MsgSubmitProposal;
 use injective_std::types::injective::exchange;
 use injective_std::types::injective::exchange::v1beta1::{
     MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType,
@@ -20,12 +24,13 @@ use injective_test_tube::{
 
 use crate::helpers::Scaled;
 use injective_cosmwasm::{
-    create_mock_spot_market, create_orderbook_response_handler, create_spot_multi_market_handler,
-    get_default_subaccount_id_for_checked_address, inj_mock_deps, HandlesMarketIdQuery,
-    InjectiveQueryWrapper, MarketId, PriceLevel, WasmMockQuerier, TEST_MARKET_ID_1,
+    create_orderbook_response_handler, create_spot_multi_market_handler,
+    get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids,
+    HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel,
+    QueryMarketAtomicExecutionFeeMultiplierResponse, SpotMarket, WasmMockQuerier, TEST_MARKET_ID_1,
     TEST_MARKET_ID_2,
 };
-use injective_math::{round_to_min_tick, FPDecimal};
+use injective_math::FPDecimal;
 use prost::Message;
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
@@ -39,6 +44,7 @@ pub const ATOM: &str = "atom";
 pub const USDT: &str = "usdt";
 pub const USDC: &str = "usdc";
 pub const INJ: &str = "inj";
+pub const INJ_2: &str = "inj_2";
 
 pub const DEFAULT_TAKER_FEE: f64 = 0.001;
 pub const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
@@ -70,23 +76,33 @@ pub fn create_price_level(p: u128, q: u128) -> PriceLevel {
 }
 
 #[derive(PartialEq)]
-pub enum MultiplierQueryBehaviour {
+pub enum MultiplierQueryBehavior {
     Success,
     Fail,
 }
 
 pub fn mock_deps_eth_inj(
-    multiplier_query_behaviour: MultiplierQueryBehaviour,
+    multiplier_query_behavior: MultiplierQueryBehavior,
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier, InjectiveQueryWrapper> {
     inj_mock_deps(|querier| {
         let mut markets = HashMap::new();
         markets.insert(
             MarketId::new(TEST_MARKET_ID_1).unwrap(),
-            create_mock_spot_market("eth", 0),
+            create_mock_spot_market(
+                "eth",
+                FPDecimal::must_from_str("0.001"),
+                FPDecimal::must_from_str("0.001"),
+                0,
+            ),
         );
         markets.insert(
             MarketId::new(TEST_MARKET_ID_2).unwrap(),
-            create_mock_spot_market("inj", 1),
+            create_mock_spot_market(
+                "inj",
+                FPDecimal::must_from_str("0.001"),
+                FPDecimal::must_from_str("0.001"),
+                1,
+            ),
         );
         querier.spot_market_response_handler = create_spot_multi_market_handler(markets);
 
@@ -130,7 +146,7 @@ pub fn mock_deps_eth_inj(
         querier.spot_market_orderbook_response_handler =
             create_orderbook_response_handler(orderbooks);
 
-        if multiplier_query_behaviour == MultiplierQueryBehaviour::Fail {
+        if multiplier_query_behavior == MultiplierQueryBehavior::Fail {
             pub fn create_spot_error_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
                 struct Temp {}
 
@@ -145,8 +161,148 @@ pub fn mock_deps_eth_inj(
 
             querier.market_atomic_execution_fee_multiplier_response_handler =
                 create_spot_error_multiplier_handler()
+        } else {
+            pub fn create_spot_ok_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
+                struct Temp {}
+
+                impl HandlesMarketIdQuery for Temp {
+                    fn handle(&self, _: MarketId) -> QuerierResult {
+                        let response = QueryMarketAtomicExecutionFeeMultiplierResponse {
+                            multiplier: FPDecimal::from_str("2.5").unwrap(),
+                        };
+                        SystemResult::Ok(ContractResult::from(to_binary(&response)))
+                    }
+                }
+
+                Some(Box::new(Temp {}))
+            }
+
+            querier.market_atomic_execution_fee_multiplier_response_handler =
+                create_spot_ok_multiplier_handler()
         }
     })
+}
+
+pub fn mock_realistic_deps_eth_atom(
+    multiplier_query_behavior: MultiplierQueryBehavior,
+) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier, InjectiveQueryWrapper> {
+    inj_mock_deps(|querier| {
+        let mut markets = HashMap::new();
+        markets.insert(
+            MarketId::new(TEST_MARKET_ID_1).unwrap(),
+            create_mock_spot_market(
+                "eth",
+                FPDecimal::must_from_str("0.000000000000001"),
+                FPDecimal::must_from_str("1000000000000000"),
+                0,
+            ),
+        );
+        markets.insert(
+            MarketId::new(TEST_MARKET_ID_2).unwrap(),
+            create_mock_spot_market(
+                "atom",
+                FPDecimal::must_from_str("0.001"),
+                FPDecimal::must_from_str("10000"),
+                1,
+            ),
+        );
+        querier.spot_market_response_handler = create_spot_multi_market_handler(markets);
+
+        let mut orderbooks = HashMap::new();
+        let eth_buy_orderbook = vec![
+            PriceLevel {
+                p: FPDecimal::must_from_str("0.000000002107200000"),
+                q: FPDecimal::from_str("784000000000000000.000000000000000000").unwrap(),
+            },
+            PriceLevel {
+                p: FPDecimal::must_from_str("0.000000001978000000"),
+                q: FPDecimal::from_str("1230000000000000000.000000000000000000").unwrap(),
+            },
+            PriceLevel {
+                p: FPDecimal::must_from_str("0.000000001966660000"),
+                q: FPDecimal::from_str("2070000000000000000.000000000000000000").unwrap(),
+            },
+        ];
+        orderbooks.insert(MarketId::new(TEST_MARKET_ID_1).unwrap(), eth_buy_orderbook);
+
+        let inj_sell_orderbook = vec![
+            PriceLevel {
+                p: 800u128.into(),
+                q: 800u128.into(),
+            },
+            PriceLevel {
+                p: 810u128.into(),
+                q: 800u128.into(),
+            },
+            PriceLevel {
+                p: 820u128.into(),
+                q: 800u128.into(),
+            },
+            PriceLevel {
+                p: 830u128.into(),
+                q: 800u128.into(),
+            },
+        ];
+        orderbooks.insert(MarketId::new(TEST_MARKET_ID_2).unwrap(), inj_sell_orderbook);
+
+        querier.spot_market_orderbook_response_handler =
+            create_orderbook_response_handler(orderbooks);
+
+        if multiplier_query_behavior == MultiplierQueryBehavior::Fail {
+            pub fn create_spot_error_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
+                struct Temp {}
+
+                impl HandlesMarketIdQuery for Temp {
+                    fn handle(&self, _: MarketId) -> QuerierResult {
+                        SystemResult::Err(SystemError::Unknown {})
+                    }
+                }
+
+                Some(Box::new(Temp {}))
+            }
+
+            querier.market_atomic_execution_fee_multiplier_response_handler =
+                create_spot_error_multiplier_handler()
+        } else {
+            pub fn create_spot_ok_multiplier_handler() -> Option<Box<dyn HandlesMarketIdQuery>> {
+                struct Temp {}
+
+                impl HandlesMarketIdQuery for Temp {
+                    fn handle(&self, _: MarketId) -> QuerierResult {
+                        let response = QueryMarketAtomicExecutionFeeMultiplierResponse {
+                            multiplier: FPDecimal::from_str("2.5").unwrap(),
+                        };
+                        SystemResult::Ok(ContractResult::from(to_binary(&response)))
+                    }
+                }
+
+                Some(Box::new(Temp {}))
+            }
+
+            querier.market_atomic_execution_fee_multiplier_response_handler =
+                create_spot_ok_multiplier_handler()
+        }
+    })
+}
+
+fn create_mock_spot_market(
+    base: &str,
+    min_price_tick_size: FPDecimal,
+    min_quantity_tick_size: FPDecimal,
+    idx: u32,
+) -> SpotMarket {
+    SpotMarket {
+        ticker: format!("{base}usdt"),
+        base_denom: base.to_string(),
+        quote_denom: "usdt".to_string(),
+        maker_fee_rate: FPDecimal::from_str("0.01").unwrap(),
+        taker_fee_rate: FPDecimal::from_str("0.001").unwrap(),
+        relayer_fee_share_rate: FPDecimal::from_str("0.4").unwrap(),
+        market_id: test_market_ids()[idx as usize].clone(),
+        status: 1,
+        min_price_tick_size,
+        min_quantity_tick_size,
+    }
 }
 
 pub fn wasm_file(contract_name: String) -> String {
@@ -231,6 +387,232 @@ pub fn get_spot_market_id(exchange: &Exchange<InjectiveTestApp>, ticker: String)
     let market = spot_markets.iter().find(|m| m.ticker == ticker).unwrap();
 
     market.market_id.to_string()
+}
+
+pub fn launch_realistic_inj_usdt_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        exchange,
+        signer,
+        INJ_2,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+    )
+}
+
+pub fn launch_realistic_weth_usdt_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        exchange,
+        signer,
+        ETH,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.0000000000001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+    )
+}
+
+pub fn launch_realistic_atom_usdt_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        exchange,
+        signer,
+        ATOM,
+        USDT,
+        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("10000")).as_str(),
+    )
+}
+
+pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Buy,
+        "2107.2",
+        "0.78",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader2,
+        market_id,
+        OrderSide::Buy,
+        "1978",
+        "1.23",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader2,
+        market_id,
+        OrderSide::Buy,
+        "1966.6",
+        "2.07",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+}
+
+pub fn create_realistic_eth_usdt_sell_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+    trader3: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Sell,
+        "2115.2",
+        "0.5",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader2,
+        market_id,
+        OrderSide::Sell,
+        "2118.9",
+        "1.22",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader2,
+        market_id,
+        OrderSide::Sell,
+        "2120.1",
+        "1.72",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader3,
+        market_id,
+        OrderSide::Sell,
+        "2121",
+        "2.11",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+}
+
+pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Buy,
+        "8.91",
+        "282.001",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader2,
+        market_id,
+        OrderSide::Buy,
+        "8.78",
+        "283.65",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader2,
+        market_id,
+        OrderSide::Buy,
+        "8.56",
+        "407.607",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+}
+
+pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+    trader2: &SigningAccount,
+    trader3: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Sell,
+        "8.89",
+        "197.89",
+        Decimals::Six,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader2,
+        market_id,
+        OrderSide::Sell,
+        "8.93",
+        "181.02",
+        Decimals::Six,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader3,
+        market_id,
+        OrderSide::Sell,
+        "8.99",
+        "203.12",
+        Decimals::Six,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Sell,
+        "9.01",
+        "421.11",
+        Decimals::Six,
+        Decimals::Six,
+    );
 }
 
 #[derive(PartialEq)]
@@ -338,12 +720,12 @@ pub fn create_realistic_limit_order(
         .unwrap();
 }
 
-pub fn init_contract_and_get_address(
+pub fn init_self_relaying_contract_and_get_address(
     wasm: &Wasm<InjectiveTestApp>,
     owner: &SigningAccount,
     initial_balance: &[Coin],
 ) -> String {
-    let code_id = store_code(wasm, owner, "helix_converter".to_string());
+    let code_id = store_code(wasm, owner, "injective_converter".to_string());
     wasm.instantiate(
         code_id,
         &InstantiateMsg {
@@ -366,7 +748,7 @@ pub fn init_contract_with_fee_recipient_and_get_address(
     initial_balance: &[Coin],
     fee_recipient: &SigningAccount,
 ) -> String {
-    let code_id = store_code(wasm, owner, "helix_converter".to_string());
+    let code_id = store_code(wasm, owner, "injective_converter".to_string());
     wasm.instantiate(
         code_id,
         &InstantiateMsg {
@@ -388,14 +770,14 @@ pub fn set_route_and_assert_success(
     signer: &SigningAccount,
     contr_addr: &str,
     from_denom: &str,
-    to_denom: &str,
+    target_denom: &str,
     route: Vec<MarketId>,
 ) {
     wasm.execute(
         contr_addr,
         &ExecuteMsg::SetRoute {
             source_denom: from_denom.to_string(),
-            target_denom: to_denom.to_string(),
+            target_denom: target_denom.to_string(),
             route,
         },
         &[],
@@ -439,13 +821,14 @@ pub fn query_bank_balance(bank: &Bank<InjectiveTestApp>, denom: &str, address: &
 }
 
 pub fn pause_spot_market(
-    gov: &Gov<InjectiveTestApp>,
+    app: &InjectiveTestApp,
     market_id: &str,
     proposer: &SigningAccount,
     validator: &SigningAccount,
 ) {
+    let gov = Gov::new(app);
     pass_spot_market_params_update_proposal(
-        gov,
+        &gov,
         &SpotMarketParamUpdateProposal {
             title: format!("Set market {market_id} status to paused"),
             description: format!("Set market {market_id} status to paused"),
@@ -459,7 +842,9 @@ pub fn pause_spot_market(
         },
         proposer,
         validator,
-    )
+    );
+
+    app.increase_time(10u64)
 }
 
 pub fn pass_spot_market_params_update_proposal(
@@ -472,7 +857,7 @@ pub fn pass_spot_market_params_update_proposal(
     exchange::v1beta1::SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
 
     println!("submitting proposal: {proposal:?}");
-    let submit_response = gov.submit_proposal(
+    let submit_response = gov.submit_proposal_v1beta1(
         MsgSubmitProposal {
             content: Some(Any {
                 type_url: "/injective.exchange.v1beta1.SpotMarketParamUpdateProposal".to_string(),
@@ -496,6 +881,7 @@ pub fn pass_spot_market_params_update_proposal(
             proposal_id,
             voter: validator.address(),
             option: 1,
+            metadata: "".to_string(),
         },
         validator,
     );
@@ -896,17 +1282,18 @@ mod tests {
     }
 }
 
-pub fn round_usd_like_fee(raw_fee: &FPCoin, min_price_tick_size: FPDecimal) -> FPCoin {
-    FPCoin {
-        amount: round_to_min_tick(raw_fee.amount, min_price_tick_size),
-        denom: raw_fee.denom.clone(),
-    }
+pub fn are_fpdecimals_approximately_equal(
+    first: FPDecimal,
+    second: FPDecimal,
+    max_diff: FPDecimal,
+) -> bool {
+    (first - second).abs() <= max_diff
 }
 
 pub fn assert_fee_is_as_expected(
     raw_fees: &mut Vec<FPCoin>,
     expected_fees: &mut Vec<FPCoin>,
-    tick_size: FPDecimal,
+    max_diff: FPDecimal,
 ) {
     assert_eq!(
         raw_fees.len(),
@@ -918,10 +1305,12 @@ pub fn assert_fee_is_as_expected(
     expected_fees.sort_by_key(|f| f.denom.clone());
 
     for (raw_fee, expected_fee) in raw_fees.iter().zip(expected_fees.iter()) {
-        assert_eq!(
-            &round_usd_like_fee(raw_fee, tick_size),
-            expected_fee,
-            "Wrong amount of fee received"
+        assert!(
+            are_fpdecimals_approximately_equal(expected_fee.amount, raw_fee.amount, max_diff,),
+            "Wrong amount of trx fee received. Expected: {}, Actual: {}, Max diff: {}",
+            expected_fee.amount,
+            raw_fee.amount,
+            max_diff
         );
     }
 }

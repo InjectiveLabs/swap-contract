@@ -6,6 +6,12 @@ use injective_cosmwasm::MarketId;
 use injective_math::FPDecimal;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum SwapEstimationAmount {
+    InputQuantity(FPCoin),
+    ReceiveQuantity(FPCoin),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct FPCoin {
     pub amount: FPDecimal,
     pub denom: String,
@@ -27,6 +33,12 @@ impl From<Coin> for FPCoin {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum SwapQuantityMode {
+    MinOutputQuantity(FPDecimal),
+    ExactOutputQuantity(FPDecimal),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct StepExecutionEstimate {
     pub worst_price: FPDecimal,
     pub result_denom: String,
@@ -40,7 +52,8 @@ pub struct CurrentSwapOperation {
     // whole swap operation
     pub sender_address: Addr,
     pub swap_steps: Vec<MarketId>,
-    pub min_target_quantity: FPDecimal,
+    pub swap_quantity_mode: SwapQuantityMode,
+    pub refund: Coin,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -50,6 +63,14 @@ pub struct CurrentSwapStep {
     pub current_balance: FPCoin,
     pub step_target_denom: String,
     pub is_buy: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct SwapResults {
+    pub market_id: MarketId,
+    pub quantity: FPDecimal,
+    pub price: FPDecimal,
+    pub fee: FPDecimal,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -82,12 +103,11 @@ impl SwapRoute {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct SwapStep {
     pub market_id: MarketId,
-    pub quote_denom: String, // quote for this step of swap, eg for swpa eth/inj using eth/usdt and inj/usdt markets, quotes will be eth in 1st step and usdt in 2nd
+    pub quote_denom: String, // quote for this step of swap, eg for swap eth/inj using eth/usdt and inj/usdt markets, quotes will be eth in 1st step and usdt in 2nd
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
 pub struct SwapEstimationResult {
-    pub target_quantity: FPDecimal,
-    pub fees: Vec<FPCoin>,
+    pub result_quantity: FPDecimal,
+    pub expected_fees: Vec<FPCoin>,
 }

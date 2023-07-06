@@ -1,55 +1,122 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{BankMsg, DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg};
+use cosmwasm_std::{
+    BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg, Uint128,
+};
 
 use protobuf::Message;
 
 use crate::contract::ATOMIC_ORDER_REPLY_ID;
 use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address,
-    InjectiveMsgWrapper, InjectiveQueryWrapper, OrderType, SpotOrder,
+    InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper, OrderType, SpotOrder,
 };
 use injective_math::FPDecimal;
 use injective_protobuf::proto::tx;
 
 use crate::error::ContractError;
-use crate::helpers::dec_scale_factor;
+use crate::helpers::{dec_scale_factor, round_up_to_min_tick};
 
-use crate::queries::estimate_single_swap_execution;
-use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE};
-use crate::types::{CurrentSwapOperation, CurrentSwapStep, FPCoin};
+use crate::queries::{estimate_single_swap_execution, estimate_swap_result, SwapQuantity};
+use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS};
+use crate::types::{
+    CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapQuantityMode,
+    SwapResults,
+};
 
 pub fn start_swap_flow(
     deps: DepsMut<InjectiveQueryWrapper>,
     env: Env,
     info: MessageInfo,
     target_denom: String,
-    min_target_quantity: FPDecimal,
+    swap_quantity_mode: SwapQuantityMode,
 ) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     if info.funds.len() != 1 {
         return Err(ContractError::CustomError {
             val: "Only one denom can be passed in funds".to_string(),
         });
     }
-    if min_target_quantity.is_negative() || min_target_quantity.is_zero() {
+    let quantity = match swap_quantity_mode {
+        SwapQuantityMode::MinOutputQuantity(q) => q,
+        SwapQuantityMode::ExactOutputQuantity(q) => q,
+    };
+
+    if quantity.is_negative() || quantity.is_zero() {
         return Err(ContractError::CustomError {
-            val: "Min target quantity must be positive!".to_string(),
+            val: "Output quantity must be positive!".to_string(),
         });
     }
 
-    let sender_address = info.sender;
-    let coin_provided = &info.funds[0];
-    let source_denom = &coin_provided.denom;
+    let source_denom = &info.funds[0].denom;
     let route = read_swap_route(deps.storage, source_denom, &target_denom)?;
     let steps = route.steps_from(source_denom);
 
-    let current_balance: FPCoin = coin_provided.to_owned().into();
+    let sender_address = info.sender;
+    let coin_provided = &info.funds[0];
+
+    let mut current_balance = coin_provided.to_owned().into();
+
+    let refund_amount = if matches!(
+        swap_quantity_mode,
+        SwapQuantityMode::ExactOutputQuantity(..)
+    ) {
+        let target_output_quantity = quantity;
+
+        let estimation = estimate_swap_result(
+            deps.as_ref(),
+            &env,
+            source_denom.to_owned(),
+            target_denom,
+            SwapQuantity::OutputQuantity(target_output_quantity),
+        )?;
+
+        let querier = InjectiveQuerier::new(&deps.querier);
+        let first_market_id = steps[0].to_owned();
+        let first_market = querier
+            .query_spot_market(&first_market_id)?
+            .market
+            .expect("market should be available");
+
+        let is_input_quote = first_market.quote_denom == *source_denom;
+
+        let required_input = if is_input_quote {
+            estimation.result_quantity.int() + FPDecimal::one()
+        } else {
+            round_up_to_min_tick(
+                estimation.result_quantity,
+                first_market.min_quantity_tick_size,
+            )
+        };
+
+        let fp_coins: FPDecimal = coin_provided.amount.into();
+
+        if required_input > fp_coins {
+            return Err(ContractError::InsufficientFundsProvided(
+                fp_coins,
+                required_input,
+            ));
+        }
+
+        current_balance = FPCoin {
+            amount: required_input,
+            denom: source_denom.to_owned(),
+        };
+
+        FPDecimal::from(coin_provided.amount) - estimation.result_quantity
+    } else {
+        FPDecimal::zero()
+    };
+
     let swap_operation = CurrentSwapOperation {
         sender_address,
         swap_steps: steps,
-        min_target_quantity,
+        swap_quantity_mode,
+        refund: Coin::new(refund_amount.into(), source_denom.to_owned()),
     };
+
+    SWAP_RESULTS.save(deps.storage, &Vec::new())?;
     SWAP_OPERATION_STATE.save(deps.storage, &swap_operation)?;
+
     execute_swap_step(deps, env, swap_operation, 0, current_balance).map_err(ContractError::Std)
 }
 
@@ -68,7 +135,7 @@ pub fn execute_swap_step(
         &deps.as_ref(),
         &env,
         &market_id,
-        current_balance.clone(),
+        SwapEstimationAmount::InputQuantity(current_balance.clone()),
         false,
     )?;
 
@@ -104,7 +171,7 @@ pub fn execute_swap_step(
     };
     STEP_STATE.save(deps.storage, &current_step)?;
 
-    let response: Response<InjectiveMsgWrapper> = Response::new().add_submessage(order_message);
+    let response = Response::new().add_submessage(order_message);
     Ok(response)
 }
 
@@ -131,25 +198,26 @@ pub fn handle_atomic_order_reply(
         err: err.to_string(),
     })?;
 
-    // unwrap results into trade_data
     let trade_data = match order_response.results.into_option() {
         Some(trade_data) => Ok(trade_data),
         None => Err(ContractError::CustomError {
             val: "No trade data in order response".to_string(),
         }),
     }?;
-    let quantity = FPDecimal::from_str(&trade_data.quantity)? / dec_scale_factor; // need to remove protobuf scale factor to get real values
-    let avg_price = FPDecimal::from_str(&trade_data.price)? / dec_scale_factor;
+
+    // need to remove protobuf scale factor to get real values
+    let average_price = FPDecimal::from_str(&trade_data.price)? / dec_scale_factor;
+    let quantity = FPDecimal::from_str(&trade_data.quantity)? / dec_scale_factor;
     let fee = FPDecimal::from_str(&trade_data.fee)? / dec_scale_factor;
-    deps.api.debug(&format!(
-        "Quantity: {quantity}, price {avg_price}, fee {fee}"
-    ));
+
+    let mut swap_results = SWAP_RESULTS.load(deps.storage)?;
 
     let current_step = STEP_STATE.load(deps.storage).map_err(ContractError::Std)?;
+
     let new_quantity = if current_step.is_buy {
         quantity
     } else {
-        quantity * avg_price - fee
+        quantity * average_price - fee
     };
 
     let new_balance = FPCoin {
@@ -157,31 +225,60 @@ pub fn handle_atomic_order_reply(
         denom: current_step.step_target_denom,
     };
 
-    deps.api.debug(&format!("New balance: {new_balance:?}"));
-
     let swap = SWAP_OPERATION_STATE.load(deps.storage)?;
-    if current_step.step_idx < (swap.swap_steps.len() - 1) as u16 {
-        execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance)
-            .map_err(ContractError::Std)
-    } else {
-        // last step, finalize and send back funds to a caller
-        if new_balance.amount < swap.min_target_quantity {
-            return Err(ContractError::MinExpectedSwapAmountNotReached(
-                swap.min_target_quantity,
-            ));
-        }
-        let send_message = BankMsg::Send {
-            to_address: swap.sender_address.to_string(),
-            amount: vec![new_balance.clone().into()],
-        };
-        deps.api.debug(&format!("Send message: {send_message:?}"));
-        SWAP_OPERATION_STATE.remove(deps.storage);
-        STEP_STATE.remove(deps.storage);
-        let response = Response::new()
-            .add_message(send_message)
-            .add_attribute("swap_final_amount", new_balance.amount.to_string())
-            .add_attribute("swap_final_denom", new_balance.denom);
 
-        Ok(response)
+    swap_results.push(SwapResults {
+        market_id: swap.swap_steps[(current_step.step_idx) as usize].to_owned(),
+        price: average_price,
+        quantity,
+        fee,
+    });
+
+    if current_step.step_idx < (swap.swap_steps.len() - 1) as u16 {
+        SWAP_RESULTS.save(deps.storage, &swap_results)?;
+        return execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance)
+            .map_err(ContractError::Std);
     }
+
+    let min_output_quantity = match swap.swap_quantity_mode {
+        SwapQuantityMode::MinOutputQuantity(q) => q,
+        SwapQuantityMode::ExactOutputQuantity(q) => q,
+    };
+
+    if new_balance.amount < min_output_quantity {
+        return Err(ContractError::MinOutputAmountNotReached(
+            min_output_quantity,
+        ));
+    }
+
+    // last step, finalize and send back funds to a caller
+    let send_message = BankMsg::Send {
+        to_address: swap.sender_address.to_string(),
+        amount: vec![new_balance.clone().into()],
+    };
+
+    let swap_results_json = serde_json_wasm::to_string(&swap_results).unwrap();
+    let swap_event = Event::new("atomic_swap_execution")
+        .add_attribute("sender", swap.sender_address.to_owned())
+        .add_attribute("swap_final_amount", new_balance.amount.to_string())
+        .add_attribute("swap_final_denom", new_balance.denom)
+        .add_attribute("swap_results", swap_results_json);
+
+    SWAP_OPERATION_STATE.remove(deps.storage);
+    STEP_STATE.remove(deps.storage);
+    SWAP_RESULTS.remove(deps.storage);
+
+    let mut response = Response::new()
+        .add_message(send_message)
+        .add_event(swap_event);
+
+    if swap.refund.amount > Uint128::zero() {
+        let refund_message = BankMsg::Send {
+            to_address: swap.sender_address.to_string(),
+            amount: vec![swap.refund],
+        };
+        response = response.add_message(refund_message)
+    }
+
+    Ok(response)
 }
