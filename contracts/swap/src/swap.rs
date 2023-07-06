@@ -264,7 +264,6 @@ pub fn handle_atomic_order_reply(
         .add_attribute("swap_input_amount", swap.input_funds.amount)
         .add_attribute("swap_input_denom", swap.input_funds.denom)
         .add_attribute("refund_amount", swap.refund.amount.to_owned())
-        .add_attribute("refund_denom", swap.refund.denom.to_owned())
         .add_attribute("swap_final_amount", new_balance.amount.to_string())
         .add_attribute("swap_final_denom", new_balance.denom)
         .add_attribute("swap_results", swap_results_json);
