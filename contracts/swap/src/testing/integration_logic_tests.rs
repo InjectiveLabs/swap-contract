@@ -2,8 +2,8 @@ use cosmwasm_std::{coin, Addr};
 
 use injective_test_tube::RunnerError::{ExecuteError, QueryError};
 use injective_test_tube::{
-    Account, Bank, Exchange, InjectiveTestApp, Module, RunnerError, RunnerResult,
-    SigningAccount, Wasm,
+    Account, Bank, Exchange, InjectiveTestApp, Module, RunnerError, RunnerResult, SigningAccount,
+    Wasm,
 };
 
 use injective_math::{round_to_min_tick, FPDecimal};
