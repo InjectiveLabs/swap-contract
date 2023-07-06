@@ -2,7 +2,7 @@ use cosmwasm_std::{coin, Addr};
 
 use injective_test_tube::RunnerError::{ExecuteError, QueryError};
 use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, RunnerError, RunnerResult,
+    Account, Bank, Exchange, InjectiveTestApp, Module, RunnerError, RunnerResult,
     SigningAccount, Wasm,
 };
 
@@ -1723,7 +1723,6 @@ fn it_reverts_if_market_is_paused() {
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
-    let gov = Gov::new(&app);
 
     let signer = init_default_signer_account(&app);
     let validator = init_default_validator_account(&app);
@@ -1733,7 +1732,7 @@ fn it_reverts_if_market_is_paused() {
     let spot_market_1_id = launch_spot_market(&exchange, &owner, ETH, USDT);
     let spot_market_2_id = launch_spot_market(&exchange, &owner, ATOM, USDT);
 
-    pause_spot_market(&gov, spot_market_1_id.as_str(), &signer, &validator);
+    pause_spot_market(&app, spot_market_1_id.as_str(), &signer, &validator);
 
     let contr_addr = init_self_relaying_contract_and_get_address(
         &wasm,
@@ -1757,20 +1756,19 @@ fn it_reverts_if_market_is_paused() {
         &[coin(12, ETH), str_coin("500_000", INJ, Decimals::Eighteen)],
     );
 
-    let query_result: RunnerResult<SwapEstimationResult> = wasm.query(
-        &contr_addr,
-        &QueryMsg::GetOutputQuantity {
-            source_denom: ETH.to_string(),
-            target_denom: ATOM.to_string(),
-            from_quantity: FPDecimal::from(12u128),
-        },
-    );
+    let query_error: RunnerError = wasm
+        .query::<QueryMsg, SwapEstimationResult>(
+            &contr_addr,
+            &QueryMsg::GetOutputQuantity {
+                source_denom: ETH.to_string(),
+                target_denom: ATOM.to_string(),
+                from_quantity: FPDecimal::from(12u128),
+            },
+        )
+        .unwrap_err();
 
     assert!(
-        query_result
-            .unwrap_err()
-            .to_string()
-            .contains("Querier contract error"),
+        query_error.to_string().contains("Querier contract error"),
         "wrong error returned by query"
     );
 

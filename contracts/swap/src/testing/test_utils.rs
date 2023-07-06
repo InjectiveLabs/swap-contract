@@ -11,7 +11,8 @@ use injective_std::types::cosmos::bank::v1beta1::{
     MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
 };
 use injective_std::types::cosmos::base::v1beta1::Coin as TubeCoin;
-use injective_std::types::cosmos::gov::v1beta1::{MsgSubmitProposal, MsgVote};
+use injective_std::types::cosmos::gov::v1::MsgVote;
+use injective_std::types::cosmos::gov::v1beta1::MsgSubmitProposal;
 use injective_std::types::injective::exchange;
 use injective_std::types::injective::exchange::v1beta1::{
     MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType,
@@ -820,13 +821,14 @@ pub fn query_bank_balance(bank: &Bank<InjectiveTestApp>, denom: &str, address: &
 }
 
 pub fn pause_spot_market(
-    gov: &Gov<InjectiveTestApp>,
+    app: &InjectiveTestApp,
     market_id: &str,
     proposer: &SigningAccount,
     validator: &SigningAccount,
 ) {
+    let gov = Gov::new(app);
     pass_spot_market_params_update_proposal(
-        gov,
+        &gov,
         &SpotMarketParamUpdateProposal {
             title: format!("Set market {market_id} status to paused"),
             description: format!("Set market {market_id} status to paused"),
@@ -840,7 +842,9 @@ pub fn pause_spot_market(
         },
         proposer,
         validator,
-    )
+    );
+
+    app.increase_time(10u64)
 }
 
 pub fn pass_spot_market_params_update_proposal(
@@ -853,7 +857,7 @@ pub fn pass_spot_market_params_update_proposal(
     exchange::v1beta1::SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
 
     println!("submitting proposal: {proposal:?}");
-    let submit_response = gov.submit_proposal(
+    let submit_response = gov.submit_proposal_v1beta1(
         MsgSubmitProposal {
             content: Some(Any {
                 type_url: "/injective.exchange.v1beta1.SpotMarketParamUpdateProposal".to_string(),
@@ -877,6 +881,7 @@ pub fn pass_spot_market_params_update_proposal(
             proposal_id,
             voter: validator.address(),
             option: 1,
+            metadata: "".to_string(),
         },
         validator,
     );
