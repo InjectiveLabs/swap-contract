@@ -70,21 +70,43 @@ There are 2 main ways you can use it:
 
 ### 1 - Utilization of HelixApp's Swap Contract
 
-The contract is [Mainnet contract]
-
 The contract is readily available on [Mainnet](https://explorer.injective.network/contract/inj1psk3468yr9teahgz73amwvpfjehnhczvkrhhqx/).
 
 Advantages:
 
 - Quick up and running token swapping capability.
+- No need to lock up funds into the contract.
 
 Limitations:
 
 - Absence of configurability: You cannot set up or delete routes, update configurations, or withdraw support funds.
 - Fee Allocation: Any generated fees will be directed towards HelixApp.
 
+### 2 - New instance of our stored code
 
-### 2 - Upload and Instantiate Your Contract
+The code is readily available on [Mainnet](https://explorer.injective.network/code/67/), and you can instanciate it too.
+
+Advantages:
+
+- You retain complete control over the available routes.
+- Administrative Privileges: Full administrative access to the contract.
+- Fee Collection: Ability to collect fees.
+
+Limitations:
+
+- Need to lock around 500 USDT in the contract to guarantee its functionality.
+
+Instantiate command:
+
+```bash
+INIT='{"admin":"'$YOUR_ADMIN_ADDRESS'", "fee_recipient":{"address": "'$YOU_FEE_RECIPIENT_ADDRESS'"}}'
+INSTANTIATE_TX_HASH=$(yes 12345678 | injectived tx wasm instantiate $code_id "$INIT" \
+--label="Your dApp Swap Contract" \
+--from=$USER --chain-id="$CHAIN_ID" --yes --admin=$USER $HOME --node=$NODE \
+$GAS_AND_FEE $SYNC_MODE $KBT
+```
+
+### 3 - Upload and Instantiate Your Contract
 
 Advantages:
 
@@ -95,6 +117,9 @@ Advantages:
 Limitations:
 
 - Complexity: This method requires a better understanding and needs a governance proposal.
+- Need to lock around 500 USDT in the contract to guarantee its functionality.
+
+
 
 ### FE Integration
 
@@ -102,8 +127,7 @@ Limitations:
 
 ### Disclaimer
 
-This contract is not audited and you should use it under your own risk 
-
+This contract is developed with precision and rigor but hasn't undergone an external audit. Proceed with discretion, understanding that use of this contract comes with inherent risks.
 
 ## How to Use
 
