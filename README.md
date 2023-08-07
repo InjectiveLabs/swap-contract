@@ -1,6 +1,109 @@
-# CosmWasm Template
+# Atomic Order Token Swap Contract
 
-Template for multi-contract [CosmWasm](https://github.com/CosmWasm/cosmwasm) projects
+The Swap contract allows instantly swapping between different tokens, using atomic market orders. If there’s no market that would allow performing such swap directly, contract will perform a necessary number of intermediary trades (for example if user wants to swap INJ to ATOM, contract will sell INJ to USDT and then buy ATOM with USDT).
+
+## Messages
+
+### Instantiate
+
+Initializes the contract state with the contract version and configuration details. The config includes an administrator address and a fee recipient address.
+
+```rust
+pub fn instantiate(
+    deps: DepsMut<InjectiveQueryWrapper>,
+    env: Env,
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> Result<Response<InjectiveMsgWrapper>, ContractError>
+```
+
+### Execute
+
+Handles different types of transactions and admin functions:
+
+- SwapMinOutput: Swap with the minimum output quantity.
+- SwapExactOutput: Swap with an exact output quantity.
+- SetRoute: Set a swap route.
+- DeleteRoute: Delete a swap route.
+- UpdateConfig: Update the contract configuration.
+- WithdrawSupportFunds: Withdraw the support funds from the contract.
+
+```rust
+pub fn execute(
+    deps: DepsMut<InjectiveQueryWrapper>,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response<InjectiveMsgWrapper>, ContractError>
+```
+
+### Reply
+
+Handles the replies from other contracts or transactions.
+
+```rust
+pub fn reply(
+    deps: DepsMut<InjectiveQueryWrapper>,
+    env: Env,
+    msg: Reply,
+) -> Result<Response<InjectiveMsgWrapper>, ContractError>
+```
+
+### Query
+
+Handles various queries to the contract:
+
+- GetRoute: Get a specific swap route.
+- GetOutputQuantity: Get the output quantity for a given input quantity.
+- GetInputQuantity: Get the input quantity for a given output quantity.
+- GetAllRoutes: Get all available swap routes.
+
+```rust
+pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdResult<Binary>
+```
+
+## Leveraging the Atomic Order Token Swap Contract for Your Injective dApp
+
+The Atomic Order Token Swap Contract offers a seamless integration for token swapping capabilities within your dApp or as an external smart contract.
+
+There are 2 main ways you can use it:
+
+### 1 - Utilization of HelixApp's Swap Contract
+
+The contract is [Mainnet contract]
+
+The contract is readily available on [Mainnet](https://explorer.injective.network/contract/inj1psk3468yr9teahgz73amwvpfjehnhczvkrhhqx/).
+
+Advantages:
+
+- Quick up and running token swapping capability.
+
+Limitations:
+
+- Absence of configurability: You cannot set up or delete routes, update configurations, or withdraw support funds.
+- Fee Allocation: Any generated fees will be directed towards HelixApp.
+
+
+### 2 - Upload and Instantiate Your Contract
+
+Advantages:
+
+- You retain complete control over the available routes.
+- Administrative Privileges: Full administrative access to the contract.
+- Fee Collection: Ability to collect fees.
+
+Limitations:
+
+- Complexity: This method requires a better understanding and needs a governance proposal.
+
+### FE Integration
+
+@Shane here it goes info on how we integrated it for Helix
+
+### Disclaimer
+
+This contract is not audited and you should use it under your own risk 
+
 
 ## How to Use
 
