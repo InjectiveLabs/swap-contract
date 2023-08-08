@@ -99,7 +99,7 @@ Limitations:
 Instantiate command:
 
 ```bash
-INIT='{"admin":"'$YOUR_ADMIN_ADDRESS'", "fee_recipient":{"address": "'$YOU_FEE_RECIPIENT_ADDRESS'"}}'
+INIT='{"admin":"'$YOUR_ADMIN_ADDRESS'", "fee_recipient":{"address": "'$YOUR_FEE_RECIPIENT_ADDRESS'"}}'
 INSTANTIATE_TX_HASH=$(yes 12345678 | injectived tx wasm instantiate $code_id "$INIT" \
 --label="Your dApp Swap Contract" \
 --from=$USER --chain-id="$CHAIN_ID" --yes --admin=$USER $HOME --node=$NODE \
