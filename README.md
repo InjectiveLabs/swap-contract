@@ -1,6 +1,28 @@
 # Atomic Order Token Swap Contract
 
-The Swap contract allows instantly swapping between different tokens, using atomic market orders. If there’s no market that would allow performing such swap directly, contract will perform a necessary number of intermediary trades (for example if user wants to swap INJ to ATOM, contract will sell INJ to USDT and then buy ATOM with USDT).
+The Swap contract allows instant swap between two different tokens. Under the hood, it is using atomic orders to place market orders in one or more spot markets.
+
+## Getting started
+
+Anyone can instantiate an instance of the Swap contract. There is version of this contract uploaded to the Injective Mainnet already and can be found on https://explorer.injective.network/code/67/.
+
+Before instantiating your contract, as the contract owner, you have three questions to answer.
+
+### 1. Which address should be the fee recipient?
+
+Since orders placed by the Swap contract are order in the Injective Exchange Module, that means each order can have a fee recipient which can receive 40% of the trading fee. Typically, Exchange dApps would set the fee recipient as their own addresses.
+
+### 2. What tokens should this contract support?
+
+Each token available in the contract must have a route defined. Route means which markets should token A go through in order to get token B. For example, if you would like to support swapping between ATOM and INJ, then you would have to set route by providing the contract the market IDs of ATOM/USDT and INJ/USDT, so that the it knows the route of swapping ATOM and INJ would be ATOM <> USDT <> INJ.
+
+At this moment, the contract can only support markets quoted in USDT.
+
+### 3. How much buffer should be provided to this contract?
+
+As the contract owner, you also have to provide funds to the contract which will be used when the swap happens. The buffer is used by the contract when it place orders. If the user wants to swap a big amount or swap in an illiquid market, then more buffer is required. An error will occur when the contract buffer cannot satisfy the user's input amount.
+
+At this moment, the buffer should only be in USDT.
 
 ## Messages
 
@@ -62,130 +84,10 @@ Handles various queries to the contract:
 pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdResult<Binary>
 ```
 
-## Leveraging the Atomic Order Token Swap Contract for Your Injective dApp
+## Disclaimer
 
-The Atomic Order Token Swap Contract offers a seamless integration for token swapping capabilities within your dApp or as an external smart contract.
+This contract is designed for education purposes only. The contributors to this codebase are not liable to any future usage.
 
-There are 2 main ways you can use it:
-
-### 1 - Utilization of HelixApp's Swap Contract
-
-The contract is readily available on [Mainnet](https://explorer.injective.network/contract/inj1psk3468yr9teahgz73amwvpfjehnhczvkrhhqx/).
-
-Advantages:
-
-- Quick up and running token swapping capability.
-- No need to lock up funds into the contract.
-
-Limitations:
-
-- Absence of configurability: You cannot set up or delete routes, update configurations, or withdraw support funds.
-- Fee Allocation: Any generated fees will be directed towards HelixApp.
-
-### 2 - New instance of our stored code
-
-The code is readily available on [Mainnet](https://explorer.injective.network/code/67/), and you can instanciate it too.
-
-Advantages:
-
-- You retain complete control over the available routes.
-- Administrative Privileges: Full administrative access to the contract.
-- Fee Collection: Ability to collect fees.
-
-Limitations:
-
-- Need to lock around 500 USDT in the contract to guarantee its functionality.
-
-Instantiate command:
-
-```bash
-INIT='{"admin":"'$YOUR_ADMIN_ADDRESS'", "fee_recipient":{"address": "'$YOUR_FEE_RECIPIENT_ADDRESS'"}}'
-INSTANTIATE_TX_HASH=$(yes 12345678 | injectived tx wasm instantiate $code_id "$INIT" \
---label="Your dApp Swap Contract" \
---from=$USER --chain-id="$CHAIN_ID" --yes --admin=$USER $HOME --node=$NODE \
-$GAS_AND_FEE $SYNC_MODE $KBT
-```
-
-### 3 - Upload and Instantiate Your Contract
-
-Advantages:
-
-- You retain complete control over the available routes.
-- Administrative Privileges: Full administrative access to the contract.
-- Fee Collection: Ability to collect fees.
-
-Limitations:
-
-- Complexity: This method requires a better understanding and needs a governance proposal.
-- Need to lock around 500 USDT in the contract to guarantee its functionality.
-
-
-
-### FE Integration
-
-@Shane here it goes info on how we integrated it for Helix
-
-### Disclaimer
-
-This contract is developed with precision and rigor but hasn't undergone an external audit. Proceed with discretion, understanding that use of this contract comes with inherent risks.
-
-## How to Use
-
-Install [cargo-make](https://sagiegurari.github.io/cargo-make/):
-
-```sh
-cargo install --force cargo-make
-```
-
-Run formatter:
-
-```sh
-cargo make fmt
-```
-
-Run tests:
-
-```sh
-cargo make test
-```
-
-Run linter (clippy):
-
-```sh
-cargo make lint
-```
-
-Check for unused dependencies:
-
-```sh
-cargo make udeps
-```
-
-Compile all contracts using [rust-optimizer](https://github.com/CosmWasm/rust-optimizer):
-
-```sh
-cargo make optimize
-```
-
-Once optimized, verify the wasm binaries are ready to be uploaded to the blockchain:
-
-```sh
-cargo make check
-```
-
-Generate JSON schema for all contracts:
-
-```sh
-cargo make schema
-```
-
-Publish contracts and packages to [crates.io](https://crates.io/):
-
-```sh
-cargo make publish
-```
-
-**NOTE:** For the last two tasks (schema and publish), you need to update the shell script in [`Makefile.toml`](./Makefile.toml) for them to work.
 
 ## License
 
