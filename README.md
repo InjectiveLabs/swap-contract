@@ -86,7 +86,7 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
 
 ## Disclaimer
 
-This contract is designed for education purposes only. The contributors to this codebase are not liable to any future usage.
+This contract is designed for educational purposes only. The contributors to this codebase are not liable to any future usage.
 
 
 ## License
