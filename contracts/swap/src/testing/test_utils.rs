@@ -431,6 +431,20 @@ pub fn launch_realistic_atom_usdt_spot_market(
     )
 }
 
+pub fn launch_realistic_usdt_usdc_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        exchange,
+        signer,
+        USDT,
+        USDC,
+        dec_to_proto(FPDecimal::must_from_str("0.0001")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("100")).as_str(),
+    )
+}
+
 pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(
     app: &InjectiveTestApp,
     market_id: &str,
@@ -610,6 +624,34 @@ pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
         OrderSide::Sell,
         "9.01",
         "421.11",
+        Decimals::Six,
+        Decimals::Six,
+    );
+}
+
+pub fn create_realistic_usdt_usdc_both_side_orders(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Buy,
+        "0.9982",
+        "1000.001",
+        Decimals::Six,
+        Decimals::Six,
+    );
+
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Sell,
+        "1.0008",
+        "1000.001",
         Decimals::Six,
         Decimals::Six,
     );

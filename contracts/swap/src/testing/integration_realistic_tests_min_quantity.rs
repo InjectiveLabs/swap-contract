@@ -10,12 +10,14 @@ use crate::testing::test_utils::{
     create_realistic_atom_usdt_sell_orders_from_spreadsheet,
     create_realistic_eth_usdt_buy_orders_from_spreadsheet,
     create_realistic_eth_usdt_sell_orders_from_spreadsheet,
-    create_realistic_inj_usdt_buy_orders_from_spreadsheet, human_to_dec, init_rich_account,
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet,
+    create_realistic_usdt_usdc_both_side_orders, human_to_dec, init_rich_account,
     init_self_relaying_contract_and_get_address, launch_realistic_atom_usdt_spot_market,
-    launch_realistic_inj_usdt_spot_market, launch_realistic_weth_usdt_spot_market,
-    must_init_account_with_funds, query_all_bank_balances, query_bank_balance,
-    set_route_and_assert_success, str_coin, Decimals, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
-    DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, INJ_2, USDT,
+    launch_realistic_inj_usdt_spot_market, launch_realistic_usdt_usdc_spot_market,
+    launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, query_all_bank_balances,
+    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, ATOM,
+    DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, INJ_2,
+    USDC, USDT,
 };
 use crate::types::{FPCoin, SwapEstimationResult};
 
@@ -23,9 +25,9 @@ use crate::types::{FPCoin, SwapEstimationResult};
    This test suite focuses on using using realistic values both for spot markets and for orders and
    focuses on swaps requesting minimum amount.
 
-   ATOM/USDT market parameters was taken from mainnet. ETH/USDT market parameters mirror WETH/USDT
+   ATOM/USDT market parameters were taken from mainnet. ETH/USDT market parameters mirror WETH/USDT
    spot market on mainnet. INJ_2/USDT mirrors mainnet's INJ/USDT market (we used a different denom
-   to avoid mixing balance changes related to gas payments).
+   to avoid mixing balance changes related to swap with ones related to gas payments).
 
    Hardcoded values used in these tests come from the second tab of this spreadsheet:
    https://docs.google.com/spreadsheets/d/1-0epjX580nDO_P2mm1tSjhvjJVppsvrO1BC4_wsBeyA/edit?usp=sharing
@@ -606,6 +608,226 @@ fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
         "Contract balance changed too much. Actual balance: {}, previous balance: {}. Max diff: {}",
         contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
         contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+}
+
+// TODO should stop failing once https://github.com/InjectiveLabs/swap-contract/issues/9 is solved
+#[test]
+fn it_executes_swap_between_markets_using_different_quote_assets_self_relaying() {
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+    let exchange = Exchange::new(&app);
+    let bank = Bank::new(&app);
+
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let _validator = app
+        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap();
+
+    let owner = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("1_000", USDC, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
+            str_coin("1", INJ_2, Decimals::Eighteen),
+        ],
+    );
+
+    let spot_market_1_id = launch_realistic_inj_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_usdt_usdc_spot_market(&exchange, &owner);
+
+    //7.791386
+
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[
+            str_coin("10", USDC, Decimals::Six),
+            str_coin("500", USDT, Decimals::Six),
+        ],
+    );
+    set_route_and_assert_success(
+        &wasm,
+        &owner,
+        &contr_addr,
+        INJ_2,
+        USDC,
+        vec![
+            spot_market_1_id.as_str().into(),
+            spot_market_2_id.as_str().into(),
+        ],
+    );
+
+    let trader1 = init_rich_account(&app);
+    let trader2 = init_rich_account(&app);
+
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet(
+        &app,
+        &spot_market_1_id,
+        &trader1,
+        &trader2,
+    );
+    create_realistic_usdt_usdc_both_side_orders(&app, &spot_market_2_id, &trader1);
+
+    app.increase_time(1);
+
+    let swapper = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1", INJ, Decimals::Eighteen),
+            str_coin("1", INJ_2, Decimals::Eighteen),
+        ],
+    );
+
+    let inj_to_swap = "1";
+
+    let mut query_result: SwapEstimationResult = wasm
+        .query(
+            &contr_addr,
+            &QueryMsg::GetOutputQuantity {
+                source_denom: INJ_2.to_string(),
+                target_denom: USDC.to_string(),
+                from_quantity: human_to_dec(inj_to_swap, Decimals::Eighteen),
+            },
+        )
+        .unwrap();
+
+    let expected_amount = human_to_dec("8.867", Decimals::Six);
+    let max_diff = human_to_dec("0.001", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(expected_amount, query_result.result_quantity, max_diff),
+        "incorrect swap result estimate returned by query"
+    );
+
+    let mut expected_fees = vec![
+        FPCoin {
+            amount: human_to_dec("0.013365", Decimals::Six),
+            denom: USDT.to_string(),
+        },
+        FPCoin {
+            amount: human_to_dec("0.01332", Decimals::Six),
+            denom: USDC.to_string(),
+        },
+    ];
+
+    // we don't care too much about decimal fraction of the fee
+    assert_fee_is_as_expected(
+        &mut query_result.expected_fees,
+        &mut expected_fees,
+        human_to_dec("0.1", Decimals::Six),
+    );
+
+    let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
+    assert_eq!(
+        contract_balances_before.len(),
+        2,
+        "wrong number of denoms in contract balances"
+    );
+
+    wasm.execute(
+        &contr_addr,
+        &ExecuteMsg::SwapMinOutput {
+            target_denom: USDC.to_string(),
+            min_output_quantity: FPDecimal::from(8u128),
+        },
+        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen)],
+        &swapper,
+    )
+    .unwrap();
+
+    let from_balance = query_bank_balance(&bank, INJ_2, swapper.address().as_str());
+    let to_balance = query_bank_balance(&bank, USDC, swapper.address().as_str());
+
+    assert_eq!(
+        from_balance,
+        FPDecimal::zero(),
+        "some of the original amount wasn't swapped"
+    );
+
+    assert!(
+        to_balance >= expected_amount,
+        "Swapper received less than expected minimum amount. Expected: {} USDC, actual: {} USDC",
+        expected_amount.scaled(Decimals::Eighteen.get_decimals().neg()),
+        to_balance.scaled(Decimals::Eighteen.get_decimals().neg()),
+    );
+
+    let max_diff = human_to_dec("0.1", Decimals::Eighteen);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            expected_amount,
+            to_balance,
+            max_diff,
+        ),
+        "Swapper did not receive expected amount. Expected: {} USDC, actual: {} USDC, max diff: {} USDC",
+        expected_amount.scaled(Decimals::Eighteen.get_decimals().neg()),
+        to_balance.scaled(Decimals::Eighteen.get_decimals().neg()),
+        max_diff.scaled(Decimals::Eighteen.get_decimals().neg())
+    );
+
+    let contract_balances_after = query_all_bank_balances(&bank, contr_addr.as_str());
+    assert_eq!(
+        contract_balances_after.len(),
+        2,
+        "wrong number of denoms in contract balances"
+    );
+
+    // let's check contract's USDT balance
+    let contract_usdt_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[0].amount.as_str());
+    let contract_usdt_balance_after =
+        FPDecimal::must_from_str(contract_balances_after[0].amount.as_str());
+
+    assert!(
+        contract_usdt_balance_after >= contract_usdt_balance_before,
+        "Contract lost some money after swap. Actual balance: {} USDT, previous balance: {} USDT",
+        contract_usdt_balance_after,
+        contract_usdt_balance_before
+    );
+
+    // contract is allowed to earn extra 0.001 USDT from the swap of ~$8 worth of INJ
+    let max_diff = human_to_dec("0.001", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdt_balance_after,
+            contract_usdt_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {} USDT, previous balance: {} USDT. Max diff: {} USDT",
+        contract_usdt_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
+        max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+
+    // let's check contract's USDC balance
+    let contract_usdc_balance_before =
+        FPDecimal::must_from_str(contract_balances_before[1].amount.as_str());
+    let contract_usdc_balance_after =
+        FPDecimal::must_from_str(contract_balances_after[1].amount.as_str());
+
+    assert!(
+        contract_usdc_balance_after >= contract_usdc_balance_before,
+        "Contract lost some money after swap. Actual balance: {} USDC, previous balance: {} USDC",
+        contract_usdc_balance_after,
+        contract_usdc_balance_before
+    );
+
+    // contract is allowed to earn extra 0.001 USDC from the swap of ~$8 worth of INJ
+    let max_diff = human_to_dec("0.001", Decimals::Six);
+
+    assert!(
+        are_fpdecimals_approximately_equal(
+            contract_usdc_balance_after,
+            contract_usdc_balance_before,
+            max_diff,
+        ),
+        "Contract balance changed too much. Actual balance: {} USDC, previous balance: {} USDC. Max diff: {} USDC",
+        contract_usdc_balance_after.scaled(Decimals::Six.get_decimals().neg()),
+        contract_usdc_balance_before.scaled(Decimals::Six.get_decimals().neg()),
         max_diff.scaled(Decimals::Six.get_decimals().neg())
     );
 }
