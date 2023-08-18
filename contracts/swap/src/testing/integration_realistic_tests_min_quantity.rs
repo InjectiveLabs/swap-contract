@@ -612,7 +612,6 @@ fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
     );
 }
 
-// TODO should stop failing once https://github.com/InjectiveLabs/swap-contract/issues/9 is solved
 #[test]
 fn it_executes_swap_between_markets_using_different_quote_assets_self_relaying() {
     let app = InjectiveTestApp::new();
@@ -637,8 +636,6 @@ fn it_executes_swap_between_markets_using_different_quote_assets_self_relaying()
 
     let spot_market_1_id = launch_realistic_inj_usdt_spot_market(&exchange, &owner);
     let spot_market_2_id = launch_realistic_usdt_usdc_spot_market(&exchange, &owner);
-
-    //7.791386
 
     let contr_addr = init_self_relaying_contract_and_get_address(
         &wasm,
