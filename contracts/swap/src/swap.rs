@@ -11,7 +11,7 @@ use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address,
     InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper, OrderType, SpotOrder,
 };
-use injective_math::FPDecimal;
+use injective_math::{round_to_min_tick, FPDecimal};
 use injective_protobuf::proto::tx;
 
 use crate::error::ContractError;
@@ -221,17 +221,38 @@ pub fn handle_atomic_order_reply(
         quantity * average_price - fee
     };
 
-    let new_balance = FPCoin {
-        amount: new_quantity,
-        denom: current_step.step_target_denom,
+    let swap = SWAP_OPERATION_STATE.load(deps.storage)?;
+
+    let has_next_market = swap.swap_steps.len() > (current_step.step_idx + 1) as usize;
+
+    let new_rounded_quantity = if has_next_market {
+        let querier = InjectiveQuerier::new(&deps.querier);
+        let next_market_id = swap.swap_steps[(current_step.step_idx + 1) as usize].to_owned();
+        let next_market = querier
+            .query_spot_market(&next_market_id)?
+            .market
+            .expect("market should be available");
+
+        let is_next_swap_sell = next_market.base_denom == current_step.step_target_denom;
+
+        if is_next_swap_sell {
+            round_to_min_tick(new_quantity, next_market.min_quantity_tick_size)
+        } else {
+            new_quantity
+        }
+    } else {
+        new_quantity
     };
 
-    let swap = SWAP_OPERATION_STATE.load(deps.storage)?;
+    let new_balance = FPCoin {
+        amount: new_rounded_quantity,
+        denom: current_step.step_target_denom,
+    };
 
     swap_results.push(SwapResults {
         market_id: swap.swap_steps[(current_step.step_idx) as usize].to_owned(),
         price: average_price,
-        quantity: new_quantity,
+        quantity: new_rounded_quantity,
         fee,
     });
 
