@@ -232,7 +232,14 @@ pub fn handle_atomic_order_reply(
             .query_spot_market(&next_market_id)?
             .market
             .expect("market should be available");
-        round_to_min_tick(new_quantity, next_market.min_quantity_tick_size)
+
+        let is_next_swap_sell = next_market.base_denom == current_step.step_target_denom;
+
+        if is_next_swap_sell {
+            round_to_min_tick(new_quantity, next_market.min_quantity_tick_size)
+        } else {
+            new_quantity
+        }
     } else {
         new_quantity
     };
