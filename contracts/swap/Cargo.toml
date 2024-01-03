@@ -1,25 +1,25 @@
 [package]
-authors = [ "Antoni Mysliborski <antoni@injectivelabs.org>" ]
+authors = ["Antoni Mysliborski <antoni@injectivelabs.org>"]
 edition = "2021"
 name    = "injective-converter"
 version = "0.1.0"
 
 exclude = [
- # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
- "contract.wasm",
- "hash.txt",
+    # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+    "contract.wasm",
+    "hash.txt",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-crate-type = [ "cdylib", "rlib" ]
+crate-type = ["cdylib", "rlib"]
 
 [features]
 # for more explicit tests, cargo test --features=backtraces
-backtraces = [ "cosmwasm-std/backtraces" ]
+backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
-library = [  ]
+library = []
 
 [package.metadata.scripts]
 optimize = """docker run --rm -v "$(pwd)":/code \
@@ -38,15 +38,16 @@ injective-cosmwasm = { version = "0.2.2" }
 injective-math     = { version = "0.1.17" }
 injective-protobuf = { version = "0.1", git = "https://github.com/InjectiveLabs/cw-injective", branch = "dev" }
 num-traits         = "0.2.15"
-protobuf           = { version = "2", features = [ "with-bytes" ] }
+protobuf           = { version = "2", features = ["with-bytes"] }
 schemars           = "0.8.8"
-serde              = { version = "1.0.137", default-features = false, features = [ "derive" ] }
+serde              = { version = "1.0.137", default-features = false, features = ["derive"] }
 serde-json-wasm    = "0.5.1"
+tarpaulin = "0.1.0"
 thiserror          = { version = "1.0.31" }
 
 [dev-dependencies]
-cosmwasm-schema     = "1.0.0"
-cw-multi-test       = "0.16.2"
-injective-std       = { version = "0.1.3" }
-injective-test-tube = { version = "1.1.3", git = "https://github.com/InjectiveLabs/test-tube.git", tag = "v1.1.3" }
-prost               = "0.11.9"
+cosmwasm-schema = "1.0.0"
+cw-multi-test   = "0.16.2"
+injective-std   = { version = "0.1.3" }
+# injective-test-tube = { version = "1.1.3", git = "https://github.com/InjectiveLabs/test-tube.git", tag = "v1.1.3" }
+prost = "0.11.9"
