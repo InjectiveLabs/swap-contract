@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
+    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
 };
 use cw2::set_contract_version;
 
@@ -104,7 +104,7 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
         QueryMsg::GetRoute {
             source_denom,
             target_denom,
-        } => Ok(to_binary(&read_swap_route(
+        } => Ok(to_json_binary(&read_swap_route(
             deps.storage,
             &source_denom,
             &target_denom,
@@ -121,7 +121,7 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
                 target_denom,
                 SwapQuantity::InputQuantity(from_quantity),
             )?;
-            Ok(to_binary(&target_quantity)?)
+            Ok(to_json_binary(&target_quantity)?)
         }
         QueryMsg::GetInputQuantity {
             to_quantity,
@@ -135,11 +135,11 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
                 target_denom,
                 SwapQuantity::OutputQuantity(to_quantity),
             )?;
-            Ok(to_binary(&target_quantity)?)
+            Ok(to_json_binary(&target_quantity)?)
         }
         QueryMsg::GetAllRoutes {} => {
             let routes = get_all_swap_routes(deps.storage)?;
-            Ok(to_binary(&routes)?)
+            Ok(to_json_binary(&routes)?)
         }
     }
 }

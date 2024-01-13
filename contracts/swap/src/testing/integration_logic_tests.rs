@@ -130,7 +130,7 @@ fn it_executes_a_swap_between_two_base_assets_with_multiple_price_levels() {
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -271,7 +271,7 @@ fn it_executes_a_swap_between_two_base_assets_with_single_price_level() {
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -413,7 +413,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets() {
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -548,7 +548,7 @@ fn it_reverts_swap_between_markets_using_different_quote_asset_if_one_quote_buff
     );
     assert_eq!(
         target_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance should not have changed after failed swap"
     );
 
@@ -619,7 +619,7 @@ fn it_executes_a_sell_of_base_asset_to_receive_min_output_quantity() {
         + FPDecimal::from(195_000u128) * FPDecimal::from(4u128)
         + FPDecimal::from(192_000u128) * FPDecimal::from(3u128);
     let expected_target_quantity = orders_nominal_total_value
-        * (FPDecimal::one()
+        * (FPDecimal::ONE
             - FPDecimal::must_from_str(&format!(
                 "{}",
                 DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
@@ -665,7 +665,7 @@ fn it_executes_a_sell_of_base_asset_to_receive_min_output_quantity() {
 
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -753,7 +753,7 @@ fn it_executes_a_buy_of_base_asset_to_receive_min_output_quantity() {
 
     // calculate how much ETH we can buy with USDT we have
     let available_usdt_after_fee = FPDecimal::from(swapper_usdt)
-        / (FPDecimal::one()
+        / (FPDecimal::ONE
             + FPDecimal::must_from_str(&format!(
                 "{}",
                 DEFAULT_TAKER_FEE * DEFAULT_ATOMIC_MULTIPLIER * DEFAULT_SELF_RELAYING_FEE_PART
@@ -826,7 +826,7 @@ fn it_executes_a_buy_of_base_asset_to_receive_min_output_quantity() {
 
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -979,7 +979,7 @@ fn it_executes_a_swap_between_base_assets_with_external_fee_recipient() {
 
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -1134,7 +1134,7 @@ fn it_reverts_the_swap_if_there_isnt_enough_buffer_for_buying_target_asset() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changes after failed swap"
     );
 
@@ -1219,7 +1219,7 @@ fn it_reverts_swap_if_no_funds_were_passed() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changes after failed swap"
     );
 
@@ -1394,7 +1394,7 @@ fn it_reverts_if_user_passes_quantities_equal_to_zero() {
             &contr_addr,
             &ExecuteMsg::SwapMinOutput {
                 target_denom: ATOM.to_string(),
-                min_output_quantity: FPDecimal::zero(),
+                min_output_quantity: FPDecimal::ZERO,
             },
             &[coin(12, ETH)],
             &swapper,
@@ -1500,7 +1500,7 @@ fn it_reverts_if_user_passes_negative_quantities() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changed after failed swap"
     );
 
@@ -1610,7 +1610,7 @@ fn it_reverts_if_there_arent_enough_orders_to_satisfy_min_quantity() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changed after failed swap"
     );
 
@@ -1701,7 +1701,7 @@ fn it_reverts_if_min_quantity_cannot_be_reached() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changed after failed swap"
     );
 
@@ -1806,7 +1806,7 @@ fn it_reverts_if_market_is_paused() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changed after failed swap"
     );
 
@@ -1909,7 +1909,7 @@ fn it_reverts_if_user_doesnt_have_enough_inj_to_pay_for_gas() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changed after failed swap"
     );
 
@@ -2105,14 +2105,14 @@ fn it_doesnt_allow_non_admin_to_withdraw_anything_from_contract() {
     let random_dude_eth_balance = query_bank_balance(&bank, ETH, random_dude.address().as_str());
     assert_eq!(
         random_dude_eth_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "random dude has some eth balance after failed withdraw"
     );
 
     let random_dude_usdt_balance = query_bank_balance(&bank, USDT, random_dude.address().as_str());
     assert_eq!(
         random_dude_usdt_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "random dude has some usdt balance after failed withdraw"
     );
 }

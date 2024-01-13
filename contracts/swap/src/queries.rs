@@ -127,7 +127,7 @@ pub fn estimate_single_swap_execution(
 
     let fee_percent = market.taker_fee_rate
         * fee_multiplier
-        * (FPDecimal::one() - get_effective_fee_discount_rate(&market, is_self_relayer));
+        * (FPDecimal::ONE - get_effective_fee_discount_rate(&market, is_self_relayer));
 
     let is_estimating_from_target = matches!(
         swap_estimation_amount,
@@ -164,7 +164,7 @@ fn estimate_execution_buy_from_source(
     fee_percent: FPDecimal,
     is_simulation: bool,
 ) -> StdResult<StepExecutionEstimate> {
-    let available_swap_quote_funds = input_quote_quantity / (FPDecimal::one() + fee_percent);
+    let available_swap_quote_funds = input_quote_quantity / (FPDecimal::ONE + fee_percent);
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
@@ -190,7 +190,7 @@ fn estimate_execution_buy_from_source(
     let fee_estimate = input_quote_quantity - available_swap_quote_funds;
 
     // check if user funds + contract funds are enough to create order
-    let required_funds = worst_price * expected_base_quantity * (FPDecimal::one() + fee_percent);
+    let required_funds = worst_price * expected_base_quantity * (FPDecimal::ONE + fee_percent);
     let funds_in_contract = deps
         .querier
         .query_balance(contract_address, &market.quote_denom)
@@ -260,8 +260,7 @@ fn estimate_execution_buy_from_target(
     let required_input_quote_quantity = expected_exchange_quote_quantity + fee_estimate;
 
     // check if user funds + contract funds are enough to create order
-    let required_funds =
-        worst_price * target_base_output_quantity * (FPDecimal::one() + fee_percent);
+    let required_funds = worst_price * target_base_output_quantity * (FPDecimal::ONE + fee_percent);
 
     let funds_in_contract = deps
         .querier
@@ -386,7 +385,7 @@ fn estimate_execution_sell_from_target(
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
     let required_swap_quantity_in_quote =
-        target_quote_output_quantity / (FPDecimal::one() - fee_percent);
+        target_quote_output_quantity / (FPDecimal::ONE - fee_percent);
     let required_fee = required_swap_quantity_in_quote - target_quote_output_quantity;
 
     let orders = querier.query_spot_market_orderbook(
@@ -456,14 +455,14 @@ pub fn get_minimum_liquidity_levels(
     calc: fn(&PriceLevel) -> FPDecimal,
     min_quantity_tick_size: FPDecimal,
 ) -> StdResult<Vec<PriceLevel>> {
-    let mut sum = FPDecimal::zero();
+    let mut sum = FPDecimal::ZERO;
     let mut orders: Vec<PriceLevel> = Vec::new();
 
     for level in levels {
         let value = calc(level);
         assert_ne!(
             value,
-            FPDecimal::zero(),
+            FPDecimal::ZERO,
             "Price level with zero value, this should not happen"
         );
 
@@ -506,13 +505,13 @@ fn get_average_price_from_orders(
 ) -> FPDecimal {
     let (total_quantity, total_notional) = levels
         .iter()
-        .fold((FPDecimal::zero(), FPDecimal::zero()), |acc, pl| {
+        .fold((FPDecimal::ZERO, FPDecimal::ZERO), |acc, pl| {
             (acc.0 + pl.q, acc.1 + pl.p * pl.q)
         });
 
     assert_ne!(
         total_quantity,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "total_quantity was zero and would result in division by zero"
     );
     let average_price = total_notional / total_quantity;
@@ -530,7 +529,7 @@ fn get_worst_price_from_orders(levels: &[PriceLevel]) -> FPDecimal {
 
 fn get_effective_fee_discount_rate(market: &SpotMarket, is_self_relayer: bool) -> FPDecimal {
     if !is_self_relayer {
-        FPDecimal::zero()
+        FPDecimal::ZERO
     } else {
         market.relayer_fee_share_rate
     }
