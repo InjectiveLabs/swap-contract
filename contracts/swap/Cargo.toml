@@ -48,5 +48,5 @@ thiserror          = { version = "1.0.31" }
 cosmwasm-schema     = "1.5.0"
 cw-multi-test       = "0.16.2"
 injective-std       = { version = "0.1.5" }
-injective-test-tube = { git = "https://github.com/InjectiveLabs/test-tube", branch = "dev" }
+injective-test-tube = "1.1.7"
 prost               = "0.11.9"
