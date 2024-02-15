@@ -33,7 +33,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.69.0
+          toolchain: 1.74.0
           target: wasm32-unknown-unknown
           override: true
           components: llvm-tools-preview
@@ -62,7 +62,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          toolchain: 1.69.0
+          toolchain: 1.74.0
           args: --locked --tests
         env:
           LLVM_PROFILE_FILE: "swap-converter-%p-%m.profraw"
@@ -82,7 +82,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: './target/debug/coverage/'
+          path: "./target/debug/coverage/"
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
@@ -98,7 +98,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.69.0
+          toolchain: 1.74.0
           override: true
           components: rustfmt, clippy
 
@@ -123,13 +123,13 @@ jobs:
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
-          toolchain: 1.69.0
+          toolchain: 1.74.0
           command: fmt
           args: --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
-          toolchain: 1.69.0
+          toolchain: 1.74.0
           command: clippy
           args: --tests -- -D warnings

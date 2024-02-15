@@ -80,7 +80,7 @@ pub fn start_swap_flow(
         let is_input_quote = first_market.quote_denom == *source_denom;
 
         let required_input = if is_input_quote {
-            estimation.result_quantity.int() + FPDecimal::one()
+            estimation.result_quantity.int() + FPDecimal::ONE
         } else {
             round_up_to_min_tick(
                 estimation.result_quantity,
@@ -104,7 +104,7 @@ pub fn start_swap_flow(
 
         FPDecimal::from(coin_provided.amount) - estimation.result_quantity
     } else {
-        FPDecimal::zero()
+        FPDecimal::ZERO
     };
 
     let swap_operation = CurrentSwapOperation {
@@ -157,6 +157,7 @@ pub fn execute_swap_step(
         &market_id,
         subaccount_id,
         Some(fee_recipient.to_owned()),
+        None,
     );
 
     let order_message = SubMsg::reply_on_success(

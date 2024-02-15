@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
-    coin, to_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
+    coin, to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
     SystemResult,
 };
 use injective_std::shim::Any;
@@ -170,7 +170,7 @@ pub fn mock_deps_eth_inj(
                         let response = QueryMarketAtomicExecutionFeeMultiplierResponse {
                             multiplier: FPDecimal::from_str("2.5").unwrap(),
                         };
-                        SystemResult::Ok(ContractResult::from(to_binary(&response)))
+                        SystemResult::Ok(ContractResult::from(to_json_binary(&response)))
                     }
                 }
 
@@ -272,7 +272,7 @@ pub fn mock_realistic_deps_eth_atom(
                         let response = QueryMarketAtomicExecutionFeeMultiplierResponse {
                             multiplier: FPDecimal::from_str("2.5").unwrap(),
                         };
-                        SystemResult::Ok(ContractResult::from(to_binary(&response)))
+                        SystemResult::Ok(ContractResult::from(to_json_binary(&response)))
                     }
                 }
 
@@ -299,7 +299,7 @@ fn create_mock_spot_market(
         taker_fee_rate: FPDecimal::from_str("0.001").unwrap(),
         relayer_fee_share_rate: FPDecimal::from_str("0.4").unwrap(),
         market_id: test_market_ids()[idx as usize].clone(),
-        status: 1,
+        status: injective_cosmwasm::MarketStatus::Active,
         min_price_tick_size,
         min_quantity_tick_size,
     }

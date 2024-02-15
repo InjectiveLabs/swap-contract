@@ -66,4 +66,5 @@ pub enum QueryMsg {
         target_denom: String,
     },
     GetAllRoutes {},
+    GetConfig {},
 }

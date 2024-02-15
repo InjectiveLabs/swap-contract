@@ -33,6 +33,12 @@ impl From<Coin> for FPCoin {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct ConfigResponse {
+    pub config: Config,
+    pub contract_version: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum SwapQuantityMode {
     MinOutputQuantity(FPDecimal),
     ExactOutputQuantity(FPDecimal),

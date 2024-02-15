@@ -27,6 +27,11 @@ pub fn read_swap_route(
     })
 }
 
+pub fn get_config(storage: &dyn Storage) -> StdResult<Config> {
+    let config = CONFIG.load(storage)?;
+    Ok(config)
+}
+
 pub fn get_all_swap_routes(storage: &dyn Storage) -> StdResult<Vec<SwapRoute>> {
     let routes = SWAP_ROUTES
         .range(storage, None, None, Order::Ascending)

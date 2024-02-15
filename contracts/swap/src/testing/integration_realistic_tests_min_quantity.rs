@@ -167,7 +167,7 @@ fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
 
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
 
@@ -359,7 +359,7 @@ fn happy_path_two_hops_swap_inj_eth_realistic_values_self_relaying() {
 
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
 
@@ -552,7 +552,7 @@ fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
 
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
 
@@ -740,7 +740,7 @@ fn it_executes_swap_between_markets_using_different_quote_assets_self_relaying()
 
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
 
@@ -1089,7 +1089,7 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -1124,7 +1124,7 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
 
     // here the actual difference is 0.000067 USDT, which we attribute differences between decimal precision of Rust/Go and Google Sheets
     assert!(
-        human_to_dec("0.0001", Decimals::Six) - contract_balance_diff > FPDecimal::zero(),
+        human_to_dec("0.0001", Decimals::Six) - contract_balance_diff > FPDecimal::ZERO,
         "contract balance has changed too much after swap"
     );
 }
@@ -1234,7 +1234,7 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
     let to_balance = query_bank_balance(&bank, ATOM, swapper.address().as_str());
     assert_eq!(
         from_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "some of the original amount wasn't swapped"
     );
     assert_eq!(
@@ -1399,7 +1399,7 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
     );
     assert_eq!(
         to_balance,
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         "target balance changed after failed swap"
     );
 

@@ -1148,7 +1148,7 @@ fn it_reverts_when_funds_provided_are_below_required_to_get_exact_amount() {
     );
 
     assert_eq!(
-        FPDecimal::zero(),
+        FPDecimal::ZERO,
         swapper_atom_balance_after,
         "swapper received some ATOM"
     );
