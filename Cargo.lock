@@ -1312,31 +1312,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "injective-converter"
-version = "1.0.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cosmwasm-storage",
- "cw-multi-test",
- "cw-storage-plus 0.14.0",
- "cw-utils 0.14.0",
- "cw2 0.14.0",
- "injective-cosmwasm",
- "injective-math",
- "injective-protobuf",
- "injective-std",
- "injective-test-tube",
- "num-traits",
- "prost 0.11.9",
- "protobuf",
- "schemars",
- "serde",
- "serde-json-wasm",
- "thiserror",
-]
-
-[[package]]
 name = "injective-cosmwasm"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2388,6 +2363,32 @@ name = "subtle-ng"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
+
+[[package]]
+name = "swap-contract"
+version = "1.1.0"
+dependencies = [
+ "cosmos-sdk-proto",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-multi-test",
+ "cw-storage-plus 0.14.0",
+ "cw-utils 0.14.0",
+ "cw2 0.14.0",
+ "injective-cosmwasm",
+ "injective-math",
+ "injective-protobuf",
+ "injective-std",
+ "injective-test-tube",
+ "num-traits",
+ "prost 0.11.9",
+ "protobuf",
+ "schemars",
+ "serde",
+ "serde-json-wasm",
+ "thiserror",
+]
 
 [[package]]
 name = "syn"

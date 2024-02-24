@@ -24,6 +24,8 @@ pub fn save_config(
         fee_recipient,
         admin,
     };
+    config.to_owned().validate()?;
+
     CONFIG.save(deps.storage, &config)
 }
 

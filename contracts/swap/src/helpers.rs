@@ -1,7 +1,10 @@
-use cosmwasm_std::{CosmosMsg, SubMsg};
+use cosmwasm_std::{CosmosMsg, DepsMut, Response, SubMsg};
 
-use injective_cosmwasm::InjectiveMsgWrapper;
+use cw_storage_plus::Item;
+use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper};
 use injective_math::FPDecimal;
+
+use crate::{state::CONFIG, types::Config, ContractError};
 
 pub fn i32_to_dec(source: i32) -> FPDecimal {
     FPDecimal::from(i128::from(source))
@@ -47,6 +50,26 @@ impl Scaled for FPDecimal {
 
 pub fn dec_scale_factor() -> FPDecimal {
     FPDecimal::ONE.scaled(18)
+}
+
+type V100Config = Config;
+const V100CONFIG: Item<V100Config> = Item::new("config");
+
+pub fn handle_config_migration(
+    deps: DepsMut<InjectiveQueryWrapper>,
+) -> Result<Response, ContractError> {
+    let v100_config = V100CONFIG.load(deps.storage)?;
+
+    let config = Config {
+        fee_recipient: v100_config.fee_recipient,
+        admin: v100_config.admin,
+    };
+
+    CONFIG.save(deps.storage, &config)?;
+
+    config.validate()?;
+
+    Ok(Response::default())
 }
 
 #[cfg(test)]
