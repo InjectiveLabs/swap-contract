@@ -1,5 +1,4 @@
-# stable
-newline_style = "unix"
-hard_tabs = false
-tab_spaces = 4
-max_width = 150
+hard_tabs     = false
+max_width     = 150
+newline_style = "Unix"
+tab_spaces    = 4
