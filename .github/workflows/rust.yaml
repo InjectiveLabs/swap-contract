@@ -65,7 +65,7 @@ jobs:
           toolchain: 1.74.0
           args: --locked --tests
         env:
-          LLVM_PROFILE_FILE: "swap-converter-%p-%m.profraw"
+          LLVM_PROFILE_FILE: "swap-contract-%p-%m.profraw"
           RUSTFLAGS: "-Cinstrument-coverage"
           RUST_BACKTRACE: 1
 

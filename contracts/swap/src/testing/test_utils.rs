@@ -817,7 +817,7 @@ pub fn init_self_relaying_contract_and_get_address(
     owner: &SigningAccount,
     initial_balance: &[Coin],
 ) -> String {
-    let code_id = store_code(wasm, owner, "injective_converter".to_string());
+    let code_id = store_code(wasm, owner, "swap_contract".to_string());
     wasm.instantiate(
         code_id,
         &InstantiateMsg {
@@ -840,7 +840,7 @@ pub fn init_contract_with_fee_recipient_and_get_address(
     initial_balance: &[Coin],
     fee_recipient: &SigningAccount,
 ) -> String {
-    let code_id = store_code(wasm, owner, "injective_converter".to_string());
+    let code_id = store_code(wasm, owner, "swap_contract".to_string());
     wasm.instantiate(
         code_id,
         &InstantiateMsg {

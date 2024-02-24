@@ -7,7 +7,7 @@ fi
 
 COMMIT_HASH=$(git rev-parse --short HEAD)
 
-rm -f ../devnet-setup/wasm-contracts/swap_converter*
-cp artifacts/injective_converter$ARCH.wasm ../devnet-setup/wasm-contracts/swap_converter_${COMMIT_HASH}.wasm
+rm -f ../devnet-setup/wasm-contracts/swap_contract*
+cp artifacts/swap_contract$ARCH.wasm ../devnet-setup/wasm-contracts/swap_contract_${COMMIT_HASH}.wasm
 
-echo "SWAP_CONVERTER_COMMIT_HASH=$COMMIT_HASH" > "../devnet-setup/wasm-contracts/swap_converter.version"
+echo "SWAP_CONVERTER_COMMIT_HASH=$COMMIT_HASH" > "../devnet-setup/wasm-contracts/swap_contract.version"
