@@ -1,4 +1,6 @@
-use injective_test_tube::{Account, Bank, Exchange, InjectiveTestApp, Module, RunnerResult, Wasm};
+use injective_test_tube::{
+    Account, Bank, Exchange, InjectiveTestApp, Module, RunnerResult, SigningAccount, Wasm,
+};
 use std::ops::Neg;
 
 use crate::helpers::Scaled;
@@ -35,36 +37,14 @@ use crate::types::{FPCoin, SwapEstimationResult};
    In all tests contract is configured to self-relay trades and thus receive a 60% fee discount.
 */
 
-#[test]
-fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
-    let app = InjectiveTestApp::new();
+pub fn happy_path_two_hops_test(app: InjectiveTestApp, owner: SigningAccount, contr_addr: String) {
     let wasm = Wasm::new(&app);
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
-
-    let _validator = app
-        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
-        .unwrap();
-    let owner = must_init_account_with_funds(
-        &app,
-        &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-        ],
-    );
-
     let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
     let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
-    let contr_addr = init_self_relaying_contract_and_get_address(
-        &wasm,
-        &owner,
-        &[str_coin("1_000", USDT, Decimals::Six)],
-    );
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -225,6 +205,35 @@ fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
         contract_usdt_balance_before.scaled(Decimals::Six.get_decimals().neg()),
         max_diff.scaled(Decimals::Six.get_decimals().neg())
     );
+}
+
+#[test]
+fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+
+    let _validator = app
+        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap();
+    let owner = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1", ETH, Decimals::Eighteen),
+            str_coin("1", ATOM, Decimals::Six),
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
+        ],
+    );
+
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[str_coin("1_000", USDT, Decimals::Six)],
+    );
+
+    happy_path_two_hops_test(app, owner, contr_addr);
 }
 
 #[test]
