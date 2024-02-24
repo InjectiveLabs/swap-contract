@@ -7,16 +7,18 @@ use injective_math::FPDecimal;
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::testing::test_utils::{
     are_fpdecimals_approximately_equal, assert_fee_is_as_expected,
-    create_realistic_atom_usdt_sell_orders_from_spreadsheet,
+    create_ninja_inj_both_side_orders, create_realistic_atom_usdt_sell_orders_from_spreadsheet,
     create_realistic_eth_usdt_buy_orders_from_spreadsheet,
     create_realistic_eth_usdt_sell_orders_from_spreadsheet,
-    create_realistic_inj_usdt_buy_orders_from_spreadsheet, create_realistic_limit_order,
+    create_realistic_inj_usdt_buy_orders_from_spreadsheet,
+    create_realistic_inj_usdt_sell_orders_from_spreadsheet, create_realistic_limit_order,
     create_realistic_usdt_usdc_both_side_orders, human_to_dec, init_rich_account,
     init_self_relaying_contract_and_get_address, launch_realistic_atom_usdt_spot_market,
-    launch_realistic_inj_usdt_spot_market, launch_realistic_usdt_usdc_spot_market,
-    launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, query_all_bank_balances,
-    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, ETH,
-    INJ, INJ_2, USDC, USDT,
+    launch_realistic_inj_usdt_spot_market, launch_realistic_ninja_inj_spot_market,
+    launch_realistic_usdt_usdc_spot_market, launch_realistic_weth_usdt_spot_market,
+    must_init_account_with_funds, query_all_bank_balances, query_bank_balance,
+    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, ETH, INJ, INJ_2, NINJA,
+    USDC, USDT,
 };
 use crate::types::{FPCoin, SwapEstimationResult};
 
@@ -891,6 +893,114 @@ fn it_correctly_swaps_between_markets_using_different_quote_assets_self_relaying
         contract_usdc_balance_after.scaled(Decimals::Six.get_decimals().neg()),
         contract_usdc_balance_before.scaled(Decimals::Six.get_decimals().neg()),
         max_diff.scaled(Decimals::Six.get_decimals().neg())
+    );
+}
+
+#[test]
+fn it_correctly_swaps_between_markets_using_different_quote_assets_self_relaying_ninja() {
+    let app = InjectiveTestApp::new();
+    let wasm = Wasm::new(&app);
+    let exchange = Exchange::new(&app);
+    let bank = Bank::new(&app);
+
+    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let _validator = app
+        .get_first_validator_signing_account(INJ.to_string(), 1.2f64)
+        .unwrap();
+
+    let owner = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1_000", USDT, Decimals::Six),
+            str_coin("1_000", USDC, Decimals::Six),
+            str_coin("1_000", NINJA, Decimals::Six),
+            str_coin("10_000", INJ, Decimals::Eighteen),
+            str_coin("101", INJ_2, Decimals::Eighteen),
+        ],
+    );
+
+    let spot_market_1_id = launch_realistic_inj_usdt_spot_market(&exchange, &owner);
+    let spot_market_2_id = launch_realistic_ninja_inj_spot_market(&exchange, &owner);
+
+    let contr_addr = init_self_relaying_contract_and_get_address(
+        &wasm,
+        &owner,
+        &[
+            str_coin("100", INJ_2, Decimals::Eighteen),
+            str_coin("10", USDC, Decimals::Six),
+            str_coin("500", USDT, Decimals::Six),
+        ],
+    );
+    set_route_and_assert_success(
+        &wasm,
+        &owner,
+        &contr_addr,
+        USDT,
+        NINJA,
+        vec![
+            spot_market_1_id.as_str().into(),
+            spot_market_2_id.as_str().into(),
+        ],
+    );
+
+    let trader1 = init_rich_account(&app);
+
+    create_realistic_inj_usdt_sell_orders_from_spreadsheet(&app, &spot_market_1_id, &trader1);
+    create_ninja_inj_both_side_orders(&app, &spot_market_2_id, &trader1);
+
+    app.increase_time(1);
+
+    let swapper = must_init_account_with_funds(
+        &app,
+        &[
+            str_coin("1", INJ, Decimals::Eighteen),
+            str_coin("100000", USDT, Decimals::Six),
+        ],
+    );
+
+    let usdt_to_swap = "100000";
+    let to_output_quantity = human_to_dec("501000", Decimals::Six);
+
+    let from_balance_before = query_bank_balance(&bank, USDT, swapper.address().as_str());
+    let to_balance_before = query_bank_balance(&bank, NINJA, swapper.address().as_str());
+
+    wasm.execute(
+        &contr_addr,
+        &ExecuteMsg::SwapExactOutput {
+            target_denom: NINJA.to_string(),
+            target_output_quantity: to_output_quantity,
+        },
+        &[str_coin(usdt_to_swap, USDT, Decimals::Six)],
+        &swapper,
+    )
+    .unwrap();
+
+    let from_balance_after = query_bank_balance(&bank, USDT, swapper.address().as_str());
+    let to_balance_after = query_bank_balance(&bank, NINJA, swapper.address().as_str());
+
+    // from 100000 USDT -> 96201.062128 USDT = 3798.937872 USDT
+    let expected_from_balance_before = human_to_dec("100000", Decimals::Six);
+    let expected_from_balance_after = human_to_dec("96201.062128", Decimals::Six);
+
+    // from 0 NINJA to 501000 NINJA
+    let expected_to_balance_before = human_to_dec("0", Decimals::Six);
+    let expected_to_balance_after = human_to_dec("501000", Decimals::Six);
+
+    assert_eq!(
+        from_balance_before, expected_from_balance_before,
+        "incorrect original amount was left after swap"
+    );
+    assert_eq!(
+        to_balance_before, expected_to_balance_before,
+        "incorrect target amount after swap"
+    );
+    assert_eq!(
+        from_balance_after, expected_from_balance_after,
+        "incorrect original amount was left after swap"
+    );
+    assert_eq!(
+        to_balance_after, expected_to_balance_after,
+        "incorrect target amount after swap"
     );
 }
 
