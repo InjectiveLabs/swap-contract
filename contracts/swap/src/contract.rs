@@ -117,8 +117,6 @@ pub fn migrate(
                 );
             }
             "1.0.0" => {
-                deps.api.debug("BBB");
-
                 set_contract_version(
                     deps.storage,
                     format!("crates.io:{CONTRACT_NAME}"),
