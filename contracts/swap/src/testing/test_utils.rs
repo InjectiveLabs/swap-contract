@@ -45,6 +45,7 @@ pub const USDT: &str = "usdt";
 pub const USDC: &str = "usdc";
 pub const INJ: &str = "inj";
 pub const INJ_2: &str = "inj_2";
+pub const NINJA: &str = "ninja";
 
 pub const DEFAULT_TAKER_FEE: f64 = 0.001;
 pub const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
@@ -445,6 +446,20 @@ pub fn launch_realistic_usdt_usdc_spot_market(
     )
 }
 
+pub fn launch_realistic_ninja_inj_spot_market(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+) -> String {
+    launch_custom_spot_market(
+        exchange,
+        signer,
+        NINJA,
+        INJ_2,
+        dec_to_proto(FPDecimal::must_from_str("1000000")).as_str(),
+        dec_to_proto(FPDecimal::must_from_str("10000000")).as_str(),
+    )
+}
+
 pub fn create_realistic_eth_usdt_buy_orders_from_spreadsheet(
     app: &InjectiveTestApp,
     market_id: &str,
@@ -577,6 +592,23 @@ pub fn create_realistic_inj_usdt_buy_orders_from_spreadsheet(
     );
 }
 
+pub fn create_realistic_inj_usdt_sell_orders_from_spreadsheet(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Sell,
+        "36",
+        "2821.001",
+        Decimals::Eighteen,
+        Decimals::Six,
+    );
+}
+
 pub fn create_realistic_atom_usdt_sell_orders_from_spreadsheet(
     app: &InjectiveTestApp,
     market_id: &str,
@@ -654,6 +686,24 @@ pub fn create_realistic_usdt_usdc_both_side_orders(
         "1000.001",
         Decimals::Six,
         Decimals::Six,
+    );
+}
+
+// not really realistic yet
+pub fn create_ninja_inj_both_side_orders(
+    app: &InjectiveTestApp,
+    market_id: &str,
+    trader1: &SigningAccount,
+) {
+    create_realistic_limit_order(
+        app,
+        trader1,
+        market_id,
+        OrderSide::Sell,
+        "0.00021",
+        "1001000",
+        Decimals::Six,
+        Decimals::Eighteen,
     );
 }
 
@@ -767,7 +817,7 @@ pub fn init_self_relaying_contract_and_get_address(
     owner: &SigningAccount,
     initial_balance: &[Coin],
 ) -> String {
-    let code_id = store_code(wasm, owner, "injective_converter".to_string());
+    let code_id = store_code(wasm, owner, "swap_contract".to_string());
     wasm.instantiate(
         code_id,
         &InstantiateMsg {
@@ -790,7 +840,7 @@ pub fn init_contract_with_fee_recipient_and_get_address(
     initial_balance: &[Coin],
     fee_recipient: &SigningAccount,
 ) -> String {
-    let code_id = store_code(wasm, owner, "injective_converter".to_string());
+    let code_id = store_code(wasm, owner, "swap_contract".to_string());
     wasm.instantiate(
         code_id,
         &InstantiateMsg {
@@ -949,6 +999,8 @@ pub fn init_rich_account(app: &InjectiveTestApp) -> SigningAccount {
             str_coin("100_000_000", USDT, Decimals::Six),
             str_coin("100_000_000", USDC, Decimals::Six),
             str_coin("100_000", INJ, Decimals::Eighteen),
+            str_coin("100_000", INJ_2, Decimals::Eighteen),
+            str_coin("100_000_000_000_000_000", NINJA, Decimals::Six),
         ],
     )
 }
@@ -1239,7 +1291,7 @@ mod tests {
     }
 
     #[test]
-    fn it_scales_integer_values_correctly_for_inj_udst() {
+    fn it_scales_integer_values_correctly_for_inj_usdt() {
         let price = "1";
         let quantity = "1";
 
@@ -1259,7 +1311,7 @@ mod tests {
     }
 
     #[test]
-    fn it_scales_decimal_values_correctly_for_inj_udst() {
+    fn it_scales_decimal_values_correctly_for_inj_usdt() {
         let price = "8.782";
         let quantity = "1.12";
 
@@ -1278,7 +1330,7 @@ mod tests {
     }
 
     #[test]
-    fn it_scales_integer_values_correctly_for_atom_udst() {
+    fn it_scales_integer_values_correctly_for_atom_usdt() {
         let price = "1";
         let quantity = "1";
 
@@ -1301,7 +1353,7 @@ mod tests {
     }
 
     #[test]
-    fn it_scales_decimal_values_correctly_for_atom_udst() {
+    fn it_scales_decimal_values_correctly_for_atom_usdt() {
         let price = "1.129";
         let quantity = "1.62";
 

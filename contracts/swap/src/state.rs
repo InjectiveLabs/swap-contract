@@ -9,6 +9,12 @@ pub const STEP_STATE: Item<CurrentSwapStep> = Item::new("current_step_cache");
 pub const SWAP_RESULTS: Item<Vec<SwapResults>> = Item::new("swap_results");
 pub const CONFIG: Item<Config> = Item::new("config");
 
+impl Config {
+    pub fn validate(self) -> StdResult<()> {
+        Ok(())
+    }
+}
+
 pub fn store_swap_route(storage: &mut dyn Storage, route: &SwapRoute) -> StdResult<()> {
     let key = route_key(&route.source_denom, &route.target_denom);
     SWAP_ROUTES.save(storage, key, route)

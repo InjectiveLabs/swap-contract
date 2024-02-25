@@ -1,8 +1,8 @@
 [package]
 authors = [ "Markus Waas <markus@injectivelabs.org>" ]
 edition = "2021"
-name    = "injective-converter"
-version = "1.0.0"
+name    = "swap-contract"
+version = "1.0.1"
 
 exclude = [
  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
@@ -45,6 +45,7 @@ serde-json-wasm    = "0.5.1"
 thiserror          = { version = "1.0.31" }
 
 [dev-dependencies]
+cosmos-sdk-proto    = { version = "0.19.0", default-features = false }
 cosmwasm-schema     = "1.5.0"
 cw-multi-test       = "0.16.2"
 injective-std       = { version = "0.1.5" }

@@ -230,22 +230,19 @@ fn estimate_execution_buy_from_target(
     fee_percent: FPDecimal,
     is_simulation: bool,
 ) -> StdResult<StepExecutionEstimate> {
-    if !(target_base_output_quantity.num % market.min_quantity_tick_size.num).is_zero() {
-        return Err(StdError::generic_err(
-            "Target quantity must be a multiple of min_quantity_tick_size",
-        ));
-    }
+    let rounded_target_base_output_quantity =
+        round_up_to_min_tick(target_base_output_quantity, market.min_quantity_tick_size);
 
     let orders = querier.query_spot_market_orderbook(
         &market.market_id,
         OrderSide::Sell,
-        Some(target_base_output_quantity),
+        Some(rounded_target_base_output_quantity),
         None,
     )?;
     let top_orders = get_minimum_liquidity_levels(
         deps,
         &orders.sells_price_level,
-        target_base_output_quantity,
+        rounded_target_base_output_quantity,
         |l| l.q,
         market.min_quantity_tick_size,
     )?;
@@ -255,12 +252,13 @@ fn estimate_execution_buy_from_target(
         get_average_price_from_orders(&top_orders, market.min_price_tick_size, true);
     let worst_price = get_worst_price_from_orders(&top_orders);
 
-    let expected_exchange_quote_quantity = target_base_output_quantity * average_price;
+    let expected_exchange_quote_quantity = rounded_target_base_output_quantity * average_price;
     let fee_estimate = expected_exchange_quote_quantity * fee_percent;
     let required_input_quote_quantity = expected_exchange_quote_quantity + fee_estimate;
 
     // check if user funds + contract funds are enough to create order
-    let required_funds = worst_price * target_base_output_quantity * (FPDecimal::ONE + fee_percent);
+    let required_funds =
+        worst_price * rounded_target_base_output_quantity * (FPDecimal::ONE + fee_percent);
 
     let funds_in_contract = deps
         .querier

@@ -16,7 +16,7 @@ pub enum ContractError {
     #[error("Failure response from submsg: {0}")]
     SubMsgFailure(String),
 
-    #[error("Unrecognised reply id: {0}")]
+    #[error("Unrecognized reply id: {0}")]
     UnrecognizedReply(u64),
 
     #[error("Invalid reply from sub-message {id}, {err}")]
@@ -27,4 +27,7 @@ pub enum ContractError {
 
     #[error("Provided amount of {0} is below required amount of {1}")]
     InsufficientFundsProvided(FPDecimal, FPDecimal),
+
+    #[error("Contract can't be migrated")]
+    MigrationError {},
 }
