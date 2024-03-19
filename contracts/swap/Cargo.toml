@@ -2,7 +2,7 @@
 authors = [ "Markus Waas <markus@injectivelabs.org>" ]
 edition = "2021"
 name    = "swap-contract"
-version = "1.0.1"
+version = "1.0.2"
 
 exclude = [
  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
@@ -41,7 +41,7 @@ num-traits         = "0.2.15"
 protobuf           = { version = "2", features = [ "with-bytes" ] }
 schemars           = "0.8.8"
 serde              = { version = "1.0.137", default-features = false, features = [ "derive" ] }
-serde-json-wasm    = "0.5.1"
+serde-json-wasm    = "1.0.1"
 thiserror          = { version = "1.0.31" }
 
 [dev-dependencies]
