@@ -86,7 +86,7 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdR
 
 ## Disclaimer
 
-This contract is designed for educational purposes only.  Your use of this contract constitutes your agreement to the terms of the License below.  In addition, your use of this contract constitutes your agreement to defend, indemnify, and hold harmless the contributors to this codebase from all claims of any kind related to your use of this contract.
+This contract is designed for educational purposes only. Your use of this contract constitutes your agreement to the terms of the License below. In addition, your use of this contract constitutes your agreement to defend, indemnify, and hold harmless the contributors to this codebase from all claims of any kind related to your use of this contract.
 
 ## License
 
