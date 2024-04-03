@@ -50,13 +50,13 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Check if cw-optimize is installed
-        run: |
-          cargo cw-optimizoor --version || cargo install cw-optimizoor
-
-      - name: Compile contracts
-        run: |
-          cargo cw-optimizoor
+      - name: Compile WASM contracts
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target wasm32-unknown-unknown --locked --package swap-contract
+        env:
+          RUSTFLAGS: "-C link-arg=-s"
 
       - name: Run tests
         uses: actions-rs/cargo@v1
