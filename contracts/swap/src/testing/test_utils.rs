@@ -1,28 +1,11 @@
-use std::collections::HashMap;
-use std::str::FromStr;
+use crate::helpers::Scaled;
 
-use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
-    coin, to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
+    coin,
+    testing::{MockApi, MockStorage},
+    to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
     SystemResult,
 };
-use injective_std::shim::Any;
-use injective_std::types::cosmos::bank::v1beta1::{
-    MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
-};
-use injective_std::types::cosmos::base::v1beta1::Coin as TubeCoin;
-use injective_std::types::cosmos::gov::v1::MsgVote;
-use injective_std::types::cosmos::gov::v1beta1::MsgSubmitProposal;
-use injective_std::types::injective::exchange;
-use injective_std::types::injective::exchange::v1beta1::{
-    MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType,
-    QuerySpotMarketsRequest, SpotMarketParamUpdateProposal, SpotOrder,
-};
-use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
-};
-
-use crate::helpers::Scaled;
 use injective_cosmwasm::{
     create_orderbook_response_handler, create_spot_multi_market_handler,
     get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids,
@@ -31,7 +14,27 @@ use injective_cosmwasm::{
     TEST_MARKET_ID_2,
 };
 use injective_math::FPDecimal;
+use injective_std::{
+    shim::{Any, Timestamp},
+    types::{
+        cosmos::{
+            authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
+            bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
+            base::v1beta1::Coin as TubeCoin,
+            gov::v1::MsgVote,
+            gov::v1beta1::MsgSubmitProposal,
+        },
+        injective::exchange::v1beta1::{
+            MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType,
+            QuerySpotMarketsRequest, SpotMarketParamUpdateProposal, SpotOrder,
+        },
+    },
+};
+use injective_test_tube::{
+    Account, Authz, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
+};
 use prost::Message;
+use std::{collections::HashMap, str::FromStr};
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
 use crate::types::FPCoin;
@@ -939,6 +942,36 @@ pub fn pause_spot_market(
     app.increase_time(10u64)
 }
 
+pub fn create_generic_authorization(
+    app: &InjectiveTestApp,
+    granter: &SigningAccount,
+    grantee: String,
+    msg: String,
+    expiration: Option<Timestamp>,
+) {
+    let authz = Authz::new(app);
+
+    let mut buf = vec![];
+    GenericAuthorization::encode(&GenericAuthorization { msg }, &mut buf).unwrap();
+
+    authz
+        .grant(
+            MsgGrant {
+                granter: granter.address(),
+                grantee,
+                grant: Some(Grant {
+                    authorization: Some(Any {
+                        type_url: "/cosmos.authz.v1beta1.GenericAuthorization".to_string(),
+                        value: buf.clone(),
+                    }),
+                    expiration,
+                }),
+            },
+            granter,
+        )
+        .unwrap();
+}
+
 pub fn pass_spot_market_params_update_proposal(
     gov: &Gov<InjectiveTestApp>,
     proposal: &SpotMarketParamUpdateProposal,
@@ -946,7 +979,7 @@ pub fn pass_spot_market_params_update_proposal(
     validator: &SigningAccount,
 ) {
     let mut buf = vec![];
-    exchange::v1beta1::SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
+    SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
 
     println!("submitting proposal: {proposal:?}");
     let submit_response = gov.submit_proposal_v1beta1(
