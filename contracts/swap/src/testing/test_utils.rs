@@ -310,11 +310,22 @@ fn create_mock_spot_market(
 }
 
 pub fn wasm_file(contract_name: String) -> String {
+    let snaked_name = contract_name.replace('-', "_");
     let arch = std::env::consts::ARCH;
+
+    let target = format!("../../target/wasm32-unknown-unknown/release/{snaked_name}.wasm");
+
     let artifacts_dir =
         std::env::var("ARTIFACTS_DIR_PATH").unwrap_or_else(|_| "artifacts".to_string());
-    let snaked_name = contract_name.replace('-', "_");
-    format!("../../{artifacts_dir}/{snaked_name}-{arch}.wasm")
+    let arch_target = format!("../../{artifacts_dir}/{snaked_name}-{arch}.wasm");
+
+    if std::path::Path::new(&target).exists() {
+        target
+    } else if std::path::Path::new(&arch_target).exists() {
+        arch_target
+    } else {
+        format!("../../{artifacts_dir}/{snaked_name}.wasm")
+    }
 }
 
 pub fn store_code(
