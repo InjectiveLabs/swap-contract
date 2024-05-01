@@ -1,5 +1,6 @@
 use crate::helpers::Scaled;
 
+use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{
     coin,
     testing::{MockApi, MockStorage},
@@ -18,11 +19,14 @@ use injective_std::{
     shim::{Any, Timestamp},
     types::{
         cosmos::{
-            authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
+            authz::v1beta1::{Grant, MsgGrant},
             bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
             base::v1beta1::Coin as TubeCoin,
             gov::v1::MsgVote,
             gov::v1beta1::MsgSubmitProposal,
+        },
+        cosmwasm::wasm::v1::{
+            AcceptedMessageKeysFilter, ContractExecutionAuthorization, ContractGrant, MaxCallsLimit,
         },
         injective::exchange::v1beta1::{
             MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType,
@@ -33,7 +37,6 @@ use injective_std::{
 use injective_test_tube::{
     Account, Authz, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
 };
-use prost::Message;
 use std::{collections::HashMap, str::FromStr};
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
@@ -750,6 +753,7 @@ pub fn create_limit_order(
                         fee_recipient: trader.address(),
                         price: format!("{price}000000000000000000"),
                         quantity: format!("{quantity}000000000000000000"),
+                        cid: "".to_string(),
                     }),
                     order_type: if order_side == OrderSide::Buy {
                         OrderType::BuyAtomic.into()
@@ -812,6 +816,7 @@ pub fn create_realistic_limit_order(
                         fee_recipient: trader.address(),
                         price: price_to_send,
                         quantity: quantity_to_send,
+                        cid: "".to_string(),
                     }),
                     order_type: if order_side == OrderSide::Buy {
                         OrderType::BuyAtomic.into()
@@ -953,17 +958,49 @@ pub fn pause_spot_market(
     app.increase_time(10u64)
 }
 
-pub fn create_generic_authorization(
+pub fn create_contract_authorization(
     app: &InjectiveTestApp,
+    contract: String,
     granter: &SigningAccount,
     grantee: String,
-    msg: String,
+    message: String,
+    limit: u64,
     expiration: Option<Timestamp>,
 ) {
     let authz = Authz::new(app);
 
+    let mut filter_buf = vec![];
+    AcceptedMessageKeysFilter::encode(
+        &AcceptedMessageKeysFilter {
+            keys: vec![message],
+        },
+        &mut filter_buf,
+    )
+    .unwrap();
+
+    let mut limit_buf = vec![];
+    MaxCallsLimit::encode(&MaxCallsLimit { remaining: limit }, &mut limit_buf).unwrap();
+
+    let contract_grant = ContractGrant {
+        contract,
+        limit: Some(Any {
+            type_url: MaxCallsLimit::TYPE_URL.to_string(),
+            value: limit_buf,
+        }),
+        filter: Some(Any {
+            type_url: AcceptedMessageKeysFilter::TYPE_URL.to_string(),
+            value: filter_buf,
+        }),
+    };
+
     let mut buf = vec![];
-    GenericAuthorization::encode(&GenericAuthorization { msg }, &mut buf).unwrap();
+    ContractExecutionAuthorization::encode(
+        &ContractExecutionAuthorization {
+            grants: vec![contract_grant],
+        },
+        &mut buf,
+    )
+    .unwrap();
 
     authz
         .grant(
@@ -972,7 +1009,7 @@ pub fn create_generic_authorization(
                 grantee,
                 grant: Some(Grant {
                     authorization: Some(Any {
-                        type_url: "/cosmos.authz.v1beta1.GenericAuthorization".to_string(),
+                        type_url: ContractExecutionAuthorization::TYPE_URL.to_string(),
                         value: buf.clone(),
                     }),
                     expiration,

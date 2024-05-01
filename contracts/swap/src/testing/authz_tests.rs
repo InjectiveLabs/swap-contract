@@ -1,28 +1,23 @@
 use crate::{
-    msg::{ExecuteMsg, QueryMsg},
+    msg::ExecuteMsg,
     testing::test_utils::{
-        create_generic_authorization, create_realistic_atom_usdt_sell_orders_from_spreadsheet,
-        create_realistic_eth_usdt_buy_orders_from_spreadsheet, human_to_dec, init_rich_account,
+        create_contract_authorization, create_realistic_atom_usdt_sell_orders_from_spreadsheet,
+        create_realistic_eth_usdt_buy_orders_from_spreadsheet, init_rich_account,
         init_self_relaying_contract_and_get_address, launch_realistic_atom_usdt_spot_market,
         launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, str_coin, Decimals,
         ATOM, ETH, INJ, USDT,
     },
-    types::SwapEstimationResult,
 };
 
 use cosmos_sdk_proto::{cosmwasm::wasm::v1::MsgExecuteContract, traits::MessageExt};
-use injective_std::{
-    shim::Any,
-    types::cosmos::authz::v1beta1::{MsgExec, MsgExecResponse},
-};
-use injective_test_tube::{
-    Account, Exchange, ExecuteResponse, InjectiveTestApp, Module, Runner, Wasm,
-};
+use injective_std::{shim::Any, types::cosmos::authz::v1beta1::MsgExec};
+use injective_test_tube::{Account, Authz, Exchange, InjectiveTestApp, Module, Wasm};
 
 #[test]
 pub fn set_route_for_third_party_test() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
+    let authz = Authz::new(&app);
     let exchange = Exchange::new(&app);
 
     let owner = must_init_account_with_funds(
@@ -48,11 +43,13 @@ pub fn set_route_for_third_party_test() {
     let trader2 = init_rich_account(&app);
     let trader3 = init_rich_account(&app);
 
-    create_generic_authorization(
+    create_contract_authorization(
         &app,
+        contr_addr.clone(),
         &owner,
         trader1.address().to_string(),
-        "/cosmwasm.wasm.v1.MsgExecuteContract".to_string(),
+        "set_route".to_string(),
+        1,
         None,
     );
 
@@ -71,8 +68,6 @@ pub fn set_route_for_third_party_test() {
     );
 
     app.increase_time(1);
-
-    let eth_to_swap = "4.08";
 
     let set_route_msg = ExecuteMsg::SetRoute {
         source_denom: ETH.to_string(),
@@ -99,18 +94,20 @@ pub fn set_route_for_third_party_test() {
         }],
     };
 
-    let _res: ExecuteResponse<MsgExecResponse> = app
-        .execute(msg, "/cosmos.authz.v1beta1.MsgExec", &trader1)
-        .unwrap();
+    let _res = authz.exec(msg, &trader1).unwrap();
 
-    let _query_result: SwapEstimationResult = wasm
-        .query(
-            &contr_addr,
-            &QueryMsg::GetOutputQuantity {
-                source_denom: ETH.to_string(),
-                target_denom: ATOM.to_string(),
-                from_quantity: human_to_dec(eth_to_swap, Decimals::Eighteen),
-            },
-        )
-        .unwrap();
+    // execute on more time to excercise account sequence
+    let msg = MsgExec {
+        grantee: trader1.address().to_string(),
+        msgs: vec![Any {
+            type_url: "/cosmwasm.wasm.v1.MsgExecuteContract".to_string(),
+            value: execute_msg.to_bytes().unwrap(),
+        }],
+    };
+
+    let err = authz.exec(msg, &trader1).unwrap_err();
+    assert!(
+        err.to_string().contains("failed to update grant with key"),
+        "incorrect error returned by execute"
+    );
 }
