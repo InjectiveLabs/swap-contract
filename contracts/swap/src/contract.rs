@@ -129,10 +129,12 @@ pub fn migrate(
         },
         "crates.io:swap-contract" => match contract_version.version.as_ref() {
             "1.0.1" => {
-                unimplemented!(
-                    "Migration from version {} is no yet supported",
-                    contract_version.version
-                );
+                // No further updates needed
+                set_contract_version(
+                    deps.storage,
+                    format!("crates.io:{CONTRACT_NAME}"),
+                    CONTRACT_VERSION,
+                )?;
             }
             _ => return Err(ContractError::MigrationError {}),
         },
