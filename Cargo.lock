@@ -1460,7 +1460,8 @@ dependencies = [
 [[package]]
 name = "injective-std"
 version = "0.1.7"
-source = "git+https://github.com/InjectiveLabs/cw-injective.git?rev=8957ee2#8957ee25cd885d3246c48a487da757548bc60f1c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1d7b7114796e44b034355983cb1ee2a1c9d1843df17c9552126e4404d463c06"
 dependencies = [
  "chrono",
  "cosmwasm-std",
@@ -1475,7 +1476,8 @@ dependencies = [
 [[package]]
 name = "injective-test-tube"
 version = "1.2.0"
-source = "git+https://github.com/InjectiveLabs/test-tube.git?rev=402efd7#402efd7a868ff44af08bd08abdd39d439c36a494"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e7b985231e977f4202a8ef7112d34558473a1bdfb4bff8dcb8ab091909728f9"
 dependencies = [
  "base64",
  "bindgen",
@@ -2697,7 +2699,7 @@ dependencies = [
  "injective-std",
  "injective-test-tube",
  "num-traits",
- "prost 0.11.9",
+ "prost 0.12.4",
  "protobuf",
  "schemars",
  "serde",
@@ -2897,9 +2899,9 @@ dependencies = [
 
 [[package]]
 name = "test-tube-inj"
-version = "1.1.3"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "751b40929081e03c825df424a5a81645f2cea444654d96f0aad962f7be4e541e"
+checksum = "cd5deed958ebd3e60b9d55bb7773442993deac73e15f0354eb5bdab05df14fcb"
 dependencies = [
  "base64",
  "cosmrs",

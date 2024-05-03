@@ -38,11 +38,9 @@ serde-json-wasm    = "1.0.1"
 thiserror          = { version = "1.0.31" }
 
 [dev-dependencies]
-cosmos-sdk-proto = { version = "0.21.1", features = [ "cosmwasm" ] }
-cosmwasm-schema  = "1.5.0"
-cw-multi-test    = "0.16.2"
-injective-std    = { git = "https://github.com/InjectiveLabs/cw-injective.git", rev = "8957ee2" }
-# injective-std       = { version = "0.1.5" }
-injective-test-tube = { git = "https://github.com/InjectiveLabs/test-tube.git", rev = "402efd7" }
-# injective-test-tube = "1.1.7"
-prost = "0.11.9"
+cosmos-sdk-proto    = { version = "0.21.1", features = [ "cosmwasm" ] }
+cosmwasm-schema     = "1.5.0"
+cw-multi-test       = "0.16.2"
+injective-std       = { version = "0.1.7" }
+injective-test-tube = "1.2.0"
+prost               = "0.12.4"

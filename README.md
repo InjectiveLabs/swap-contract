@@ -84,9 +84,17 @@ Handles various queries to the contract:
 pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> StdResult<Binary>
 ```
 
+## Authz Permission
+
+Example how to allow the contract admin to authorize other addresses to make contract calls on their behalf.
+
+```bash
+ injectived tx grant contract execution <grantee_addr> <contract_addr> --allow-raw-msgs set_routes --max-calls 5 --max-funds 100000uwasm --expiration 1667979596  --from=sgt-account --gas=auto --gas-prices 500000000inj --gas-adjustment 1.3 --output=json --node=https://testnet.sentry.tm.injective.network:443 --chain-id='injective-888'
+```
+
 ## Disclaimer
 
-This contract is designed for educational purposes only.  Your use of this contract constitutes your agreement to the terms of the License below.  In addition, your use of this contract constitutes your agreement to defend, indemnify, and hold harmless the contributors to this codebase from all claims of any kind related to your use of this contract.
+This contract is designed for educational purposes only. Your use of this contract constitutes your agreement to the terms of the License below. In addition, your use of this contract constitutes your agreement to defend, indemnify, and hold harmless the contributors to this codebase from all claims of any kind related to your use of this contract.
 
 ## License
 
