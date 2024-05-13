@@ -1,28 +1,12 @@
-use std::collections::HashMap;
-use std::str::FromStr;
+use crate::helpers::Scaled;
 
-use cosmwasm_std::testing::{MockApi, MockStorage};
+use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{
-    coin, to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
+    coin,
+    testing::{MockApi, MockStorage},
+    to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError,
     SystemResult,
 };
-use injective_std::shim::Any;
-use injective_std::types::cosmos::bank::v1beta1::{
-    MsgSend, QueryAllBalancesRequest, QueryBalanceRequest,
-};
-use injective_std::types::cosmos::base::v1beta1::Coin as TubeCoin;
-use injective_std::types::cosmos::gov::v1::MsgVote;
-use injective_std::types::cosmos::gov::v1beta1::MsgSubmitProposal;
-use injective_std::types::injective::exchange;
-use injective_std::types::injective::exchange::v1beta1::{
-    MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType,
-    QuerySpotMarketsRequest, SpotMarketParamUpdateProposal, SpotOrder,
-};
-use injective_test_tube::{
-    Account, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
-};
-
-use crate::helpers::Scaled;
 use injective_cosmwasm::{
     create_orderbook_response_handler, create_spot_multi_market_handler,
     get_default_subaccount_id_for_checked_address, inj_mock_deps, test_market_ids,
@@ -31,7 +15,29 @@ use injective_cosmwasm::{
     TEST_MARKET_ID_2,
 };
 use injective_math::FPDecimal;
-use prost::Message;
+use injective_std::{
+    shim::{Any, Timestamp},
+    types::{
+        cosmos::{
+            authz::v1beta1::{Grant, MsgGrant},
+            bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
+            base::v1beta1::Coin as TubeCoin,
+            gov::v1::MsgVote,
+            gov::v1beta1::MsgSubmitProposal,
+        },
+        cosmwasm::wasm::v1::{
+            AcceptedMessageKeysFilter, ContractExecutionAuthorization, ContractGrant, MaxCallsLimit,
+        },
+        injective::exchange::v1beta1::{
+            MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType,
+            QuerySpotMarketsRequest, SpotMarketParamUpdateProposal, SpotOrder,
+        },
+    },
+};
+use injective_test_tube::{
+    Account, Authz, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm,
+};
+use std::{collections::HashMap, str::FromStr};
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
 use crate::types::FPCoin;
@@ -307,11 +313,22 @@ fn create_mock_spot_market(
 }
 
 pub fn wasm_file(contract_name: String) -> String {
+    let snaked_name = contract_name.replace('-', "_");
     let arch = std::env::consts::ARCH;
+
+    let target = format!("../../target/wasm32-unknown-unknown/release/{snaked_name}.wasm");
+
     let artifacts_dir =
         std::env::var("ARTIFACTS_DIR_PATH").unwrap_or_else(|_| "artifacts".to_string());
-    let snaked_name = contract_name.replace('-', "_");
-    format!("../../{artifacts_dir}/{snaked_name}-{arch}.wasm")
+    let arch_target = format!("../../{artifacts_dir}/{snaked_name}-{arch}.wasm");
+
+    if std::path::Path::new(&target).exists() {
+        target
+    } else if std::path::Path::new(&arch_target).exists() {
+        arch_target
+    } else {
+        format!("../../{artifacts_dir}/{snaked_name}.wasm")
+    }
 }
 
 pub fn store_code(
@@ -736,6 +753,7 @@ pub fn create_limit_order(
                         fee_recipient: trader.address(),
                         price: format!("{price}000000000000000000"),
                         quantity: format!("{quantity}000000000000000000"),
+                        cid: "".to_string(),
                     }),
                     order_type: if order_side == OrderSide::Buy {
                         OrderType::BuyAtomic.into()
@@ -798,6 +816,7 @@ pub fn create_realistic_limit_order(
                         fee_recipient: trader.address(),
                         price: price_to_send,
                         quantity: quantity_to_send,
+                        cid: "".to_string(),
                     }),
                     order_type: if order_side == OrderSide::Buy {
                         OrderType::BuyAtomic.into()
@@ -939,6 +958,68 @@ pub fn pause_spot_market(
     app.increase_time(10u64)
 }
 
+pub fn create_contract_authorization(
+    app: &InjectiveTestApp,
+    contract: String,
+    granter: &SigningAccount,
+    grantee: String,
+    message: String,
+    limit: u64,
+    expiration: Option<Timestamp>,
+) {
+    let authz = Authz::new(app);
+
+    let mut filter_buf = vec![];
+    AcceptedMessageKeysFilter::encode(
+        &AcceptedMessageKeysFilter {
+            keys: vec![message],
+        },
+        &mut filter_buf,
+    )
+    .unwrap();
+
+    let mut limit_buf = vec![];
+    MaxCallsLimit::encode(&MaxCallsLimit { remaining: limit }, &mut limit_buf).unwrap();
+
+    let contract_grant = ContractGrant {
+        contract,
+        limit: Some(Any {
+            type_url: MaxCallsLimit::TYPE_URL.to_string(),
+            value: limit_buf,
+        }),
+        filter: Some(Any {
+            type_url: AcceptedMessageKeysFilter::TYPE_URL.to_string(),
+            value: filter_buf,
+        }),
+    };
+
+    let mut buf = vec![];
+    ContractExecutionAuthorization::encode(
+        &ContractExecutionAuthorization {
+            grants: vec![contract_grant],
+        },
+        &mut buf,
+    )
+    .unwrap();
+
+    authz
+        .grant(
+            MsgGrant {
+                granter: granter.address(),
+                grantee,
+                grant: Some(Grant {
+                    authorization: Some(Any {
+                        type_url: ContractExecutionAuthorization::TYPE_URL.to_string(),
+                        value: buf.clone(),
+                    }),
+                    expiration,
+                }),
+            },
+            granter,
+        )
+        .unwrap();
+}
+
 pub fn pass_spot_market_params_update_proposal(
     gov: &Gov<InjectiveTestApp>,
     proposal: &SpotMarketParamUpdateProposal,
@@ -946,7 +1027,7 @@ pub fn pass_spot_market_params_update_proposal(
     validator: &SigningAccount,
 ) {
     let mut buf = vec![];
-    exchange::v1beta1::SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
+    SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
 
     println!("submitting proposal: {proposal:?}");
     let submit_response = gov.submit_proposal_v1beta1(

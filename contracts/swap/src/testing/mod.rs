@@ -1,3 +1,4 @@
+mod authz_tests;
 mod config_tests;
 mod integration_logic_tests;
 mod integration_realistic_tests_exact_quantity;
