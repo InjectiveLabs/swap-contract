@@ -2,22 +2,6 @@ use crate::helpers::Scaled;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{coin, to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult};
-use injective_std::{
-    shim::Any,
-    types::{
-        cosmos::{
-            bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
-            base::v1beta1::Coin as TubeCoin,
-            gov::{v1::MsgVote, v1beta1::MsgSubmitProposal},
-        },
-        injective::exchange::v1beta1::{
-            MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType, QuerySpotMarketsRequest, SpotMarketParamUpdateProposal,
-            SpotOrder,
-        },
-    },
-};
-use injective_test_tube::{Account, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm};
-
 use injective_cosmwasm::{
     create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps,
     test_market_ids, HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, QueryMarketAtomicExecutionFeeMultiplierResponse, SpotMarket,
@@ -31,21 +15,23 @@ use injective_std::{
             authz::v1beta1::{Grant, MsgGrant},
             bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
             base::v1beta1::Coin as TubeCoin,
-            gov::v1::MsgVote,
-            gov::v1beta1::MsgSubmitProposal,
+            gov::{v1::MsgVote, v1beta1::MsgSubmitProposal},
         },
         cosmwasm::wasm::v1::{AcceptedMessageKeysFilter, ContractExecutionAuthorization, ContractGrant, MaxCallsLimit},
         injective::exchange::v1beta1::{
-            MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType, QuerySpotMarketsRequest, SpotMarketParamUpdateProposal,
-            SpotOrder,
+            MsgCreateSpotLimitOrder, OrderInfo, OrderType, QuerySpotMarketsRequest, SpotMarketParamUpdateProposal, SpotOrder,
         },
     },
 };
 use injective_test_tube::{Account, Authz, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm};
+use injective_testing::test_tube::{exchange::launch_spot_market_custom, utils::store_code};
+use prost::Message;
 use std::{collections::HashMap, str::FromStr};
 
-use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
-use crate::types::FPCoin;
+use crate::{
+    msg::{ExecuteMsg, FeeRecipient, InstantiateMsg},
+    types::FPCoin,
+};
 
 pub const TEST_CONTRACT_ADDR: &str = "inj14hj2tavq8fpesdwxxcu44rty3hh90vhujaxlnz";
 pub const TEST_USER_ADDR: &str = "inj1p7z8p649xspcey7wp5e4leqf7wa39kjjj6wja8";
@@ -288,57 +274,8 @@ fn create_mock_spot_market(base: &str, min_price_tick_size: FPDecimal, min_quant
         status: injective_cosmwasm::MarketStatus::Active,
         min_price_tick_size,
         min_quantity_tick_size,
-        min_notional: "0".to_string(),
     }
 }
-
-pub fn launch_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount, base: &str, quote: &str) -> String {
-    let ticker = format!("{base}/{quote}");
-    exchange
-        .instant_spot_market_launch(
-            MsgInstantSpotMarketLaunch {
-                sender: signer.address(),
-                ticker: ticker.clone(),
-                base_denom: base.to_string(),
-                quote_denom: quote.to_string(),
-                min_price_tick_size: "1_000_000_000_000_000".to_owned(),
-                min_quantity_tick_size: "1_000_000_000_000_000".to_owned(),
-                min_notional: "0".to_string(),
-            },
-            signer,
-        )
-        .unwrap();
-
-    get_spot_market_id(exchange, ticker)
-}
-
-pub fn launch_custom_spot_market(
-    exchange: &Exchange<InjectiveTestApp>,
-    signer: &SigningAccount,
-    base: &str,
-    quote: &str,
-    min_price_tick_size: &str,
-    min_quantity_tick_size: &str,
-) -> String {
-    let ticker = format!("{base}/{quote}");
-    exchange
-        .instant_spot_market_launch(
-            MsgInstantSpotMarketLaunch {
-                sender: signer.address(),
-                ticker: ticker.clone(),
-                base_denom: base.to_string(),
-                quote_denom: quote.to_string(),
-                min_price_tick_size: min_price_tick_size.to_string(),
-                min_quantity_tick_size: min_quantity_tick_size.to_string(),
-                min_notional: "0".to_string(),
-            },
-            signer,
-        )
-        .unwrap();
-
-    get_spot_market_id(exchange, ticker)
-}
-
 pub fn get_spot_market_id(exchange: &Exchange<InjectiveTestApp>, ticker: String) -> String {
     let spot_markets = exchange
         .query_spot_markets(&QuerySpotMarketsRequest {
@@ -354,57 +291,62 @@ pub fn get_spot_market_id(exchange: &Exchange<InjectiveTestApp>, ticker: String)
 }
 
 pub fn launch_realistic_inj_usdt_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount) -> String {
-    launch_custom_spot_market(
+    launch_spot_market_custom(
         exchange,
         signer,
-        INJ_2,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+        "TICKER".to_string(),
+        INJ_2.to_string(),
+        USDT.to_string(),
+        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")),
+        dec_to_proto(FPDecimal::must_from_str("0.0001")),
     )
 }
 
 pub fn launch_realistic_weth_usdt_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount) -> String {
-    launch_custom_spot_market(
+    launch_spot_market_custom(
         exchange,
         signer,
-        ETH,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.0000000000001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("1000000000000000")).as_str(),
+        "ETH/USDT".to_string(),
+        ETH.to_string(),
+        USDT.to_string(),
+        "0.00000000000001".to_string(),
+        "0.001".to_string(),
     )
 }
 
 pub fn launch_realistic_atom_usdt_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount) -> String {
-    launch_custom_spot_market(
+    launch_spot_market_custom(
         exchange,
         signer,
-        ATOM,
-        USDT,
-        dec_to_proto(FPDecimal::must_from_str("0.001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("10000")).as_str(),
+        "ATOM/USDT".to_string(),
+        ATOM.to_string(),
+        USDT.to_string(),
+        "0.000000000001".to_string(),
+        "0.000000001".to_string(),
     )
 }
 
 pub fn launch_realistic_usdt_usdc_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount) -> String {
-    launch_custom_spot_market(
+    launch_spot_market_custom(
         exchange,
         signer,
-        USDT,
-        USDC,
-        dec_to_proto(FPDecimal::must_from_str("0.0001")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("100")).as_str(),
+        "TICKER".to_string(),
+        USDT.to_string(),
+        USDC.to_string(),
+        dec_to_proto(FPDecimal::must_from_str("0.0001")),
+        dec_to_proto(FPDecimal::must_from_str("100")),
     )
 }
 
 pub fn launch_realistic_ninja_inj_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount) -> String {
-    launch_custom_spot_market(
+    launch_spot_market_custom(
         exchange,
         signer,
-        NINJA,
-        INJ_2,
-        dec_to_proto(FPDecimal::must_from_str("1000000")).as_str(),
-        dec_to_proto(FPDecimal::must_from_str("10000000")).as_str(),
+        "TICKER".to_string(),
+        NINJA.to_string(),
+        INJ_2.to_string(),
+        dec_to_proto(FPDecimal::must_from_str("1000000")),
+        dec_to_proto(FPDecimal::must_from_str("10000000")),
     )
 }
 
@@ -792,7 +734,7 @@ pub fn pause_spot_market(app: &InjectiveTestApp, market_id: &str, proposer: &Sig
             status: 2,
             min_notional: "0".to_string(),
             ticker: "0".to_string(),
-            admin_info: "0".to_string(),
+            admin_info: None,
         },
         proposer,
         validator,
