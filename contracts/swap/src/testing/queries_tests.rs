@@ -574,7 +574,7 @@ fn get_all_queries_returns_empty_array_if_no_routes_are_set() {
     )
     .unwrap();
 
-    let all_routes_result = get_all_swap_routes(deps.as_ref().storage);
+    let all_routes_result = get_all_swap_routes(deps.as_ref().storage, None, None);
 
     assert!(all_routes_result.is_ok(), "Error getting all routes");
     assert!(
@@ -626,7 +626,7 @@ fn get_all_queries_returns_expected_array_if_routes_are_set() {
     )
     .unwrap();
 
-    let all_routes_result = get_all_swap_routes(deps.as_ref().storage);
+    let all_routes_result = get_all_swap_routes(deps.as_ref().storage, None, None);
     assert!(all_routes_result.is_ok(), "Error getting all routes");
 
     let eth_inj_route = SwapRoute {

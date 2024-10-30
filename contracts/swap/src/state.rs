@@ -1,13 +1,15 @@
-use cosmwasm_std::{Order, StdError, StdResult, Storage};
-use cw_storage_plus::{Item, Map};
-
 use crate::types::{Config, CurrentSwapOperation, CurrentSwapStep, SwapResults, SwapRoute};
+
+use cosmwasm_std::{Order, StdError, StdResult, Storage};
+use cw_storage_plus::{Bound, Item, Map};
 
 pub const SWAP_ROUTES: Map<(String, String), SwapRoute> = Map::new("swap_routes");
 pub const SWAP_OPERATION_STATE: Item<CurrentSwapOperation> = Item::new("current_swap_cache");
 pub const STEP_STATE: Item<CurrentSwapStep> = Item::new("current_step_cache");
 pub const SWAP_RESULTS: Item<Vec<SwapResults>> = Item::new("swap_results");
 pub const CONFIG: Item<Config> = Item::new("config");
+
+pub const DEFAULT_LIMIT: u32 = 100u32;
 
 impl Config {
     pub fn validate(self) -> StdResult<()> {
@@ -38,11 +40,22 @@ pub fn get_config(storage: &dyn Storage) -> StdResult<Config> {
     Ok(config)
 }
 
-pub fn get_all_swap_routes(storage: &dyn Storage) -> StdResult<Vec<SwapRoute>> {
+pub fn get_all_swap_routes(
+    storage: &dyn Storage,
+    start_after: Option<(String, String)>,
+    limit: Option<u32>,
+) -> StdResult<Vec<SwapRoute>> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT) as usize;
+
+    let start_bound = start_after
+        .as_ref()
+        .map(|(s, t)| Bound::inclusive((s.clone(), t.clone())));
+
     let routes = SWAP_ROUTES
-        .range(storage, None, None, Order::Ascending)
-        .map(|item| item.unwrap().1)
-        .collect();
+        .range(storage, start_bound, None, Order::Ascending)
+        .take(limit)
+        .map(|item| item.map(|(_, route)| route)) // Extract the `SwapRoute` from each item
+        .collect::<StdResult<Vec<SwapRoute>>>()?;
 
     Ok(routes)
 }

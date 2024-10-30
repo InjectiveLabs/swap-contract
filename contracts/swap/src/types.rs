@@ -1,17 +1,17 @@
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin};
+use injective_cosmwasm::MarketId;
+use injective_math::FPDecimal;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use injective_cosmwasm::MarketId;
-use injective_math::FPDecimal;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub enum SwapEstimationAmount {
     InputQuantity(FPCoin),
     ReceiveQuantity(FPCoin),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct FPCoin {
     pub amount: FPDecimal,
     pub denom: String,
@@ -19,7 +19,7 @@ pub struct FPCoin {
 
 impl From<FPCoin> for Coin {
     fn from(value: FPCoin) -> Self {
-        Coin::new(value.amount.into(), value.denom)
+        Coin::new(value.amount, value.denom)
     }
 }
 
@@ -32,19 +32,19 @@ impl From<Coin> for FPCoin {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct ConfigResponse {
     pub config: Config,
     pub contract_version: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub enum SwapQuantityMode {
     MinOutputQuantity(FPDecimal),
     ExactOutputQuantity(FPDecimal),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct StepExecutionEstimate {
     pub worst_price: FPDecimal,
     pub result_denom: String,
@@ -53,7 +53,7 @@ pub struct StepExecutionEstimate {
     pub fee_estimate: Option<FPCoin>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct CurrentSwapOperation {
     // whole swap operation
     pub sender_address: Addr,
@@ -63,7 +63,7 @@ pub struct CurrentSwapOperation {
     pub refund: Coin,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct CurrentSwapStep {
     // current step
     pub step_idx: u16,
@@ -72,7 +72,7 @@ pub struct CurrentSwapStep {
     pub is_buy: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct SwapResults {
     pub market_id: MarketId,
     pub quantity: FPDecimal,
@@ -80,7 +80,7 @@ pub struct SwapResults {
     pub fee: FPDecimal,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct Config {
     // if fee_recipient is contract, fee discount is replayed to a sender (will not stay in the contract)
     pub fee_recipient: Addr,
@@ -88,7 +88,7 @@ pub struct Config {
     pub admin: Addr,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct SwapRoute {
     pub steps: Vec<MarketId>,
     pub source_denom: String,
@@ -107,13 +107,13 @@ impl SwapRoute {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct SwapStep {
     pub market_id: MarketId,
     pub quote_denom: String, // quote for this step of swap, eg for swap eth/inj using eth/usdt and inj/usdt markets, quotes will be eth in 1st step and usdt in 2nd
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct SwapEstimationResult {
     pub result_quantity: FPDecimal,
     pub expected_fees: Vec<FPCoin>,

@@ -16,10 +16,11 @@ All notable changes to this project will be documented in this file.
 
 -
 
-## [1.0.2] - 2024-03-19
+## [1.1.0] - 2024-10-30
 
 ### Fixed
 
+- Added pagination to `get_all_routes`
 - Bump version of `serde-json-wasm`
 
 ## [1.0.1] - 2024-02-24
