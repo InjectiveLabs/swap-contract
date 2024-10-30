@@ -27,6 +27,7 @@ cw2                = { workspace = true }
 injective-cosmwasm = { workspace = true }
 injective-math     = { workspace = true }
 injective-std      = { workspace = true }
+injective-testing  = { workspace = true }
 prost              = { workspace = true }
 schemars           = { workspace = true }
 serde              = { workspace = true }
@@ -34,7 +35,5 @@ serde-json-wasm    = { workspace = true }
 thiserror          = { workspace = true }
 
 [dev-dependencies]
-cosmwasm-schema = { workspace = true }
-# cw-multi-test       = { workspace = true }
 injective-std       = { workspace = true }
 injective-test-tube = { workspace = true }

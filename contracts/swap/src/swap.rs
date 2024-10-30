@@ -246,7 +246,7 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
 
     let mut response = Response::new().add_message(send_message).add_event(swap_event);
 
-    if swap.refund.amount > Uint128::zero() {
+    if !swap.refund.amount.is_zero() {
         let refund_message = BankMsg::Send {
             to_address: swap.sender_address.to_string(),
             amount: vec![swap.refund],

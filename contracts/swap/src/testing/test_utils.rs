@@ -1,27 +1,48 @@
-use std::collections::HashMap;
-use std::str::FromStr;
+use crate::helpers::Scaled;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{coin, to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult};
-use injective_std::shim::Any;
-use injective_std::types::cosmos::bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest};
-use injective_std::types::cosmos::base::v1beta1::Coin as TubeCoin;
-use injective_std::types::cosmos::gov::v1::MsgVote;
-use injective_std::types::cosmos::gov::v1beta1::MsgSubmitProposal;
-use injective_std::types::injective::exchange;
-use injective_std::types::injective::exchange::v1beta1::{
-    MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType, QuerySpotMarketsRequest, SpotMarketParamUpdateProposal, SpotOrder,
+use injective_std::{
+    shim::Any,
+    types::{
+        cosmos::{
+            bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
+            base::v1beta1::Coin as TubeCoin,
+            gov::{v1::MsgVote, v1beta1::MsgSubmitProposal},
+        },
+        injective::exchange::v1beta1::{
+            MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType, QuerySpotMarketsRequest, SpotMarketParamUpdateProposal,
+            SpotOrder,
+        },
+    },
 };
 use injective_test_tube::{Account, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm};
 
-use crate::helpers::Scaled;
 use injective_cosmwasm::{
     create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps,
     test_market_ids, HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, QueryMarketAtomicExecutionFeeMultiplierResponse, SpotMarket,
     WasmMockQuerier, TEST_MARKET_ID_1, TEST_MARKET_ID_2,
 };
 use injective_math::FPDecimal;
-use prost::Message;
+use injective_std::{
+    shim::{Any, Timestamp},
+    types::{
+        cosmos::{
+            authz::v1beta1::{Grant, MsgGrant},
+            bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
+            base::v1beta1::Coin as TubeCoin,
+            gov::v1::MsgVote,
+            gov::v1beta1::MsgSubmitProposal,
+        },
+        cosmwasm::wasm::v1::{AcceptedMessageKeysFilter, ContractExecutionAuthorization, ContractGrant, MaxCallsLimit},
+        injective::exchange::v1beta1::{
+            MsgCreateSpotLimitOrder, MsgInstantSpotMarketLaunch, OrderInfo, OrderType, QuerySpotMarketsRequest, SpotMarketParamUpdateProposal,
+            SpotOrder,
+        },
+    },
+};
+use injective_test_tube::{Account, Authz, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm};
+use std::{collections::HashMap, str::FromStr};
 
 use crate::msg::{ExecuteMsg, FeeRecipient, InstantiateMsg};
 use crate::types::FPCoin;
@@ -269,18 +290,6 @@ fn create_mock_spot_market(base: &str, min_price_tick_size: FPDecimal, min_quant
         min_quantity_tick_size,
         min_notional: "0".to_string(),
     }
-}
-
-pub fn wasm_file(contract_name: String) -> String {
-    let arch = std::env::consts::ARCH;
-    let artifacts_dir = std::env::var("ARTIFACTS_DIR_PATH").unwrap_or_else(|_| "artifacts".to_string());
-    let snaked_name = contract_name.replace('-', "_");
-    format!("../../{artifacts_dir}/{snaked_name}-{arch}.wasm")
-}
-
-pub fn store_code(wasm: &Wasm<InjectiveTestApp>, owner: &SigningAccount, contract_name: String) -> u64 {
-    let wasm_byte_code = std::fs::read(wasm_file(contract_name)).unwrap();
-    wasm.store_code(&wasm_byte_code, None, owner).unwrap().data.code_id
 }
 
 pub fn launch_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount, base: &str, quote: &str) -> String {
@@ -792,6 +801,62 @@ pub fn pause_spot_market(app: &InjectiveTestApp, market_id: &str, proposer: &Sig
     app.increase_time(10u64)
 }
 
+pub fn create_contract_authorization(
+    app: &InjectiveTestApp,
+    contract: String,
+    granter: &SigningAccount,
+    grantee: String,
+    message: String,
+    limit: u64,
+    expiration: Option<Timestamp>,
+) {
+    let authz = Authz::new(app);
+
+    let mut filter_buf = vec![];
+    AcceptedMessageKeysFilter::encode(&AcceptedMessageKeysFilter { keys: vec![message] }, &mut filter_buf).unwrap();
+
+    let mut limit_buf = vec![];
+    MaxCallsLimit::encode(&MaxCallsLimit { remaining: limit }, &mut limit_buf).unwrap();
+
+    let contract_grant = ContractGrant {
+        contract,
+        limit: Some(Any {
+            type_url: MaxCallsLimit::TYPE_URL.to_string(),
+            value: limit_buf,
+        }),
+        filter: Some(Any {
+            type_url: AcceptedMessageKeysFilter::TYPE_URL.to_string(),
+            value: filter_buf,
+        }),
+    };
+
+    let mut buf = vec![];
+    ContractExecutionAuthorization::encode(
+        &ContractExecutionAuthorization {
+            grants: vec![contract_grant],
+        },
+        &mut buf,
+    )
+    .unwrap();
+
+    authz
+        .grant(
+            MsgGrant {
+                granter: granter.address(),
+                grantee,
+                grant: Some(Grant {
+                    authorization: Some(Any {
+                        type_url: ContractExecutionAuthorization::TYPE_URL.to_string(),
+                        value: buf.clone(),
+                    }),
+                    expiration,
+                }),
+            },
+            granter,
+        )
+        .unwrap();
+}
+
 pub fn pass_spot_market_params_update_proposal(
     gov: &Gov<InjectiveTestApp>,
     proposal: &SpotMarketParamUpdateProposal,
@@ -799,7 +864,7 @@ pub fn pass_spot_market_params_update_proposal(
     validator: &SigningAccount,
 ) {
     let mut buf = vec![];
-    exchange::v1beta1::SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
+    SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
 
     println!("submitting proposal: {proposal:?}");
     let submit_response = gov.submit_proposal_v1beta1(
