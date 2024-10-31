@@ -158,7 +158,7 @@ pub fn execute_swap_step(
 pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env, msg: Reply) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     let dec_scale_factor = dec_scale_factor(); // protobuf serializes Dec values with extra 10^18 factor
 
-    let order_response = MsgCreateSpotMarketOrderResponse::decode(msg.payload.as_slice()).unwrap();
+    let order_response = parse_market_order_response(msg)?;
 
     let trade_data = match order_response.results {
         Some(trade_data) => Ok(trade_data),
@@ -255,4 +255,19 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
     }
 
     Ok(response)
+}
+
+pub fn parse_market_order_response(msg: Reply) -> StdResult<MsgCreateSpotMarketOrderResponse> {
+    let binding = msg.result.into_result().map_err(ContractError::SubMsgFailure).unwrap();
+
+    let first_messsage = binding.msg_responses.first();
+
+    let order_response = MsgCreateSpotMarketOrderResponse::decode(first_messsage.unwrap().value.as_slice())
+        .map_err(|err| ContractError::ReplyParseFailure {
+            id: msg.id,
+            err: err.to_string(),
+        })
+        .unwrap();
+
+    Ok(order_response)
 }

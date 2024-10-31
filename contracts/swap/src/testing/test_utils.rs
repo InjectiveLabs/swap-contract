@@ -13,18 +13,17 @@ use injective_std::{
     types::{
         cosmos::{
             authz::v1beta1::{Grant, MsgGrant},
-            bank::v1beta1::{MsgSend, QueryAllBalancesRequest, QueryBalanceRequest},
-            base::v1beta1::Coin as TubeCoin,
-            gov::{v1::MsgVote, v1beta1::MsgSubmitProposal},
+            bank::v1beta1::{QueryAllBalancesRequest, QueryBalanceRequest},
         },
         cosmwasm::wasm::v1::{AcceptedMessageKeysFilter, ContractExecutionAuthorization, ContractGrant, MaxCallsLimit},
-        injective::exchange::v1beta1::{
-            MsgCreateSpotLimitOrder, OrderInfo, OrderType, QuerySpotMarketsRequest, SpotMarketParamUpdateProposal, SpotOrder,
-        },
+        injective::exchange::v1beta1::{MsgCreateSpotLimitOrder, OrderInfo, OrderType, SpotOrder},
     },
 };
-use injective_test_tube::{Account, Authz, Bank, Exchange, Gov, InjectiveTestApp, Module, SigningAccount, Wasm};
-use injective_testing::test_tube::{exchange::launch_spot_market_custom, utils::store_code};
+use injective_test_tube::{Account, Authz, Bank, Exchange, InjectiveTestApp, Module, SigningAccount, Wasm};
+use injective_testing::{
+    test_tube::{exchange::launch_spot_market_custom, utils::store_code},
+    utils::scale_price_quantity_spot_market,
+};
 use prost::Message;
 use std::{collections::HashMap, str::FromStr};
 
@@ -47,7 +46,6 @@ pub const NINJA: &str = "ninja";
 pub const DEFAULT_TAKER_FEE: f64 = 0.001;
 pub const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
 pub const DEFAULT_SELF_RELAYING_FEE_PART: f64 = 0.6;
-pub const DEFAULT_RELAYER_SHARE: f64 = 1.0 - DEFAULT_SELF_RELAYING_FEE_PART;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 #[repr(i32)]
@@ -276,29 +274,16 @@ fn create_mock_spot_market(base: &str, min_price_tick_size: FPDecimal, min_quant
         min_quantity_tick_size,
     }
 }
-pub fn get_spot_market_id(exchange: &Exchange<InjectiveTestApp>, ticker: String) -> String {
-    let spot_markets = exchange
-        .query_spot_markets(&QuerySpotMarketsRequest {
-            status: "Active".to_string(),
-            market_ids: vec![],
-        })
-        .unwrap()
-        .markets;
-
-    let market = spot_markets.iter().find(|m| m.ticker == ticker).unwrap();
-
-    market.market_id.to_string()
-}
 
 pub fn launch_realistic_inj_usdt_spot_market(exchange: &Exchange<InjectiveTestApp>, signer: &SigningAccount) -> String {
     launch_spot_market_custom(
         exchange,
         signer,
-        "TICKER".to_string(),
+        "INJ2/USDT".to_string(),
         INJ_2.to_string(),
         USDT.to_string(),
-        dec_to_proto(FPDecimal::must_from_str("0.000000000000001")),
-        dec_to_proto(FPDecimal::must_from_str("0.0001")),
+        "0.000000000000001".to_string(),
+        "1000000000000000".to_string(),
     )
 }
 
@@ -309,8 +294,8 @@ pub fn launch_realistic_weth_usdt_spot_market(exchange: &Exchange<InjectiveTestA
         "ETH/USDT".to_string(),
         ETH.to_string(),
         USDT.to_string(),
-        "0.00000000000001".to_string(),
-        "0.001".to_string(),
+        "0.0000000000001".to_string(),
+        "1000000000000000".to_string(),
     )
 }
 
@@ -321,8 +306,8 @@ pub fn launch_realistic_atom_usdt_spot_market(exchange: &Exchange<InjectiveTestA
         "ATOM/USDT".to_string(),
         ATOM.to_string(),
         USDT.to_string(),
-        "0.000000000001".to_string(),
-        "0.000000001".to_string(),
+        "0.001".to_string(),
+        "10000".to_string(),
     )
 }
 
@@ -330,11 +315,11 @@ pub fn launch_realistic_usdt_usdc_spot_market(exchange: &Exchange<InjectiveTestA
     launch_spot_market_custom(
         exchange,
         signer,
-        "TICKER".to_string(),
+        "USDT/USDC".to_string(),
         USDT.to_string(),
         USDC.to_string(),
-        dec_to_proto(FPDecimal::must_from_str("0.0001")),
-        dec_to_proto(FPDecimal::must_from_str("100")),
+        "0.0001".to_string(),
+        "100".to_string(),
     )
 }
 
@@ -342,11 +327,11 @@ pub fn launch_realistic_ninja_inj_spot_market(exchange: &Exchange<InjectiveTestA
     launch_spot_market_custom(
         exchange,
         signer,
-        "TICKER".to_string(),
+        "NINJA/INJ2".to_string(),
         NINJA.to_string(),
         INJ_2.to_string(),
-        dec_to_proto(FPDecimal::must_from_str("1000000")),
-        dec_to_proto(FPDecimal::must_from_str("10000000")),
+        "1000000".to_string(),
+        "10000000".to_string(),
     )
 }
 
@@ -546,47 +531,6 @@ pub enum OrderSide {
     Sell,
 }
 
-pub fn create_limit_order(app: &InjectiveTestApp, trader: &SigningAccount, market_id: &str, order_side: OrderSide, price: u128, quantity: u32) {
-    let exchange = Exchange::new(app);
-    exchange
-        .create_spot_limit_order(
-            MsgCreateSpotLimitOrder {
-                sender: trader.address(),
-                order: Some(SpotOrder {
-                    market_id: market_id.to_string(),
-                    order_info: Some(OrderInfo {
-                        subaccount_id: get_default_subaccount_id_for_checked_address(&Addr::unchecked(trader.address())).to_string(),
-                        fee_recipient: trader.address(),
-                        price: format!("{price}000000000000000000"),
-                        quantity: format!("{quantity}000000000000000000"),
-                        cid: "".to_string(),
-                    }),
-                    order_type: if order_side == OrderSide::Buy {
-                        OrderType::BuyAtomic.into()
-                    } else {
-                        OrderType::SellAtomic.into()
-                    },
-                    trigger_price: "".to_string(),
-                }),
-            },
-            trader,
-        )
-        .unwrap();
-}
-
-pub fn scale_price_quantity_for_market(price: &str, quantity: &str, base_decimals: &Decimals, quote_decimals: &Decimals) -> (String, String) {
-    let price_dec = FPDecimal::must_from_str(price.replace('_', "").as_str());
-    let quantity_dec = FPDecimal::must_from_str(quantity.replace('_', "").as_str());
-
-    let scaled_price = price_dec.scaled(quote_decimals.get_decimals() - base_decimals.get_decimals());
-    let scaled_quantity = quantity_dec.scaled(base_decimals.get_decimals());
-    (dec_to_proto(scaled_price), dec_to_proto(scaled_quantity))
-}
-
-pub fn dec_to_proto(val: FPDecimal) -> String {
-    val.scaled(18).to_string()
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn create_realistic_limit_order(
     app: &InjectiveTestApp,
@@ -598,7 +542,7 @@ pub fn create_realistic_limit_order(
     base_decimals: Decimals,
     quote_decimals: Decimals,
 ) {
-    let (price_to_send, quantity_to_send) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+    let (price_to_send, quantity_to_send) = scale_price_quantity_spot_market(price, quantity, &(base_decimals as i32), &(quote_decimals as i32));
 
     let exchange = Exchange::new(app);
     exchange
@@ -633,29 +577,6 @@ pub fn init_self_relaying_contract_and_get_address(wasm: &Wasm<InjectiveTestApp>
         code_id,
         &InstantiateMsg {
             fee_recipient: FeeRecipient::SwapContract,
-            admin: Addr::unchecked(owner.address()),
-        },
-        Some(&owner.address()),
-        Some("Swap"),
-        initial_balance,
-        owner,
-    )
-    .unwrap()
-    .data
-    .address
-}
-
-pub fn init_contract_with_fee_recipient_and_get_address(
-    wasm: &Wasm<InjectiveTestApp>,
-    owner: &SigningAccount,
-    initial_balance: &[Coin],
-    fee_recipient: &SigningAccount,
-) -> String {
-    let code_id = store_code(wasm, owner, "swap_contract".to_string());
-    wasm.instantiate(
-        code_id,
-        &InstantiateMsg {
-            fee_recipient: FeeRecipient::Address(Addr::unchecked(fee_recipient.address())),
             admin: Addr::unchecked(owner.address()),
         },
         Some(&owner.address()),
@@ -718,31 +639,6 @@ pub fn query_bank_balance(bank: &Bank<InjectiveTestApp>, denom: &str, address: &
     .unwrap()
 }
 
-pub fn pause_spot_market(app: &InjectiveTestApp, market_id: &str, proposer: &SigningAccount, validator: &SigningAccount) {
-    let gov = Gov::new(app);
-    pass_spot_market_params_update_proposal(
-        &gov,
-        &SpotMarketParamUpdateProposal {
-            title: format!("Set market {market_id} status to paused"),
-            description: format!("Set market {market_id} status to paused"),
-            market_id: market_id.to_string(),
-            maker_fee_rate: "".to_string(),
-            taker_fee_rate: "".to_string(),
-            relayer_fee_share_rate: "".to_string(),
-            min_price_tick_size: "".to_string(),
-            min_quantity_tick_size: "".to_string(),
-            status: 2,
-            min_notional: "0".to_string(),
-            ticker: "0".to_string(),
-            admin_info: None,
-        },
-        proposer,
-        validator,
-    );
-
-    app.increase_time(10u64)
-}
-
 pub fn create_contract_authorization(
     app: &InjectiveTestApp,
     contract: String,
@@ -799,56 +695,6 @@ pub fn create_contract_authorization(
         .unwrap();
 }
 
-pub fn pass_spot_market_params_update_proposal(
-    gov: &Gov<InjectiveTestApp>,
-    proposal: &SpotMarketParamUpdateProposal,
-    proposer: &SigningAccount,
-    validator: &SigningAccount,
-) {
-    let mut buf = vec![];
-    SpotMarketParamUpdateProposal::encode(proposal, &mut buf).unwrap();
-
-    println!("submitting proposal: {proposal:?}");
-    let submit_response = gov.submit_proposal_v1beta1(
-        MsgSubmitProposal {
-            content: Some(Any {
-                type_url: "/injective.exchange.v1beta1.SpotMarketParamUpdateProposal".to_string(),
-                value: buf,
-            }),
-            initial_deposit: vec![TubeCoin {
-                amount: "100000000000000000000".to_string(),
-                denom: "inj".to_string(),
-            }],
-            proposer: proposer.address(),
-        },
-        proposer,
-    );
-
-    assert!(submit_response.is_ok(), "failed to submit proposal");
-
-    let proposal_id = submit_response.unwrap().data.proposal_id;
-    println!("voting on proposal: {proposal_id:?}");
-    let vote_response = gov.vote(
-        MsgVote {
-            proposal_id,
-            voter: validator.address(),
-            option: 1,
-            metadata: "".to_string(),
-        },
-        validator,
-    );
-
-    assert!(vote_response.is_ok(), "failed to vote on proposal");
-}
-
-pub fn init_default_validator_account(app: &InjectiveTestApp) -> SigningAccount {
-    app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap()
-}
-
-pub fn init_default_signer_account(app: &InjectiveTestApp) -> SigningAccount {
-    must_init_account_with_funds(app, &[str_coin("100_000", INJ, Decimals::Eighteen)])
-}
-
 pub fn init_rich_account(app: &InjectiveTestApp) -> SigningAccount {
     must_init_account_with_funds(
         app,
@@ -862,21 +708,6 @@ pub fn init_rich_account(app: &InjectiveTestApp) -> SigningAccount {
             str_coin("100_000_000_000_000_000", NINJA, Decimals::Six),
         ],
     )
-}
-
-pub fn fund_account_with_some_inj(bank: &Bank<InjectiveTestApp>, from: &SigningAccount, to: &SigningAccount) {
-    bank.send(
-        MsgSend {
-            from_address: from.address(),
-            to_address: to.address(),
-            amount: vec![TubeCoin {
-                amount: "1000000000000000000000".to_string(),
-                denom: "inj".to_string(),
-            }],
-        },
-        from,
-    )
-    .unwrap();
 }
 
 pub fn human_to_dec(raw_number: &str, decimals: Decimals) -> FPDecimal {
@@ -894,7 +725,7 @@ pub fn str_coin(human_amount: &str, denom: &str, decimals: Decimals) -> Coin {
 }
 
 mod tests {
-    use crate::testing::test_utils::{human_to_dec, human_to_proto, scale_price_quantity_for_market, Decimals};
+    use crate::testing::test_utils::{human_to_dec, human_to_proto, scale_price_quantity_spot_market, Decimals};
     use injective_math::FPDecimal;
 
     #[test]
@@ -1088,7 +919,7 @@ mod tests {
         let base_decimals = Decimals::Eighteen;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) = scale_price_quantity_spot_market(price, quantity, &(base_decimals as i32), &(quote_decimals as i32));
 
         // 1 => 1 * 10^6 - 10^18 => 0.000000000001000000 * 10^18 => 1000000
         assert_eq!(scaled_price, "1000000", "price was scaled incorrectly");
@@ -1107,7 +938,7 @@ mod tests {
         let base_decimals = Decimals::Eighteen;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) = scale_price_quantity_spot_market(price, quantity, &(base_decimals as i32), &(quote_decimals as i32));
 
         // 0.000000000008782000 * 10^18 = 8782000
         assert_eq!(scaled_price, "8782000", "price was scaled incorrectly");
@@ -1125,7 +956,7 @@ mod tests {
         let base_decimals = Decimals::Six;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) = scale_price_quantity_spot_market(price, quantity, &(base_decimals as i32), &(quote_decimals as i32));
 
         // 1 => 1.(10^18) => 1000000000000000000
         assert_eq!(scaled_price, "1000000000000000000", "price was scaled incorrectly");
@@ -1141,7 +972,7 @@ mod tests {
         let base_decimals = Decimals::Six;
         let quote_decimals = Decimals::Six;
 
-        let (scaled_price, scaled_quantity) = scale_price_quantity_for_market(price, quantity, &base_decimals, &quote_decimals);
+        let (scaled_price, scaled_quantity) = scale_price_quantity_spot_market(price, quantity, &(base_decimals as i32), &(quote_decimals as i32));
 
         // 1.129 => 1.129(10^15) => 1129000000000000000
         assert_eq!(scaled_price, "1129000000000000000", "price was scaled incorrectly");
@@ -1154,7 +985,7 @@ pub fn are_fpdecimals_approximately_equal(first: FPDecimal, second: FPDecimal, m
     (first - second).abs() <= max_diff
 }
 
-pub fn assert_fee_is_as_expected(raw_fees: &mut Vec<FPCoin>, expected_fees: &mut Vec<FPCoin>, max_diff: FPDecimal) {
+pub fn assert_fee_is_as_expected(raw_fees: &mut [FPCoin], expected_fees: &mut [FPCoin], max_diff: FPDecimal) {
     assert_eq!(raw_fees.len(), expected_fees.len(), "Wrong number of fee denoms received");
 
     raw_fees.sort_by_key(|f| f.denom.clone());

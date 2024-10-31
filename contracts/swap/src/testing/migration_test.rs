@@ -2,30 +2,24 @@ use crate::{
     msg::{FeeRecipient, InstantiateMsg, MigrateMsg},
     testing::{
         integration_realistic_tests_min_quantity::happy_path_two_hops_test,
-        test_utils::{
-            must_init_account_with_funds, store_code, str_coin, Decimals, ATOM, ETH, INJ, USDT,
-        },
+        test_utils::{must_init_account_with_funds, str_coin, Decimals, ATOM, ETH, INJ, USDT},
     },
 };
 
-use cosmos_sdk_proto::cosmwasm::wasm::v1::{
-    MsgMigrateContract, MsgMigrateContractResponse, QueryContractInfoRequest,
-    QueryContractInfoResponse,
-};
 use cosmwasm_std::Addr;
+use injective_std::types::cosmwasm::wasm::v1::{MsgMigrateContract, MsgMigrateContractResponse, QueryContractInfoRequest, QueryContractInfoResponse};
 use injective_test_tube::{Account, ExecuteResponse, InjectiveTestApp, Module, Runner, Wasm};
+use injective_testing::test_tube::utils::store_code;
 
 type V100InstantiateMsg = InstantiateMsg;
 
 #[test]
 #[cfg_attr(not(feature = "integration"), ignore)]
-fn test_migration_v100_to_v101() {
+fn test_migration() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
 
-    let wasm_byte_code =
-        std::fs::read("../../contracts/swap/src/testing/test_artifacts/swap-contract-v100.wasm")
-            .unwrap();
+    let wasm_byte_code = std::fs::read("../../contracts/swap/src/testing/test_artifacts/swap-contract-v101.wasm").unwrap();
 
     let owner = must_init_account_with_funds(
         &app,
@@ -37,11 +31,7 @@ fn test_migration_v100_to_v101() {
         ],
     );
 
-    let swap_v100_code_id = wasm
-        .store_code(&wasm_byte_code, None, &owner)
-        .unwrap()
-        .data
-        .code_id;
+    let swap_v100_code_id = wasm.store_code(&wasm_byte_code, None, &owner).unwrap().data.code_id;
 
     let swap_v100_address: String = wasm
         .instantiate(

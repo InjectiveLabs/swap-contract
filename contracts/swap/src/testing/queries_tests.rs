@@ -1,7 +1,7 @@
 use std::ops::Neg;
 use std::str::FromStr;
 
-use cosmwasm_std::testing::{mock_env, mock_info};
+use cosmwasm_std::testing::{message_info, mock_env};
 use cosmwasm_std::{coin, Addr};
 
 use crate::admin::set_route;
@@ -32,7 +32,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_source_quantity() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::Address(admin.to_owned()),
             admin: admin.to_owned(),
@@ -107,7 +107,7 @@ fn test_calculate_swap_price_external_fee_recipient_from_target_quantity() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::Address(admin.to_owned()),
             admin: admin.to_owned(),
@@ -181,7 +181,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_source_quantity() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::SwapContract,
             admin: admin.to_owned(),
@@ -252,7 +252,7 @@ fn test_calculate_swap_price_self_fee_recipient_from_target_quantity() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::SwapContract,
             admin: admin.to_owned(),
@@ -329,7 +329,7 @@ fn test_calculate_estimate_when_selling_both_quantity_directions_simple() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::Address(admin.to_owned()),
             admin: admin.to_owned(),
@@ -433,7 +433,7 @@ fn test_calculate_estimate_when_buying_both_quantity_directions_simple() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::Address(admin.to_owned()),
             admin: admin.to_owned(),
@@ -522,7 +522,7 @@ fn get_all_queries_returns_empty_array_if_no_routes_are_set() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::SwapContract,
             admin: admin.to_owned(),
@@ -544,7 +544,7 @@ fn get_all_queries_returns_expected_array_if_routes_are_set() {
     instantiate(
         deps.as_mut_deps(),
         mock_env(),
-        mock_info(admin.as_ref(), &[coin(1_000u128, "usdt")]),
+        message_info(&Addr::unchecked(admin), &[coin(1_000u128, "usdt")]),
         InstantiateMsg {
             fee_recipient: FeeRecipient::SwapContract,
             admin: admin.to_owned(),
@@ -607,6 +607,6 @@ fn get_all_queries_returns_expected_array_if_routes_are_set() {
         "Incorrect routes returned"
     );
 
-    let all_routes_result_paginated = get_all_swap_routes(deps.as_ref().storage, None, Some(1u32)).unwrap();
-    assert_eq!(all_routes_result_paginated.len(), 1);
+    let all_routes_result_paginated = get_all_swap_routes(deps.as_ref().storage, None, Some(1u32));
+    assert_eq!(all_routes_result_paginated.unwrap().len(), 1);
 }
