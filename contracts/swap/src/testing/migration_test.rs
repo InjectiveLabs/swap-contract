@@ -11,7 +11,7 @@ use injective_std::types::cosmwasm::wasm::v1::{MsgMigrateContract, MsgMigrateCon
 use injective_test_tube::{Account, ExecuteResponse, InjectiveTestApp, Module, Runner, Wasm};
 use injective_testing::test_tube::utils::store_code;
 
-type V100InstantiateMsg = InstantiateMsg;
+type V101InstantiateMsg = InstantiateMsg;
 
 #[test]
 #[cfg_attr(not(feature = "integration"), ignore)]
@@ -31,12 +31,12 @@ fn test_migration() {
         ],
     );
 
-    let swap_v100_code_id = wasm.store_code(&wasm_byte_code, None, &owner).unwrap().data.code_id;
+    let swap_v101_code_id = wasm.store_code(&wasm_byte_code, None, &owner).unwrap().data.code_id;
 
-    let swap_v100_address: String = wasm
+    let swap_v101_address: String = wasm
         .instantiate(
-            swap_v100_code_id,
-            &V100InstantiateMsg {
+            swap_v101_code_id,
+            &V101InstantiateMsg {
                 admin: Addr::unchecked(owner.address()),
                 fee_recipient: FeeRecipient::SwapContract,
             },
@@ -53,14 +53,14 @@ fn test_migration() {
         .query(
             "/cosmwasm.wasm.v1.Query/ContractInfo",
             &QueryContractInfoRequest {
-                address: swap_v100_address.clone(),
+                address: swap_v101_address.clone(),
             },
         )
         .unwrap();
     let contract_info = res.contract_info.unwrap();
 
-    assert_eq!(res.address, swap_v100_address);
-    assert_eq!(contract_info.code_id, swap_v100_code_id);
+    assert_eq!(res.address, swap_v101_address);
+    assert_eq!(contract_info.code_id, swap_v101_code_id);
     assert_eq!(contract_info.creator, owner.address());
     assert_eq!(contract_info.label, "swap-contract");
 
@@ -70,7 +70,7 @@ fn test_migration() {
         .execute(
             MsgMigrateContract {
                 sender: owner.address(),
-                contract: swap_v100_address.clone(),
+                contract: swap_v101_address.clone(),
                 code_id: swap_v110_code_id,
                 msg: serde_json_wasm::to_vec(&MigrateMsg {}).unwrap(),
             },
@@ -83,17 +83,17 @@ fn test_migration() {
         .query(
             "/cosmwasm.wasm.v1.Query/ContractInfo",
             &QueryContractInfoRequest {
-                address: swap_v100_address.clone(),
+                address: swap_v101_address.clone(),
             },
         )
         .unwrap();
 
     let contract_info = res.contract_info.unwrap();
 
-    assert_eq!(res.address, swap_v100_address);
+    assert_eq!(res.address, swap_v101_address);
     assert_eq!(contract_info.code_id, swap_v110_code_id);
     assert_eq!(contract_info.creator, owner.address());
     assert_eq!(contract_info.label, "swap-contract");
 
-    happy_path_two_hops_test(app, owner, swap_v100_address);
+    happy_path_two_hops_test(app, owner, swap_v101_address);
 }

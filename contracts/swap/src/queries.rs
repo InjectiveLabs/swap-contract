@@ -72,9 +72,6 @@ pub fn estimate_swap_result(
         current_swap.amount = swap_estimate.result_quantity;
         current_swap.denom = swap_estimate.result_denom;
 
-        deps.api.debug(&format!("step: {:?}", step));
-        deps.api.debug(&format!("current_swap: {:?}", current_swap));
-
         let step_fee = swap_estimate.fee_estimate.expect("fee estimate should be available");
 
         fees.push(step_fee);
@@ -184,9 +181,6 @@ fn estimate_execution_buy_from_source(
             "Swap amount too high, required funds: {required_funds}, available funds: {funds_for_margin}",
         )));
     }
-
-    deps.api.debug(&format!("average_price: {average_price}"));
-    deps.api.debug(&format!("result_quantity: {result_quantity}"));
 
     Ok(StepExecutionEstimate {
         worst_price,
@@ -305,14 +299,9 @@ fn estimate_execution_sell_from_source(
     let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
     let worst_price = get_worst_price_from_orders(&top_orders);
 
-    deps.api.debug(&format!("average_price: {average_price}"));
-    deps.api.debug(&format!("input_base_quantity: {input_base_quantity}"));
-
     let expected_exchange_quantity = input_base_quantity * average_price;
     let fee_estimate = expected_exchange_quantity * fee_percent;
     let expected_quantity = expected_exchange_quantity - fee_estimate;
-
-    deps.api.debug(&format!("input_base_quantity: {expected_exchange_quantity}"));
 
     Ok(StepExecutionEstimate {
         worst_price,
