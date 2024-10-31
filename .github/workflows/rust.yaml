@@ -33,7 +33,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.74.0
+          toolchain: 1.78.0
           target: wasm32-unknown-unknown
           override: true
           components: llvm-tools-preview
@@ -98,7 +98,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.74.0
+          toolchain: 1.78.0
           override: true
           components: rustfmt, clippy
 
