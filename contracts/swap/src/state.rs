@@ -22,17 +22,11 @@ pub fn store_swap_route(storage: &mut dyn Storage, route: &SwapRoute) -> StdResu
     SWAP_ROUTES.save(storage, key, route)
 }
 
-pub fn read_swap_route(
-    storage: &dyn Storage,
-    source_denom: &str,
-    target_denom: &str,
-) -> StdResult<SwapRoute> {
+pub fn read_swap_route(storage: &dyn Storage, source_denom: &str, target_denom: &str) -> StdResult<SwapRoute> {
     let key = route_key(source_denom, target_denom);
-    SWAP_ROUTES.load(storage, key).map_err(|_| {
-        StdError::generic_err(format!(
-            "No swap route not found from {source_denom} to {target_denom}",
-        ))
-    })
+    SWAP_ROUTES
+        .load(storage, key)
+        .map_err(|_| StdError::generic_err(format!("No swap route not found from {source_denom} to {target_denom}",)))
 }
 
 pub fn get_config(storage: &dyn Storage) -> StdResult<Config> {
@@ -40,16 +34,10 @@ pub fn get_config(storage: &dyn Storage) -> StdResult<Config> {
     Ok(config)
 }
 
-pub fn get_all_swap_routes(
-    storage: &dyn Storage,
-    start_after: Option<(String, String)>,
-    limit: Option<u32>,
-) -> StdResult<Vec<SwapRoute>> {
+pub fn get_all_swap_routes(storage: &dyn Storage, start_after: Option<(String, String)>, limit: Option<u32>) -> StdResult<Vec<SwapRoute>> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT) as usize;
 
-    let start_bound = start_after
-        .as_ref()
-        .map(|(s, t)| Bound::inclusive((s.clone(), t.clone())));
+    let start_bound = start_after.as_ref().map(|(s, t)| Bound::inclusive((s.clone(), t.clone())));
 
     let routes = SWAP_ROUTES
         .range(storage, start_bound, None, Order::Ascending)

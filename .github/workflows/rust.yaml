@@ -62,7 +62,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          toolchain: 1.74.0
+          toolchain: 1.78.0
           args: --locked --tests
         env:
           LLVM_PROFILE_FILE: "swap-contract-%p-%m.profraw"

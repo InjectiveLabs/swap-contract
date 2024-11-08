@@ -10,10 +10,7 @@ pub fn i32_to_dec(source: i32) -> FPDecimal {
     FPDecimal::from(i128::from(source))
 }
 
-pub fn get_message_data(
-    response: &[SubMsg<InjectiveMsgWrapper>],
-    position: usize,
-) -> &InjectiveMsgWrapper {
+pub fn get_message_data(response: &[SubMsg<InjectiveMsgWrapper>], position: usize) -> &InjectiveMsgWrapper {
     let sth = match &response.get(position).unwrap().msg {
         CosmosMsg::Custom(msg) => msg,
         _ => panic!("No wrapped message found"),
@@ -41,10 +38,7 @@ pub trait Scaled {
 
 impl Scaled for FPDecimal {
     fn scaled(self, digits: i32) -> Self {
-        self.to_owned()
-            * FPDecimal::from(10i128)
-                .pow(FPDecimal::from(digits as i128))
-                .unwrap()
+        self.to_owned() * FPDecimal::from(10i128).pow(FPDecimal::from(digits as i128)).unwrap()
     }
 }
 
@@ -55,9 +49,7 @@ pub fn dec_scale_factor() -> FPDecimal {
 type V100Config = Config;
 const V100CONFIG: Item<V100Config> = Item::new("config");
 
-pub fn handle_config_migration(
-    deps: DepsMut<InjectiveQueryWrapper>,
-) -> Result<Response, ContractError> {
+pub fn handle_config_migration(deps: DepsMut<InjectiveQueryWrapper>) -> Result<Response, ContractError> {
     let v100_config = V100CONFIG.load(deps.storage)?;
 
     let config = Config {

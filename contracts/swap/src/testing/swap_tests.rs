@@ -6,9 +6,7 @@ use injective_cosmwasm::{MarketId, OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_I
 use crate::admin::set_route;
 use crate::queries::estimate_single_swap_execution;
 use crate::state::CONFIG;
-use crate::testing::test_utils::{
-    mock_deps_eth_inj, str_coin, Decimals, MultiplierQueryBehavior, TEST_USER_ADDR,
-};
+use crate::testing::test_utils::{mock_deps_eth_inj, str_coin, Decimals, MultiplierQueryBehavior, TEST_USER_ADDR};
 use crate::types::{Config, FPCoin, SwapEstimationAmount};
 
 #[test]
@@ -21,9 +19,7 @@ fn it_reverts_if_atomic_fee_multiplier_query_fails() {
         fee_recipient: Addr::unchecked(TEST_USER_ADDR),
         admin: Addr::unchecked(TEST_USER_ADDR),
     };
-    CONFIG
-        .save(deps.as_mut_deps().storage, &config)
-        .expect("could not save config");
+    CONFIG.save(deps.as_mut_deps().storage, &config).expect("could not save config");
 
     set_route(
         deps.as_mut_deps(),
@@ -44,10 +40,7 @@ fn it_reverts_if_atomic_fee_multiplier_query_fails() {
 
     assert!(response_1.is_err(), "should have failed");
     assert!(
-        response_1
-            .unwrap_err()
-            .to_string()
-            .contains("Querier system error: Unknown system error"),
+        response_1.unwrap_err().to_string().contains("Querier system error: Unknown system error"),
         "wrong error message"
     );
 }
