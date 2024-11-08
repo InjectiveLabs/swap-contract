@@ -1,28 +1,21 @@
-use std::str::FromStr;
-
-use cosmwasm_std::{
-    BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg, Uint128,
+use crate::{
+    contract::ATOMIC_ORDER_REPLY_ID,
+    error::ContractError,
+    helpers::{dec_scale_factor, round_up_to_min_tick},
+    queries::{estimate_single_swap_execution, estimate_swap_result, SwapQuantity},
+    state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS},
+    types::{CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapQuantityMode, SwapResults},
 };
 
-use protobuf::Message;
-
-use crate::contract::ATOMIC_ORDER_REPLY_ID;
+use cosmwasm_std::{BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg};
 use injective_cosmwasm::{
-    create_spot_market_order_msg, get_default_subaccount_id_for_checked_address,
-    InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper, OrderType, SpotOrder,
+    create_spot_market_order_msg, get_default_subaccount_id_for_checked_address, InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper,
+    OrderType, SpotOrder,
 };
 use injective_math::{round_to_min_tick, FPDecimal};
-use injective_protobuf::proto::tx;
-
-use crate::error::ContractError;
-use crate::helpers::{dec_scale_factor, round_up_to_min_tick};
-
-use crate::queries::{estimate_single_swap_execution, estimate_swap_result, SwapQuantity};
-use crate::state::{read_swap_route, CONFIG, STEP_STATE, SWAP_OPERATION_STATE, SWAP_RESULTS};
-use crate::types::{
-    CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapQuantityMode,
-    SwapResults,
-};
+use injective_std::types::injective::exchange::v1beta1::MsgCreateSpotMarketOrderResponse;
+use prost::Message;
+use std::str::FromStr;
 
 pub fn start_swap_flow(
     deps: DepsMut<InjectiveQueryWrapper>,
@@ -56,10 +49,7 @@ pub fn start_swap_flow(
 
     let mut current_balance = coin_provided.to_owned().into();
 
-    let refund_amount = if matches!(
-        swap_quantity_mode,
-        SwapQuantityMode::ExactOutputQuantity(..)
-    ) {
+    let refund_amount = if matches!(swap_quantity_mode, SwapQuantityMode::ExactOutputQuantity(..)) {
         let target_output_quantity = quantity;
 
         let estimation = estimate_swap_result(
@@ -72,29 +62,20 @@ pub fn start_swap_flow(
 
         let querier = InjectiveQuerier::new(&deps.querier);
         let first_market_id = steps[0].to_owned();
-        let first_market = querier
-            .query_spot_market(&first_market_id)?
-            .market
-            .expect("market should be available");
+        let first_market = querier.query_spot_market(&first_market_id)?.market.expect("market should be available");
 
         let is_input_quote = first_market.quote_denom == *source_denom;
 
         let required_input = if is_input_quote {
             estimation.result_quantity.int() + FPDecimal::ONE
         } else {
-            round_up_to_min_tick(
-                estimation.result_quantity,
-                first_market.min_quantity_tick_size,
-            )
+            round_up_to_min_tick(estimation.result_quantity, first_market.min_quantity_tick_size)
         };
 
         let fp_coins: FPDecimal = coin_provided.amount.into();
 
         if required_input > fp_coins {
-            return Err(ContractError::InsufficientFundsProvided(
-                fp_coins,
-                required_input,
-            ));
+            return Err(ContractError::InsufficientFundsProvided(fp_coins, required_input));
         }
 
         current_balance = FPCoin {
@@ -111,7 +92,7 @@ pub fn start_swap_flow(
         sender_address,
         swap_steps: steps,
         swap_quantity_mode,
-        refund: Coin::new(refund_amount.into(), source_denom.to_owned()),
+        refund: Coin::new(refund_amount, source_denom.to_owned()),
         input_funds: coin_provided.to_owned(),
     };
 
@@ -160,10 +141,7 @@ pub fn execute_swap_step(
         None,
     );
 
-    let order_message = SubMsg::reply_on_success(
-        create_spot_market_order_msg(contract.to_owned(), order),
-        ATOMIC_ORDER_REPLY_ID,
-    );
+    let order_message = SubMsg::reply_on_success(create_spot_market_order_msg(contract.to_owned(), order), ATOMIC_ORDER_REPLY_ID);
 
     let current_step = CurrentSwapStep {
         step_idx,
@@ -177,30 +155,12 @@ pub fn execute_swap_step(
     Ok(response)
 }
 
-pub fn handle_atomic_order_reply(
-    deps: DepsMut<InjectiveQueryWrapper>,
-    env: Env,
-    msg: Reply,
-) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
+pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env, msg: Reply) -> Result<Response<InjectiveMsgWrapper>, ContractError> {
     let dec_scale_factor = dec_scale_factor(); // protobuf serializes Dec values with extra 10^18 factor
-    let id = msg.id;
-    let order_response: tx::MsgCreateSpotMarketOrderResponse = Message::parse_from_bytes(
-        msg.result
-            .into_result()
-            .map_err(ContractError::SubMsgFailure)?
-            .data
-            .ok_or_else(|| ContractError::ReplyParseFailure {
-                id,
-                err: "Missing reply data".to_owned(),
-            })?
-            .as_slice(),
-    )
-    .map_err(|err| ContractError::ReplyParseFailure {
-        id,
-        err: err.to_string(),
-    })?;
 
-    let trade_data = match order_response.results.into_option() {
+    let order_response = parse_market_order_response(msg)?;
+
+    let trade_data = match order_response.results {
         Some(trade_data) => Ok(trade_data),
         None => Err(ContractError::CustomError {
             val: "No trade data in order response".to_string(),
@@ -216,11 +176,7 @@ pub fn handle_atomic_order_reply(
 
     let current_step = STEP_STATE.load(deps.storage).map_err(ContractError::Std)?;
 
-    let new_quantity = if current_step.is_buy {
-        quantity
-    } else {
-        quantity * average_price - fee
-    };
+    let new_quantity = if current_step.is_buy { quantity } else { quantity * average_price - fee };
 
     let swap = SWAP_OPERATION_STATE.load(deps.storage)?;
 
@@ -229,10 +185,7 @@ pub fn handle_atomic_order_reply(
     let new_rounded_quantity = if has_next_market {
         let querier = InjectiveQuerier::new(&deps.querier);
         let next_market_id = swap.swap_steps[(current_step.step_idx + 1) as usize].to_owned();
-        let next_market = querier
-            .query_spot_market(&next_market_id)?
-            .market
-            .expect("market should be available");
+        let next_market = querier.query_spot_market(&next_market_id)?.market.expect("market should be available");
 
         let is_next_swap_sell = next_market.base_denom == current_step.step_target_denom;
 
@@ -259,8 +212,7 @@ pub fn handle_atomic_order_reply(
 
     if current_step.step_idx < (swap.swap_steps.len() - 1) as u16 {
         SWAP_RESULTS.save(deps.storage, &swap_results)?;
-        return execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance)
-            .map_err(ContractError::Std);
+        return execute_swap_step(deps, env, swap, current_step.step_idx + 1, new_balance).map_err(ContractError::Std);
     }
 
     let min_output_quantity = match swap.swap_quantity_mode {
@@ -269,9 +221,7 @@ pub fn handle_atomic_order_reply(
     };
 
     if new_balance.amount < min_output_quantity {
-        return Err(ContractError::MinOutputAmountNotReached(
-            min_output_quantity,
-        ));
+        return Err(ContractError::MinOutputAmountNotReached(min_output_quantity));
     }
 
     // last step, finalize and send back funds to a caller
@@ -294,11 +244,9 @@ pub fn handle_atomic_order_reply(
     STEP_STATE.remove(deps.storage);
     SWAP_RESULTS.remove(deps.storage);
 
-    let mut response = Response::new()
-        .add_message(send_message)
-        .add_event(swap_event);
+    let mut response = Response::new().add_message(send_message).add_event(swap_event);
 
-    if swap.refund.amount > Uint128::zero() {
+    if !swap.refund.amount.is_zero() {
         let refund_message = BankMsg::Send {
             to_address: swap.sender_address.to_string(),
             amount: vec![swap.refund],
@@ -307,4 +255,19 @@ pub fn handle_atomic_order_reply(
     }
 
     Ok(response)
+}
+
+pub fn parse_market_order_response(msg: Reply) -> StdResult<MsgCreateSpotMarketOrderResponse> {
+    let binding = msg.result.into_result().map_err(ContractError::SubMsgFailure).unwrap();
+
+    let first_messsage = binding.msg_responses.first();
+
+    let order_response = MsgCreateSpotMarketOrderResponse::decode(first_messsage.unwrap().value.as_slice())
+        .map_err(|err| ContractError::ReplyParseFailure {
+            id: msg.id,
+            err: err.to_string(),
+        })
+        .unwrap();
+
+    Ok(order_response)
 }

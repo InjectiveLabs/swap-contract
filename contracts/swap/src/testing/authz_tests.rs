@@ -2,16 +2,18 @@ use crate::{
     msg::ExecuteMsg,
     testing::test_utils::{
         create_contract_authorization, create_realistic_atom_usdt_sell_orders_from_spreadsheet,
-        create_realistic_eth_usdt_buy_orders_from_spreadsheet, init_rich_account,
-        init_self_relaying_contract_and_get_address, launch_realistic_atom_usdt_spot_market,
-        launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, str_coin, Decimals,
-        ATOM, ETH, INJ, USDT,
+        create_realistic_eth_usdt_buy_orders_from_spreadsheet, init_rich_account, init_self_relaying_contract_and_get_address,
+        launch_realistic_atom_usdt_spot_market, launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, str_coin, Decimals, ATOM, ETH,
+        INJ, USDT,
     },
 };
 
-use cosmos_sdk_proto::{cosmwasm::wasm::v1::MsgExecuteContract, traits::MessageExt};
-use injective_std::{shim::Any, types::cosmos::authz::v1beta1::MsgExec};
+use injective_std::{
+    shim::Any,
+    types::{cosmos::authz::v1beta1::MsgExec, cosmwasm::wasm::v1::MsgExecuteContract},
+};
 use injective_test_tube::{Account, Authz, Exchange, InjectiveTestApp, Module, Wasm};
+use prost::Message;
 
 #[test]
 pub fn set_route_for_third_party_test() {
@@ -33,11 +35,7 @@ pub fn set_route_for_third_party_test() {
     let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
     let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
-    let contr_addr = init_self_relaying_contract_and_get_address(
-        &wasm,
-        &owner,
-        &[str_coin("1_000", USDT, Decimals::Six)],
-    );
+    let contr_addr = init_self_relaying_contract_and_get_address(&wasm, &owner, &[str_coin("1_000", USDT, Decimals::Six)]);
 
     let trader1 = init_rich_account(&app);
     let trader2 = init_rich_account(&app);
@@ -53,29 +51,15 @@ pub fn set_route_for_third_party_test() {
         None,
     );
 
-    create_realistic_eth_usdt_buy_orders_from_spreadsheet(
-        &app,
-        &spot_market_1_id,
-        &trader1,
-        &trader2,
-    );
-    create_realistic_atom_usdt_sell_orders_from_spreadsheet(
-        &app,
-        &spot_market_2_id,
-        &trader1,
-        &trader2,
-        &trader3,
-    );
+    create_realistic_eth_usdt_buy_orders_from_spreadsheet(&app, &spot_market_1_id, &trader1, &trader2);
+    create_realistic_atom_usdt_sell_orders_from_spreadsheet(&app, &spot_market_2_id, &trader1, &trader2, &trader3);
 
     app.increase_time(1);
 
     let set_route_msg = ExecuteMsg::SetRoute {
         source_denom: ETH.to_string(),
         target_denom: ATOM.to_string(),
-        route: vec![
-            spot_market_1_id.as_str().into(),
-            spot_market_2_id.as_str().into(),
-        ],
+        route: vec![spot_market_1_id.as_str().into(), spot_market_2_id.as_str().into()],
     };
 
     let execute_msg = MsgExecuteContract {
@@ -85,12 +69,11 @@ pub fn set_route_for_third_party_test() {
         funds: vec![],
     };
 
-    // execute on more time to excercise account sequence
     let msg = MsgExec {
         grantee: trader1.address().to_string(),
         msgs: vec![Any {
             type_url: "/cosmwasm.wasm.v1.MsgExecuteContract".to_string(),
-            value: execute_msg.to_bytes().unwrap(),
+            value: execute_msg.encode_to_vec(),
         }],
     };
 
@@ -101,13 +84,10 @@ pub fn set_route_for_third_party_test() {
         grantee: trader1.address().to_string(),
         msgs: vec![Any {
             type_url: "/cosmwasm.wasm.v1.MsgExecuteContract".to_string(),
-            value: execute_msg.to_bytes().unwrap(),
+            value: execute_msg.encode_to_vec(),
         }],
     };
 
     let err = authz.exec(msg, &trader1).unwrap_err();
-    assert!(
-        err.to_string().contains("failed to update grant with key"),
-        "incorrect error returned by execute"
-    );
+    assert!(err.to_string().contains("failed to get grant with given granter"));
 }

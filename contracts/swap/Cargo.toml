@@ -2,7 +2,7 @@
 authors = [ "Markus Waas <markus@injectivelabs.org>" ]
 edition = "2021"
 name    = "swap-contract"
-version = "1.0.2"
+version = "1.1.0"
 
 exclude = [
  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
@@ -16,31 +16,25 @@ exclude = [
 crate-type = [ "cdylib", "rlib" ]
 
 [features]
-# for more explicit tests, cargo test --features=backtraces
-backtraces = [ "cosmwasm-std/backtraces" ]
-# use library feature to disable all instantiate/execute/query exports
 library = [  ]
 
 [dependencies]
-cosmwasm-std       = { version = "1.5.4", features = [ "abort", "cosmwasm_1_2", "cosmwasm_1_3", "cosmwasm_1_4", "iterator", "stargate" ] }
-cosmwasm-storage   = "1.5.0"
-cw-storage-plus    = "0.14.0"
-cw-utils           = "0.14.0"
-cw2                = "0.14.0"
-injective-cosmwasm = { version = "0.2.18" }
-injective-math     = { version = "0.2.4" }
-injective-protobuf = { version = "0.2.2" }
-num-traits         = "0.2.15"
-protobuf           = { version = "2", features = [ "with-bytes" ] }
-schemars           = "0.8.8"
-serde              = { version = "1.0.137", default-features = false, features = [ "derive" ] }
-serde-json-wasm    = "1.0.1"
-thiserror          = { version = "1.0.31" }
+cosmwasm-schema    = { workspace = true }
+cosmwasm-std       = { workspace = true }
+cw-storage-plus    = { workspace = true }
+cw-utils           = { workspace = true }
+cw2                = { workspace = true }
+injective-cosmwasm = { workspace = true }
+injective-math     = { workspace = true }
+injective-std      = { workspace = true }
+prost              = { workspace = true }
+schemars           = { workspace = true }
+serde              = { workspace = true }
+serde-json-wasm    = { workspace = true }
+thiserror          = { workspace = true }
 
 [dev-dependencies]
-cosmos-sdk-proto    = { version = "0.21.1", features = [ "cosmwasm" ] }
-cosmwasm-schema     = "1.5.0"
-cw-multi-test       = "0.16.2"
-injective-std       = { version = "0.1.7" }
-injective-test-tube = "1.2.0"
-prost               = "0.12.4"
+injective-std       = { workspace = true }
+injective-test-tube = { workspace = true }
+injective-testing   = { workspace = true }
+test-tube-inj       = { workspace = true }

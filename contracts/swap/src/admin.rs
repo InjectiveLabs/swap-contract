@@ -3,36 +3,22 @@ use crate::state::{remove_swap_route, store_swap_route, CONFIG};
 use crate::types::{Config, SwapRoute};
 use crate::ContractError;
 use crate::ContractError::CustomError;
-use cosmwasm_std::{
-    ensure, ensure_eq, Addr, Attribute, BankMsg, Coin, Deps, DepsMut, Env, Event, Response,
-    StdResult,
-};
+use cosmwasm_std::{ensure, ensure_eq, Addr, Attribute, BankMsg, Coin, Deps, DepsMut, Env, Event, Response, StdResult};
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper, MarketId};
 use std::collections::HashSet;
 
-pub fn save_config(
-    deps: DepsMut<InjectiveQueryWrapper>,
-    env: Env,
-    admin: Addr,
-    fee_recipient: FeeRecipient,
-) -> StdResult<()> {
+pub fn save_config(deps: DepsMut<InjectiveQueryWrapper>, env: Env, admin: Addr, fee_recipient: FeeRecipient) -> StdResult<()> {
     let fee_recipient = match fee_recipient {
         FeeRecipient::Address(addr) => addr,
         FeeRecipient::SwapContract => env.contract.address,
     };
-    let config = Config {
-        fee_recipient,
-        admin,
-    };
+    let config = Config { fee_recipient, admin };
     config.to_owned().validate()?;
 
     CONFIG.save(deps.storage, &config)
 }
 
-pub fn verify_sender_is_admin(
-    deps: Deps<InjectiveQueryWrapper>,
-    sender: &Addr,
-) -> Result<(), ContractError> {
+pub fn verify_sender_is_admin(deps: Deps<InjectiveQueryWrapper>, sender: &Addr) -> Result<(), ContractError> {
     let config = CONFIG.load(deps.storage)?;
     ensure_eq!(&config.admin, sender, ContractError::Unauthorized {});
     Ok(())
@@ -57,10 +43,7 @@ pub fn update_config(
             FeeRecipient::Address(addr) => addr,
             FeeRecipient::SwapContract => env.contract.address,
         };
-        updated_config_event_attrs.push(Attribute::new(
-            "fee_recipient",
-            config.fee_recipient.to_string(),
-        ));
+        updated_config_event_attrs.push(Attribute::new("fee_recipient", config.fee_recipient.to_string()));
     }
     CONFIG.save(deps.storage, &config)?;
 
@@ -108,13 +91,7 @@ pub fn set_route(
         });
     }
 
-    if route
-        .clone()
-        .into_iter()
-        .collect::<HashSet<MarketId>>()
-        .len()
-        < route.len()
-    {
+    if route.clone().into_iter().collect::<HashSet<MarketId>>().len() < route.len() {
         return Err(ContractError::CustomError {
             val: "Route cannot have duplicate steps!".to_string(),
         });
@@ -131,10 +108,7 @@ pub fn set_route(
     Ok(Response::new().add_attribute("method", "set_route"))
 }
 
-fn verify_route_exists(
-    deps: Deps<InjectiveQueryWrapper>,
-    route: &SwapRoute,
-) -> Result<(), ContractError> {
+fn verify_route_exists(deps: Deps<InjectiveQueryWrapper>, route: &SwapRoute) -> Result<(), ContractError> {
     struct MarketDenom {
         quote_denom: String,
         base_denom: String,
@@ -143,12 +117,9 @@ fn verify_route_exists(
     let querier = InjectiveQuerier::new(&deps.querier);
 
     for market_id in route.steps.iter() {
-        let market = querier
-            .query_spot_market(market_id)?
-            .market
-            .ok_or(CustomError {
-                val: format!("Market {} not found", market_id.as_str()).to_string(),
-            })?;
+        let market = querier.query_spot_market(market_id)?.market.ok_or(CustomError {
+            val: format!("Market {} not found", market_id.as_str()).to_string(),
+        })?;
 
         denoms.push(MarketDenom {
             quote_denom: market.quote_denom,
@@ -164,15 +135,13 @@ fn verify_route_exists(
         }
     );
     ensure!(
-        denoms.first().unwrap().quote_denom == route.source_denom
-            || denoms.first().unwrap().base_denom == route.source_denom,
+        denoms.first().unwrap().quote_denom == route.source_denom || denoms.first().unwrap().base_denom == route.source_denom,
         CustomError {
             val: "Source denom not found in first market".to_string()
         }
     );
     ensure!(
-        denoms.last().unwrap().quote_denom == route.target_denom
-            || denoms.last().unwrap().base_denom == route.target_denom,
+        denoms.last().unwrap().quote_denom == route.target_denom || denoms.last().unwrap().base_denom == route.target_denom,
         CustomError {
             val: "Target denom not found in last market".to_string()
         }

@@ -1,7 +1,5 @@
 use cosmwasm_std::{Addr, Deps, Env, StdError, StdResult};
-use injective_cosmwasm::{
-    InjectiveQuerier, InjectiveQueryWrapper, MarketId, OrderSide, PriceLevel, SpotMarket,
-};
+use injective_cosmwasm::{InjectiveQuerier, InjectiveQueryWrapper, MarketId, OrderSide, PriceLevel, SpotMarket};
 use injective_math::utils::round_to_min_tick;
 use injective_math::FPDecimal;
 
@@ -65,12 +63,8 @@ pub fn estimate_swap_result(
             env,
             &step,
             match swap_quantity {
-                SwapQuantity::InputQuantity(_) => {
-                    SwapEstimationAmount::InputQuantity(current_swap.clone())
-                }
-                SwapQuantity::OutputQuantity(_) => {
-                    SwapEstimationAmount::ReceiveQuantity(current_swap.clone())
-                }
+                SwapQuantity::InputQuantity(_) => SwapEstimationAmount::InputQuantity(current_swap.clone()),
+                SwapQuantity::OutputQuantity(_) => SwapEstimationAmount::ReceiveQuantity(current_swap.clone()),
             },
             true,
         )?;
@@ -78,9 +72,7 @@ pub fn estimate_swap_result(
         current_swap.amount = swap_estimate.result_quantity;
         current_swap.denom = swap_estimate.result_denom;
 
-        let step_fee = swap_estimate
-            .fee_estimate
-            .expect("fee estimate should be available");
+        let step_fee = swap_estimate.fee_estimate.expect("fee estimate should be available");
 
         fees.push(step_fee);
     }
@@ -105,34 +97,21 @@ pub fn estimate_single_swap_execution(
         SwapEstimationAmount::ReceiveQuantity(fp) => fp,
     };
 
-    let market = querier
-        .query_spot_market(market_id)?
-        .market
-        .expect("market should be available");
+    let market = querier.query_spot_market(market_id)?.market.expect("market should be available");
 
-    let has_invalid_denom =
-        balance_in.denom != market.quote_denom && balance_in.denom != market.base_denom;
+    let has_invalid_denom = balance_in.denom != market.quote_denom && balance_in.denom != market.base_denom;
     if has_invalid_denom {
-        return Err(StdError::generic_err(
-            "Invalid swap denom - neither base nor quote",
-        ));
+        return Err(StdError::generic_err("Invalid swap denom - neither base nor quote"));
     }
 
     let config = CONFIG.load(deps.storage)?;
     let is_self_relayer = config.fee_recipient == env.contract.address;
 
-    let fee_multiplier = querier
-        .query_market_atomic_execution_fee_multiplier(market_id)?
-        .multiplier;
+    let fee_multiplier = querier.query_market_atomic_execution_fee_multiplier(market_id)?.multiplier;
 
-    let fee_percent = market.taker_fee_rate
-        * fee_multiplier
-        * (FPDecimal::ONE - get_effective_fee_discount_rate(&market, is_self_relayer));
+    let fee_percent = market.taker_fee_rate * fee_multiplier * (FPDecimal::ONE - get_effective_fee_discount_rate(&market, is_self_relayer));
 
-    let is_estimating_from_target = matches!(
-        swap_estimation_amount,
-        SwapEstimationAmount::ReceiveQuantity(_)
-    );
+    let is_estimating_from_target = matches!(swap_estimation_amount, SwapEstimationAmount::ReceiveQuantity(_));
 
     let is_buy = if is_estimating_from_target {
         balance_in.denom == market.base_denom
@@ -166,12 +145,7 @@ fn estimate_execution_buy_from_source(
 ) -> StdResult<StepExecutionEstimate> {
     let available_swap_quote_funds = input_quote_quantity / (FPDecimal::ONE + fee_percent);
 
-    let orders = querier.query_spot_market_orderbook(
-        &market.market_id,
-        OrderSide::Sell,
-        None,
-        Some(available_swap_quote_funds),
-    )?;
+    let orders = querier.query_spot_market_orderbook(&market.market_id, OrderSide::Sell, None, Some(available_swap_quote_funds))?;
     let top_orders = get_minimum_liquidity_levels(
         deps,
         &orders.sells_price_level,
@@ -181,8 +155,7 @@ fn estimate_execution_buy_from_source(
     )?;
 
     // lets overestimate amount for buys means rounding average price up -> higher buy price -> worse
-    let average_price =
-        get_average_price_from_orders(&top_orders, market.min_price_tick_size, true);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size, true);
     let worst_price = get_worst_price_from_orders(&top_orders);
 
     let expected_base_quantity = available_swap_quote_funds / average_price;
@@ -230,15 +203,9 @@ fn estimate_execution_buy_from_target(
     fee_percent: FPDecimal,
     is_simulation: bool,
 ) -> StdResult<StepExecutionEstimate> {
-    let rounded_target_base_output_quantity =
-        round_up_to_min_tick(target_base_output_quantity, market.min_quantity_tick_size);
+    let rounded_target_base_output_quantity = round_up_to_min_tick(target_base_output_quantity, market.min_quantity_tick_size);
 
-    let orders = querier.query_spot_market_orderbook(
-        &market.market_id,
-        OrderSide::Sell,
-        Some(rounded_target_base_output_quantity),
-        None,
-    )?;
+    let orders = querier.query_spot_market_orderbook(&market.market_id, OrderSide::Sell, Some(rounded_target_base_output_quantity), None)?;
     let top_orders = get_minimum_liquidity_levels(
         deps,
         &orders.sells_price_level,
@@ -248,8 +215,7 @@ fn estimate_execution_buy_from_target(
     )?;
 
     // lets overestimate amount for buys means rounding average price up -> higher buy price -> worse
-    let average_price =
-        get_average_price_from_orders(&top_orders, market.min_price_tick_size, true);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size, true);
     let worst_price = get_worst_price_from_orders(&top_orders);
 
     let expected_exchange_quote_quantity = rounded_target_base_output_quantity * average_price;
@@ -257,8 +223,7 @@ fn estimate_execution_buy_from_target(
     let required_input_quote_quantity = expected_exchange_quote_quantity + fee_estimate;
 
     // check if user funds + contract funds are enough to create order
-    let required_funds =
-        worst_price * rounded_target_base_output_quantity * (FPDecimal::ONE + fee_percent);
+    let required_funds = worst_price * rounded_target_base_output_quantity * (FPDecimal::ONE + fee_percent);
 
     let funds_in_contract = deps
         .querier
@@ -304,31 +269,12 @@ fn estimate_execution_buy(
         SwapEstimationAmount::ReceiveQuantity(fp) => fp,
     };
 
-    let is_estimating_from_target = matches!(
-        swap_estimation_amount,
-        SwapEstimationAmount::ReceiveQuantity(_)
-    );
+    let is_estimating_from_target = matches!(swap_estimation_amount, SwapEstimationAmount::ReceiveQuantity(_));
 
     if is_estimating_from_target {
-        estimate_execution_buy_from_target(
-            deps,
-            querier,
-            contract_address,
-            market,
-            amount_coin.amount,
-            fee_percent,
-            is_simulation,
-        )
+        estimate_execution_buy_from_target(deps, querier, contract_address, market, amount_coin.amount, fee_percent, is_simulation)
     } else {
-        estimate_execution_buy_from_source(
-            deps,
-            querier,
-            contract_address,
-            market,
-            amount_coin.amount,
-            fee_percent,
-            is_simulation,
-        )
+        estimate_execution_buy_from_source(deps, querier, contract_address, market, amount_coin.amount, fee_percent, is_simulation)
     }
 }
 
@@ -339,12 +285,7 @@ fn estimate_execution_sell_from_source(
     input_base_quantity: FPDecimal,
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
-    let orders = querier.query_spot_market_orderbook(
-        &market.market_id,
-        OrderSide::Buy,
-        Some(input_base_quantity),
-        None,
-    )?;
+    let orders = querier.query_spot_market_orderbook(&market.market_id, OrderSide::Buy, Some(input_base_quantity), None)?;
 
     let top_orders = get_minimum_liquidity_levels(
         deps,
@@ -355,8 +296,7 @@ fn estimate_execution_sell_from_source(
     )?;
 
     // lets overestimate amount for sells means rounding average price down -> lower sell price -> worse
-    let average_price =
-        get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
     let worst_price = get_worst_price_from_orders(&top_orders);
 
     let expected_exchange_quantity = input_base_quantity * average_price;
@@ -382,16 +322,10 @@ fn estimate_execution_sell_from_target(
     target_quote_output_quantity: FPDecimal,
     fee_percent: FPDecimal,
 ) -> StdResult<StepExecutionEstimate> {
-    let required_swap_quantity_in_quote =
-        target_quote_output_quantity / (FPDecimal::ONE - fee_percent);
+    let required_swap_quantity_in_quote = target_quote_output_quantity / (FPDecimal::ONE - fee_percent);
     let required_fee = required_swap_quantity_in_quote - target_quote_output_quantity;
 
-    let orders = querier.query_spot_market_orderbook(
-        &market.market_id,
-        OrderSide::Buy,
-        None,
-        Some(required_swap_quantity_in_quote),
-    )?;
+    let orders = querier.query_spot_market_orderbook(&market.market_id, OrderSide::Buy, None, Some(required_swap_quantity_in_quote))?;
     let top_orders = get_minimum_liquidity_levels(
         deps,
         &orders.buys_price_level,
@@ -401,18 +335,14 @@ fn estimate_execution_sell_from_target(
     )?;
 
     // lets overestimate amount for sells means rounding average price down -> lower sell price -> worse
-    let average_price =
-        get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
+    let average_price = get_average_price_from_orders(&top_orders, market.min_price_tick_size, false);
     let worst_price = get_worst_price_from_orders(&top_orders);
 
     let required_swap_input_quantity_in_base = required_swap_quantity_in_quote / average_price;
 
     Ok(StepExecutionEstimate {
         worst_price,
-        result_quantity: round_up_to_min_tick(
-            required_swap_input_quantity_in_base,
-            market.min_quantity_tick_size,
-        ),
+        result_quantity: round_up_to_min_tick(required_swap_input_quantity_in_base, market.min_quantity_tick_size),
         result_denom: market.base_denom.to_string(),
         is_buy_order: false,
         fee_estimate: Some(FPCoin {
@@ -434,10 +364,7 @@ fn estimate_execution_sell(
         SwapEstimationAmount::ReceiveQuantity(fp) => fp,
     };
 
-    let is_estimating_from_target = matches!(
-        swap_estimation_amount,
-        SwapEstimationAmount::ReceiveQuantity(_)
-    );
+    let is_estimating_from_target = matches!(swap_estimation_amount, SwapEstimationAmount::ReceiveQuantity(_));
 
     if is_estimating_from_target {
         estimate_execution_sell_from_target(deps, querier, market, amount_coin.amount, fee_percent)
@@ -458,11 +385,7 @@ pub fn get_minimum_liquidity_levels(
 
     for level in levels {
         let value = calc(level);
-        assert_ne!(
-            value,
-            FPDecimal::ZERO,
-            "Price level with zero value, this should not happen"
-        );
+        assert_ne!(value, FPDecimal::ZERO, "Price level with zero value, this should not happen");
 
         let order_to_add = if sum + value > total {
             let excess = value + sum - total;
@@ -488,24 +411,16 @@ pub fn get_minimum_liquidity_levels(
     }
 
     if sum < total {
-        return Err(StdError::generic_err(
-            "Not enough liquidity to fulfill order",
-        ));
+        return Err(StdError::generic_err("Not enough liquidity to fulfill order"));
     }
 
     Ok(orders)
 }
 
-fn get_average_price_from_orders(
-    levels: &[PriceLevel],
-    min_price_tick_size: FPDecimal,
-    is_rounding_up: bool,
-) -> FPDecimal {
+fn get_average_price_from_orders(levels: &[PriceLevel], min_price_tick_size: FPDecimal, is_rounding_up: bool) -> FPDecimal {
     let (total_quantity, total_notional) = levels
         .iter()
-        .fold((FPDecimal::ZERO, FPDecimal::ZERO), |acc, pl| {
-            (acc.0 + pl.q, acc.1 + pl.p * pl.q)
-        });
+        .fold((FPDecimal::ZERO, FPDecimal::ZERO), |acc, pl| (acc.0 + pl.q, acc.1 + pl.p * pl.q));
 
     assert_ne!(
         total_quantity,
@@ -543,11 +458,7 @@ mod tests {
 
     #[test]
     fn test_average_price_simple() {
-        let levels = vec![
-            create_price_level(1, 200),
-            create_price_level(2, 200),
-            create_price_level(3, 200),
-        ];
+        let levels = vec![create_price_level(1, 200), create_price_level(2, 200), create_price_level(3, 200)];
 
         let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"), false);
         assert_eq!(avg, FPDecimal::from(2u128));
@@ -555,11 +466,7 @@ mod tests {
 
     #[test]
     fn test_average_price_simple_round_down() {
-        let levels = vec![
-            create_price_level(1, 300),
-            create_price_level(2, 200),
-            create_price_level(3, 100),
-        ];
+        let levels = vec![create_price_level(1, 300), create_price_level(2, 200), create_price_level(3, 100)];
 
         let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"), false);
         assert_eq!(avg, FPDecimal::must_from_str("1.66")); //we round down
@@ -567,11 +474,7 @@ mod tests {
 
     #[test]
     fn test_average_price_simple_round_up() {
-        let levels = vec![
-            create_price_level(1, 300),
-            create_price_level(2, 200),
-            create_price_level(3, 100),
-        ];
+        let levels = vec![create_price_level(1, 300), create_price_level(2, 200), create_price_level(3, 100)];
 
         let avg = get_average_price_from_orders(&levels, FPDecimal::must_from_str("0.01"), true);
         assert_eq!(avg, FPDecimal::must_from_str("1.67")); //we round up
@@ -579,11 +482,7 @@ mod tests {
 
     #[test]
     fn test_worst_price() {
-        let levels = vec![
-            create_price_level(1, 100),
-            create_price_level(2, 200),
-            create_price_level(3, 300),
-        ];
+        let levels = vec![create_price_level(1, 100), create_price_level(2, 200), create_price_level(3, 300)];
 
         let worst = get_worst_price_from_orders(&levels);
         assert_eq!(worst, FPDecimal::from(3u128));
@@ -601,19 +500,12 @@ mod tests {
             FPDecimal::must_from_str("0.01"),
         );
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            StdError::generic_err("Not enough liquidity to fulfill order")
-        );
+        assert_eq!(result.unwrap_err(), StdError::generic_err("Not enough liquidity to fulfill order"));
     }
 
     #[test]
     fn test_find_minimum_orders_with_gaps() {
-        let levels = vec![
-            create_price_level(1, 100),
-            create_price_level(3, 300),
-            create_price_level(5, 500),
-        ];
+        let levels = vec![create_price_level(1, 100), create_price_level(3, 300), create_price_level(5, 500)];
 
         let result = get_minimum_liquidity_levels(
             &inj_mock_deps(|_| {}).as_ref(),
@@ -632,11 +524,7 @@ mod tests {
 
     #[test]
     fn test_find_minimum_buy_orders_not_consuming_fully() {
-        let levels = vec![
-            create_price_level(1, 100),
-            create_price_level(3, 300),
-            create_price_level(5, 500),
-        ];
+        let levels = vec![create_price_level(1, 100), create_price_level(3, 300), create_price_level(5, 500)];
 
         let result = get_minimum_liquidity_levels(
             &inj_mock_deps(|_| {}).as_ref(),
@@ -658,11 +546,7 @@ mod tests {
 
     #[test]
     fn test_find_minimum_sell_orders_not_consuming_fully() {
-        let buy_levels = vec![
-            create_price_level(5, 500),
-            create_price_level(3, 300),
-            create_price_level(1, 100),
-        ];
+        let buy_levels = vec![create_price_level(5, 500), create_price_level(3, 300), create_price_level(1, 100)];
 
         let result = get_minimum_liquidity_levels(
             &inj_mock_deps(|_| {}).as_ref(),

@@ -1,28 +1,24 @@
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use injective_cosmwasm::MarketId;
 use injective_math::FPDecimal;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum FeeRecipient {
     Address(Addr),
     SwapContract,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     pub fee_recipient: FeeRecipient,
     pub admin: Addr,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     SwapMinOutput {
         target_denom: String,
@@ -51,8 +47,7 @@ pub enum ExecuteMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum QueryMsg {
     GetRoute {
         source_denom: String,
@@ -68,6 +63,9 @@ pub enum QueryMsg {
         source_denom: String,
         target_denom: String,
     },
-    GetAllRoutes {},
+    GetAllRoutes {
+        start_after: Option<(String, String)>,
+        limit: Option<u32>,
+    },
     GetConfig {},
 }
