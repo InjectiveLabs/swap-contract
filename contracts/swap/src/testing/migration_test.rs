@@ -2,7 +2,7 @@ use crate::{
     msg::{FeeRecipient, InstantiateMsg, MigrateMsg},
     testing::{
         integration_realistic_tests_min_quantity::happy_path_two_hops_test,
-        test_utils::{must_init_account_with_funds, str_coin, Decimals, ATOM, ETH, INJ, USDT},
+        test_utils::{initial_coin, must_init_account_with_funds_and_setting_denoms, str_coin, Decimals, ATOM, ETH, INJ, USDT},
     },
 };
 
@@ -20,14 +20,16 @@ fn test_migration() {
     let wasm = Wasm::new(&app);
 
     let wasm_byte_code = std::fs::read("../../contracts/swap/src/testing/test_artifacts/swap-contract-v101.wasm").unwrap();
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
 
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 

@@ -1,5 +1,9 @@
+use cosmwasm_std::Coin;
 use injective_math::FPDecimal;
 use injective_test_tube::{Account, Bank, Exchange, InjectiveTestApp, Module, Wasm};
+use injective_testing::test_tube::bank::send;
+use injective_testing::test_tube::exchange::add_denom_notional_and_decimal;
+use std::collections::HashMap;
 use std::ops::Neg;
 
 use crate::helpers::Scaled;
@@ -10,10 +14,10 @@ use crate::testing::test_utils::{
     create_realistic_atom_usdt_sell_orders_from_spreadsheet, create_realistic_eth_usdt_buy_orders_from_spreadsheet,
     create_realistic_eth_usdt_sell_orders_from_spreadsheet, create_realistic_inj_usdt_buy_orders_from_spreadsheet,
     create_realistic_inj_usdt_sell_orders_from_spreadsheet, create_realistic_limit_order, create_realistic_usdt_usdc_both_side_orders, human_to_dec,
-    init_rich_account, init_self_relaying_contract_and_get_address, launch_realistic_atom_usdt_spot_market, launch_realistic_inj_usdt_spot_market,
-    launch_realistic_ninja_inj_spot_market, launch_realistic_usdt_usdc_spot_market, launch_realistic_weth_usdt_spot_market,
-    must_init_account_with_funds, query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM,
-    ETH, INJ, INJ_2, NINJA, USDC, USDT,
+    init_rich_account, init_self_relaying_contract_and_get_address, initial_coin, launch_realistic_atom_usdt_spot_market,
+    launch_realistic_inj_usdt_spot_market, launch_realistic_ninja_inj_spot_market, launch_realistic_usdt_usdc_spot_market,
+    launch_realistic_weth_usdt_spot_market, must_init_account_with_funds_and_setting_denoms, query_all_bank_balances, query_bank_balance,
+    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, ETH, INJ, INJ_2, NINJA, USDC, USDT,
 };
 use crate::types::{FPCoin, SwapEstimationResult};
 
@@ -67,16 +71,17 @@ fn it_correctly_swaps_eth_to_get_very_high_exact_amount_of_atom() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -125,9 +130,13 @@ fn it_correctly_swaps_eth_to_get_very_high_exact_amount_of_atom() {
 
     let eth_to_swap = "4.4";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(eth_to_swap, ETH, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(eth_to_swap, ETH, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -235,17 +244,18 @@ fn it_correctly_swaps_inj_to_get_very_high_exact_amount_of_atom() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("10_000", INJ_2, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("10_000", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -294,9 +304,13 @@ fn it_correctly_swaps_inj_to_get_very_high_exact_amount_of_atom() {
 
     let inj_to_swap = "1100.1";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -401,16 +415,17 @@ fn it_swaps_inj_to_get_very_high_exact_amount_of_eth() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("10_000", INJ_2, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("10_000", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -459,9 +474,13 @@ fn it_swaps_inj_to_get_very_high_exact_amount_of_eth() {
     let inj_to_swap = "2855.259";
     let exact_quantity_to_receive = human_to_dec("11.2", Decimals::Eighteen);
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -544,16 +563,17 @@ fn it_correctly_swaps_between_markets_using_different_quote_assets_self_relaying
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("1_000", USDC, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("1", INJ_2, Decimals::Eighteen),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("1_000", USDC, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -582,7 +602,11 @@ fn it_correctly_swaps_between_markets_using_different_quote_assets_self_relaying
 
     app.increase_time(1);
 
-    let swapper = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen), str_coin("1", INJ_2, Decimals::Eighteen)]);
+    let swapper = must_init_account_with_funds_and_setting_denoms(
+        &app,
+        &validator,
+        &[initial_coin("1", INJ, Decimals::Eighteen), initial_coin("1", INJ_2, Decimals::Eighteen)],
+    );
 
     let inj_to_swap = "1";
     let to_output_quantity = human_to_dec("8", Decimals::Six);
@@ -708,17 +732,18 @@ fn it_correctly_swaps_between_markets_using_different_quote_assets_self_relaying
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("1_000", USDC, Decimals::Six),
-            str_coin("1_000", NINJA, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("101", INJ_2, Decimals::Eighteen),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("1_000", USDC, Decimals::Six),
+            initial_coin("1_000", NINJA, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("101", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -750,7 +775,11 @@ fn it_correctly_swaps_between_markets_using_different_quote_assets_self_relaying
 
     app.increase_time(1);
 
-    let swapper = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen), str_coin("100000", USDT, Decimals::Six)]);
+    let swapper = must_init_account_with_funds_and_setting_denoms(
+        &app,
+        &validator,
+        &[initial_coin("1", INJ, Decimals::Eighteen), initial_coin("100000", USDT, Decimals::Six)],
+    );
 
     let usdt_to_swap = "100000";
     let to_output_quantity = human_to_dec("501000", Decimals::Six);
@@ -799,17 +828,17 @@ fn it_doesnt_lose_buffer_if_exact_swap_of_eth_to_atom_is_executed_multiple_times
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -834,15 +863,16 @@ fn it_doesnt_lose_buffer_if_exact_swap_of_eth_to_atom_is_executed_multiple_times
     let eth_to_swap = "4.08";
     let iterations = 100i128;
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin(
+            initial_coin(
                 (FPDecimal::must_from_str(eth_to_swap) * FPDecimal::from(iterations)).to_string().as_str(),
                 ETH,
                 Decimals::Eighteen,
             ),
-            str_coin("1", INJ, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -902,17 +932,18 @@ fn it_reverts_when_funds_provided_are_below_required_to_get_exact_amount() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("10_000", INJ_2, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("10_000", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -940,9 +971,13 @@ fn it_reverts_when_funds_provided_are_below_required_to_get_exact_amount() {
 
     let inj_to_swap = "608";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -1009,16 +1044,17 @@ fn exact_two_hop_eth_atom_swap_test_template(exact_quantity_to_receive: FPDecima
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -1046,9 +1082,13 @@ fn exact_two_hop_eth_atom_swap_test_template(exact_quantity_to_receive: FPDecima
 
     let eth_to_swap = "4.08";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(eth_to_swap, ETH, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(eth_to_swap, ETH, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -1130,17 +1170,18 @@ fn exact_two_hop_inj_atom_swap_test_template(exact_quantity_to_receive: FPDecima
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("10_000", INJ_2, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("10_000", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -1168,9 +1209,13 @@ fn exact_two_hop_inj_atom_swap_test_template(exact_quantity_to_receive: FPDecima
 
     let inj_to_swap = "973.258";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -1252,16 +1297,17 @@ fn exact_two_hop_inj_eth_swap_test_template(exact_quantity_to_receive: FPDecimal
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("10_000", INJ_2, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("10_000", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -1289,9 +1335,13 @@ fn exact_two_hop_inj_eth_swap_test_template(exact_quantity_to_receive: FPDecimal
 
     let inj_to_swap = "973.258";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);

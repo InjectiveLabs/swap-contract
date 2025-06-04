@@ -260,9 +260,8 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
 pub fn parse_market_order_response(msg: Reply) -> StdResult<MsgCreateSpotMarketOrderResponse> {
     let binding = msg.result.into_result().map_err(ContractError::SubMsgFailure).unwrap();
 
-    let first_messsage = binding.msg_responses.first();
-
-    let order_response = MsgCreateSpotMarketOrderResponse::decode(first_messsage.unwrap().value.as_slice())
+    let first_message = binding.msg_responses.first();
+    let order_response = MsgCreateSpotMarketOrderResponse::decode(first_message.unwrap().value.as_slice())
         .map_err(|err| ContractError::ReplyParseFailure {
             id: msg.id,
             err: err.to_string(),
