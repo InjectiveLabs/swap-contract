@@ -1,13 +1,13 @@
-use cosmwasm_std::testing::mock_env;
-use cosmwasm_std::Addr;
+use crate::{
+    admin::set_route,
+    queries::estimate_single_swap_execution,
+    state::CONFIG,
+    testing::test_utils::{mock_deps_eth_inj, str_coin, Decimals, MultiplierQueryBehavior, TEST_USER_ADDR},
+    types::{Config, FPCoin, SwapEstimationAmount},
+};
 
+use cosmwasm_std::{testing::mock_env, Addr};
 use injective_cosmwasm::{MarketId, OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
-
-use crate::admin::set_route;
-use crate::queries::estimate_single_swap_execution;
-use crate::state::CONFIG;
-use crate::testing::test_utils::{mock_deps_eth_inj, str_coin, Decimals, MultiplierQueryBehavior, TEST_USER_ADDR};
-use crate::types::{Config, FPCoin, SwapEstimationAmount};
 
 #[test]
 fn it_reverts_if_atomic_fee_multiplier_query_fails() {

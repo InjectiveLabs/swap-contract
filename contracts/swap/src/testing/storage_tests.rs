@@ -1,11 +1,11 @@
+use crate::{
+    admin::{delete_route, set_route},
+    state::{read_swap_route, store_swap_route, CONFIG},
+    testing::test_utils::{mock_deps_eth_inj, MultiplierQueryBehavior, TEST_CONTRACT_ADDR, TEST_USER_ADDR},
+    types::{Config, SwapRoute},
+};
 use cosmwasm_std::Addr;
-
-use crate::admin::{delete_route, set_route};
 use injective_cosmwasm::{inj_mock_deps, MarketId, OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2, TEST_MARKET_ID_3};
-
-use crate::state::{read_swap_route, store_swap_route, CONFIG};
-use crate::testing::test_utils::{mock_deps_eth_inj, MultiplierQueryBehavior, TEST_CONTRACT_ADDR, TEST_USER_ADDR};
-use crate::types::{Config, SwapRoute};
 
 #[test]
 fn it_can_store_and_read_swap_route() {

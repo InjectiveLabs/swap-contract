@@ -1,20 +1,21 @@
+use crate::{
+    helpers::Scaled,
+    msg::{ExecuteMsg, QueryMsg},
+    testing::test_utils::{
+        are_fpdecimals_approximately_equal, assert_fee_is_as_expected, create_realistic_atom_usdt_sell_orders_from_spreadsheet,
+        create_realistic_eth_usdt_buy_orders_from_spreadsheet, create_realistic_eth_usdt_sell_orders_from_spreadsheet,
+        create_realistic_inj_usdt_buy_orders_from_spreadsheet, create_realistic_usdt_usdc_both_side_orders, human_to_dec, init_rich_account,
+        init_self_relaying_contract_and_get_address, initial_coin, launch_realistic_atom_usdt_spot_market, launch_realistic_inj_usdt_spot_market,
+        launch_realistic_usdt_usdc_spot_market, launch_realistic_weth_usdt_spot_market, must_init_account_with_funds_and_setting_denoms,
+        query_all_bank_balances, query_bank_balance, set_route_and_assert_success, str_coin, Decimals, ATOM, DEFAULT_ATOMIC_MULTIPLIER,
+        DEFAULT_SELF_RELAYING_FEE_PART, DEFAULT_TAKER_FEE, ETH, INJ, INJ_2, USDC, USDT,
+    },
+    types::{FPCoin, SwapEstimationResult},
+};
+
+use injective_math::FPDecimal;
 use injective_test_tube::{Account, Bank, Exchange, InjectiveTestApp, Module, RunnerResult, SigningAccount, Wasm};
 use std::ops::Neg;
-
-use crate::helpers::Scaled;
-use injective_math::FPDecimal;
-
-use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::testing::test_utils::{
-    are_fpdecimals_approximately_equal, assert_fee_is_as_expected, create_realistic_atom_usdt_sell_orders_from_spreadsheet,
-    create_realistic_eth_usdt_buy_orders_from_spreadsheet, create_realistic_eth_usdt_sell_orders_from_spreadsheet,
-    create_realistic_inj_usdt_buy_orders_from_spreadsheet, create_realistic_usdt_usdc_both_side_orders, human_to_dec, init_rich_account,
-    init_self_relaying_contract_and_get_address, launch_realistic_atom_usdt_spot_market, launch_realistic_inj_usdt_spot_market,
-    launch_realistic_usdt_usdc_spot_market, launch_realistic_weth_usdt_spot_market, must_init_account_with_funds, query_all_bank_balances,
-    query_bank_balance, set_route_and_assert_success, str_coin, Decimals, ATOM, DEFAULT_ATOMIC_MULTIPLIER, DEFAULT_SELF_RELAYING_FEE_PART,
-    DEFAULT_TAKER_FEE, ETH, INJ, INJ_2, USDC, USDT,
-};
-use crate::types::{FPCoin, SwapEstimationResult};
 
 /*
    This test suite focuses on using using realistic values both for spot markets and for orders and
@@ -38,6 +39,8 @@ pub fn happy_path_two_hops_test(app: InjectiveTestApp, owner: SigningAccount, co
     let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
     let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
 
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+
     set_route_and_assert_success(
         &wasm,
         &owner,
@@ -58,9 +61,13 @@ pub fn happy_path_two_hops_test(app: InjectiveTestApp, owner: SigningAccount, co
 
     let eth_to_swap = "4.08";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(eth_to_swap, ETH, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(eth_to_swap, ETH, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let mut query_result: SwapEstimationResult = wasm
@@ -162,16 +169,18 @@ fn happy_path_two_hops_swap_eth_atom_realistic_values_self_relaying() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
+
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -187,16 +196,17 @@ fn happy_path_two_hops_swap_inj_eth_realistic_values_self_relaying() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("1", INJ_2, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -224,9 +234,13 @@ fn happy_path_two_hops_swap_inj_eth_realistic_values_self_relaying() {
 
     let inj_to_swap = "973.258";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let mut query_result: SwapEstimationResult = wasm
@@ -330,17 +344,18 @@ fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("1", INJ_2, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -368,9 +383,13 @@ fn happy_path_two_hops_swap_inj_atom_realistic_values_self_relaying() {
 
     let inj_to_swap = "973.258";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(inj_to_swap, INJ_2, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(inj_to_swap, INJ_2, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let mut query_result: SwapEstimationResult = wasm
@@ -474,16 +493,17 @@ fn it_executes_swap_between_markets_using_different_quote_assets_self_relaying()
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("1_000", USDC, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
-            str_coin("1", INJ_2, Decimals::Eighteen),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("1_000", USDC, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", INJ_2, Decimals::Eighteen),
         ],
     );
 
@@ -512,7 +532,11 @@ fn it_executes_swap_between_markets_using_different_quote_assets_self_relaying()
 
     app.increase_time(1);
 
-    let swapper = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen), str_coin("1", INJ_2, Decimals::Eighteen)]);
+    let swapper = must_init_account_with_funds_and_setting_denoms(
+        &app,
+        &validator,
+        &[initial_coin("1", INJ, Decimals::Eighteen), initial_coin("1", INJ_2, Decimals::Eighteen)],
+    );
 
     let inj_to_swap = "1";
 
@@ -640,17 +664,17 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -674,15 +698,16 @@ fn it_doesnt_lose_buffer_if_executed_multiple_times() {
 
     let eth_to_swap = "4.08";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin(
+            initial_coin(
                 (FPDecimal::must_from_str(eth_to_swap) * FPDecimal::from(100u128)).to_string().as_str(),
                 ETH,
                 Decimals::Eighteen,
             ),
-            str_coin("1", INJ, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -754,16 +779,17 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -791,9 +817,13 @@ fn it_correctly_calculates_required_funds_when_querying_buy_with_minimum_buffer_
 
     let eth_to_swap = "4.08";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(eth_to_swap, ETH, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(eth_to_swap, ETH, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let query_result: FPDecimal = wasm
@@ -877,16 +907,17 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -915,9 +946,13 @@ fn it_correctly_calculates_required_funds_when_executing_buy_with_minimum_buffer
 
     let eth_to_swap = "4.08";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(eth_to_swap, ETH, Decimals::Eighteen), str_coin("0.01", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(eth_to_swap, ETH, Decimals::Eighteen),
+            initial_coin("0.01", INJ, Decimals::Eighteen),
+        ],
     );
 
     let contract_balances_before = query_all_bank_balances(&bank, &contr_addr);
@@ -975,16 +1010,17 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
     let exchange = Exchange::new(&app);
     let bank = Bank::new(&app);
 
-    let _signer = must_init_account_with_funds(&app, &[str_coin("1", INJ, Decimals::Eighteen)]);
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
 
-    let _validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
-    let owner = must_init_account_with_funds(
+    let _signer = must_init_account_with_funds_and_setting_denoms(&app, &validator, &[initial_coin("1", INJ, Decimals::Eighteen)]);
+    let owner = must_init_account_with_funds_and_setting_denoms(
         &app,
+        &validator,
         &[
-            str_coin("1", ETH, Decimals::Eighteen),
-            str_coin("1", ATOM, Decimals::Six),
-            str_coin("1_000", USDT, Decimals::Six),
-            str_coin("10_000", INJ, Decimals::Eighteen),
+            initial_coin("1", ETH, Decimals::Eighteen),
+            initial_coin("1", ATOM, Decimals::Six),
+            initial_coin("1_000", USDT, Decimals::Six),
+            initial_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
 
@@ -1013,9 +1049,13 @@ fn it_returns_all_funds_if_there_is_not_enough_buffer_realistic_values() {
 
     let eth_to_swap = "4.08";
 
-    let swapper = must_init_account_with_funds(
+    let swapper = must_init_account_with_funds_and_setting_denoms(
         &app,
-        &[str_coin(eth_to_swap, ETH, Decimals::Eighteen), str_coin("1", INJ, Decimals::Eighteen)],
+        &validator,
+        &[
+            initial_coin(eth_to_swap, ETH, Decimals::Eighteen),
+            initial_coin("1", INJ, Decimals::Eighteen),
+        ],
     );
 
     let query_result: RunnerResult<FPDecimal> = wasm.query(

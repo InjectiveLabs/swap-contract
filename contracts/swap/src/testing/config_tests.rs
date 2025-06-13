@@ -1,13 +1,15 @@
+use crate::{
+    contract::execute,
+    msg::{ExecuteMsg, FeeRecipient},
+    state::CONFIG,
+    testing::test_utils::{TEST_CONTRACT_ADDR, TEST_USER_ADDR},
+    types::Config,
+};
+
 use cosmwasm_std::testing::{message_info, mock_env};
 use cosmwasm_std::{coins, Addr};
 
 use injective_cosmwasm::{inj_mock_deps, OwnedDepsExt};
-
-use crate::contract::execute;
-use crate::msg::{ExecuteMsg, FeeRecipient};
-use crate::state::CONFIG;
-use crate::testing::test_utils::{TEST_CONTRACT_ADDR, TEST_USER_ADDR};
-use crate::types::Config;
 
 #[test]
 pub fn admin_can_update_config() {

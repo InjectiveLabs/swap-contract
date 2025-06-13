@@ -1,8 +1,10 @@
-use crate::msg::FeeRecipient;
-use crate::state::{remove_swap_route, store_swap_route, CONFIG};
-use crate::types::{Config, SwapRoute};
-use crate::ContractError;
-use crate::ContractError::CustomError;
+use crate::{
+    msg::FeeRecipient,
+    state::{remove_swap_route, store_swap_route, CONFIG},
+    types::{Config, SwapRoute},
+    ContractError,
+    ContractError::CustomError,
+};
 use cosmwasm_std::{ensure, ensure_eq, Addr, Attribute, BankMsg, Coin, Deps, DepsMut, Env, Event, Response, StdResult};
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper, MarketId};
 use std::collections::HashSet;

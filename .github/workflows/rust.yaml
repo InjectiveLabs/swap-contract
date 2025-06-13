@@ -39,7 +39,7 @@ jobs:
           components: llvm-tools-preview
 
       - name: Set up cargo cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         continue-on-error: false
         with:
           path: |
@@ -78,14 +78,14 @@ jobs:
         # ./grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./target/debug/lcov.info --ignore *_test.rs
 
       - name: Setup Pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v4
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: "./target/debug/coverage/"
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
 
   lints:
     name: Lints
@@ -103,7 +103,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Set up cargo cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         continue-on-error: false
         with:
           path: |

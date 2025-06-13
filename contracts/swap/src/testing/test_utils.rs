@@ -1,7 +1,14 @@
-use crate::helpers::Scaled;
+use crate::{
+    helpers::Scaled,
+    msg::{ExecuteMsg, FeeRecipient, InstantiateMsg},
+    types::FPCoin,
+};
 
-use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{coin, to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult};
+use cosmwasm_std::{
+    coin,
+    testing::{MockApi, MockStorage},
+    to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128,
+};
 use injective_cosmwasm::{
     create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps,
     test_market_ids, HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, QueryMarketAtomicExecutionFeeMultiplierResponse, SpotMarket,
@@ -10,6 +17,7 @@ use injective_cosmwasm::{
 use injective_math::FPDecimal;
 use injective_std::{
     shim::{Any, Timestamp},
+    types::injective::exchange::v1beta1::MsgInstantSpotMarketLaunch,
     types::{
         cosmos::{
             authz::v1beta1::{Grant, MsgGrant},
@@ -21,16 +29,13 @@ use injective_std::{
 };
 use injective_test_tube::{Account, Authz, Bank, Exchange, InjectiveTestApp, Module, SigningAccount, Wasm};
 use injective_testing::{
-    test_tube::{exchange::launch_spot_market_custom, utils::store_code},
-    utils::scale_price_quantity_spot_market,
+    test_tube::bank::send,
+    test_tube::exchange::{add_denom_notional_and_decimal, get_spot_market_id},
+    utils::dec_to_proto,
+    {test_tube::utils::store_code, utils::scale_price_quantity_spot_market},
 };
-use prost::Message;
 use std::{collections::HashMap, str::FromStr};
-
-use crate::{
-    msg::{ExecuteMsg, FeeRecipient, InstantiateMsg},
-    types::FPCoin,
-};
+use test_tube_inj::cosmrs::proto::prost::Message;
 
 pub const TEST_CONTRACT_ADDR: &str = "inj14hj2tavq8fpesdwxxcu44rty3hh90vhujaxlnz";
 pub const TEST_USER_ADDR: &str = "inj1p7z8p649xspcey7wp5e4leqf7wa39kjjj6wja8";
@@ -46,6 +51,38 @@ pub const NINJA: &str = "ninja";
 pub const DEFAULT_TAKER_FEE: f64 = 0.001;
 pub const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
 pub const DEFAULT_SELF_RELAYING_FEE_PART: f64 = 0.6;
+
+#[allow(clippy::too_many_arguments)]
+pub fn launch_spot_market_custom(
+    exchange: &Exchange<InjectiveTestApp>,
+    signer: &SigningAccount,
+    ticker: String,
+    base_denom: String,
+    quote_denom: String,
+    min_price_tick_size: String,
+    min_quantity_tick_size: String,
+    base_decimals: i32,
+    quote_decimals: i32,
+) -> String {
+    exchange
+        .instant_spot_market_launch(
+            MsgInstantSpotMarketLaunch {
+                sender: signer.address(),
+                ticker: ticker.clone(),
+                base_denom,
+                quote_denom,
+                min_price_tick_size: dec_to_proto(FPDecimal::must_from_str(&min_price_tick_size)),
+                min_quantity_tick_size: dec_to_proto(FPDecimal::must_from_str(&min_quantity_tick_size)),
+                min_notional: dec_to_proto(FPDecimal::must_from_str("1")),
+                base_decimals: base_decimals as u32,
+                quote_decimals: quote_decimals as u32,
+            },
+            signer,
+        )
+        .unwrap();
+
+    get_spot_market_id(exchange, ticker)
+}
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 #[repr(i32)]
@@ -272,6 +309,7 @@ fn create_mock_spot_market(base: &str, min_price_tick_size: FPDecimal, min_quant
         status: injective_cosmwasm::MarketStatus::Active,
         min_price_tick_size,
         min_quantity_tick_size,
+        min_notional: FPDecimal::from_str("0.000000001").unwrap(),
     }
 }
 
@@ -284,6 +322,8 @@ pub fn launch_realistic_inj_usdt_spot_market(exchange: &Exchange<InjectiveTestAp
         USDT.to_string(),
         "0.000000000000001".to_string(),
         "1000000000000000".to_string(),
+        Decimals::Eighteen.get_decimals(),
+        Decimals::Six.get_decimals(),
     )
 }
 
@@ -296,6 +336,8 @@ pub fn launch_realistic_weth_usdt_spot_market(exchange: &Exchange<InjectiveTestA
         USDT.to_string(),
         "0.0000000000001".to_string(),
         "1000000000000000".to_string(),
+        Decimals::Eighteen.get_decimals(),
+        Decimals::Six.get_decimals(),
     )
 }
 
@@ -308,6 +350,8 @@ pub fn launch_realistic_atom_usdt_spot_market(exchange: &Exchange<InjectiveTestA
         USDT.to_string(),
         "0.001".to_string(),
         "10000".to_string(),
+        Decimals::Six.get_decimals(),
+        Decimals::Six.get_decimals(),
     )
 }
 
@@ -320,6 +364,8 @@ pub fn launch_realistic_usdt_usdc_spot_market(exchange: &Exchange<InjectiveTestA
         USDC.to_string(),
         "0.0001".to_string(),
         "100".to_string(),
+        Decimals::Six.get_decimals(),
+        Decimals::Six.get_decimals(),
     )
 }
 
@@ -332,6 +378,8 @@ pub fn launch_realistic_ninja_inj_spot_market(exchange: &Exchange<InjectiveTestA
         INJ_2.to_string(),
         "1000000".to_string(),
         "10000000".to_string(),
+        Decimals::Six.get_decimals(),
+        Decimals::Eighteen.get_decimals(),
     )
 }
 
@@ -610,8 +658,48 @@ pub fn set_route_and_assert_success(
     .unwrap();
 }
 
+pub struct InitialCoin {
+    pub coin: Coin,
+    pub decimals: u32,
+}
+
 pub fn must_init_account_with_funds(app: &InjectiveTestApp, initial_funds: &[Coin]) -> SigningAccount {
     app.init_account(initial_funds).unwrap()
+}
+
+pub fn must_init_account_with_funds_and_setting_denoms(
+    app: &InjectiveTestApp,
+    validator: &SigningAccount,
+    initial_funds: &[InitialCoin],
+) -> SigningAccount {
+    let mut initial_funds_coin: Vec<Coin> = initial_funds
+        .iter()
+        .map(|ic| coin(ic.coin.amount.into(), ic.coin.denom.clone()))
+        .collect();
+    let mut initial_funds_decimals = initial_funds.iter().map(|ic| ic.decimals).collect::<Vec<u32>>();
+
+    // add 1000000000000000000000 inj to initial funds with adding to element if inj already in it
+    if let Some(pos) = initial_funds_coin.iter().position(|c| c.denom == INJ) {
+        initial_funds_coin[pos].amount += Uint128::from(1_000_000_000_000_000_000_000u128);
+    } else {
+        initial_funds_coin.push(coin(1_000_000_000_000_000_000_000u128, INJ.to_string()));
+        initial_funds_decimals.push(18);
+    }
+
+    let account = app.init_account_decimals(&initial_funds_coin, &initial_funds_decimals).unwrap();
+    send(&Bank::new(app), "1000000000000000000000", "inj", &account, validator);
+
+    for initial_coin in initial_funds {
+        add_denom_notional_and_decimal(
+            app,
+            validator,
+            initial_coin.coin.denom.to_string(),
+            "1".to_string(),
+            initial_coin.decimals as u64,
+        );
+    }
+
+    account
 }
 
 pub fn query_all_bank_balances(bank: &Bank<InjectiveTestApp>, address: &str) -> Vec<injective_std::types::cosmos::base::v1beta1::Coin> {
@@ -722,6 +810,13 @@ pub fn str_coin(human_amount: &str, denom: &str, decimals: Decimals) -> Coin {
     let scaled_amount = human_to_dec(human_amount, decimals);
     let as_int: u128 = scaled_amount.into();
     coin(as_int, denom)
+}
+
+pub fn initial_coin(human_amount: &str, denom: &str, decimals: Decimals) -> InitialCoin {
+    InitialCoin {
+        coin: str_coin(human_amount, denom, decimals),
+        decimals: decimals.get_decimals() as u32,
+    }
 }
 
 mod tests {
