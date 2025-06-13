@@ -14,8 +14,8 @@ cw2                 = { version = "2.0.0" }
 injective-cosmwasm  = { version = "0.3.3" }
 injective-math      = { version = "0.3.3" }
 injective-std       = { version = "1.16.0-beta.2" }
-injective-test-tube = { version = "1.16.0-beta.2.1" }
-injective-testing   = { version = "1.1.9" }
+injective-test-tube = { version = "1.16.0-beta.3" }
+injective-testing   = { version = "1.1.11" }
 prost               = { version = "0.13.5" }
 schemars            = { version = "0.8.16", features = [ "enumset" ] }
 serde               = { version = "1.0.193", default-features = false, features = [ "derive" ] }

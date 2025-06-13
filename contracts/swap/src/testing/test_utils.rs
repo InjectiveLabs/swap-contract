@@ -48,6 +48,7 @@ pub const DEFAULT_TAKER_FEE: f64 = 0.001;
 pub const DEFAULT_ATOMIC_MULTIPLIER: f64 = 2.5;
 pub const DEFAULT_SELF_RELAYING_FEE_PART: f64 = 0.6;
 
+#[allow(clippy::too_many_arguments)]
 pub fn launch_spot_market_custom(
     exchange: &Exchange<InjectiveTestApp>,
     signer: &SigningAccount,

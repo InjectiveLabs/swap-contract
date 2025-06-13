@@ -12,7 +12,9 @@ use injective_std::{
     shim::Any,
     types::{cosmos::authz::v1beta1::MsgExec, cosmwasm::wasm::v1::MsgExecuteContract},
 };
-use injective_test_tube::{Account, Authz, Exchange, InjectiveTestApp, Module, Wasm};
+use injective_test_tube::{Account, Authz, Bank, Exchange, InjectiveTestApp, Module, Wasm};
+use injective_testing::test_tube::bank::send;
+use injective_testing::test_tube::exchange::add_denom_notional_and_decimal;
 use prost::Message;
 
 #[test]
@@ -31,6 +33,13 @@ pub fn set_route_for_third_party_test() {
             str_coin("10_000", INJ, Decimals::Eighteen),
         ],
     );
+
+    let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
+    send(&Bank::new(&app), "1000000000000000000000", "inj", &owner, &validator);
+    add_denom_notional_and_decimal(&app, &validator, INJ.to_string(), "1".to_string(), 18);
+    add_denom_notional_and_decimal(&app, &validator, ETH.to_string(), "1".to_string(), 18);
+    add_denom_notional_and_decimal(&app, &validator, ATOM.to_string(), "1".to_string(), 6);
+    add_denom_notional_and_decimal(&app, &validator, USDT.to_string(), "1".to_string(), 6);
 
     let spot_market_1_id = launch_realistic_weth_usdt_spot_market(&exchange, &owner);
     let spot_market_2_id = launch_realistic_atom_usdt_spot_market(&exchange, &owner);
