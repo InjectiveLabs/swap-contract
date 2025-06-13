@@ -1,16 +1,23 @@
-use crate::helpers::Scaled;
+use crate::{
+    helpers::Scaled,
+    msg::{ExecuteMsg, FeeRecipient, InstantiateMsg},
+    types::FPCoin,
+};
 
-use cosmwasm_std::testing::{MockApi, MockStorage};
-use cosmwasm_std::{coin, to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128};
+use cosmwasm_std::{
+    coin,
+    testing::{MockApi, MockStorage},
+    to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128,
+};
 use injective_cosmwasm::{
     create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps,
     test_market_ids, HandlesMarketIdQuery, InjectiveQueryWrapper, MarketId, PriceLevel, QueryMarketAtomicExecutionFeeMultiplierResponse, SpotMarket,
     WasmMockQuerier, TEST_MARKET_ID_1, TEST_MARKET_ID_2,
 };
 use injective_math::FPDecimal;
-use injective_std::types::injective::exchange::v1beta1::MsgInstantSpotMarketLaunch;
 use injective_std::{
     shim::{Any, Timestamp},
+    types::injective::exchange::v1beta1::MsgInstantSpotMarketLaunch,
     types::{
         cosmos::{
             authz::v1beta1::{Grant, MsgGrant},
@@ -21,17 +28,14 @@ use injective_std::{
     },
 };
 use injective_test_tube::{Account, Authz, Bank, Exchange, InjectiveTestApp, Module, SigningAccount, Wasm};
-use injective_testing::test_tube::bank::send;
-use injective_testing::test_tube::exchange::{add_denom_notional_and_decimal, get_spot_market_id};
-use injective_testing::utils::dec_to_proto;
-use injective_testing::{test_tube::utils::store_code, utils::scale_price_quantity_spot_market};
+use injective_testing::{
+    test_tube::bank::send,
+    test_tube::exchange::{add_denom_notional_and_decimal, get_spot_market_id},
+    utils::dec_to_proto,
+    {test_tube::utils::store_code, utils::scale_price_quantity_spot_market},
+};
 use std::{collections::HashMap, str::FromStr};
 use test_tube_inj::cosmrs::proto::prost::Message;
-
-use crate::{
-    msg::{ExecuteMsg, FeeRecipient, InstantiateMsg},
-    types::FPCoin,
-};
 
 pub const TEST_CONTRACT_ADDR: &str = "inj14hj2tavq8fpesdwxxcu44rty3hh90vhujaxlnz";
 pub const TEST_USER_ADDR: &str = "inj1p7z8p649xspcey7wp5e4leqf7wa39kjjj6wja8";

@@ -1,23 +1,26 @@
-use std::ops::Neg;
-use std::str::FromStr;
-
-use cosmwasm_std::testing::{message_info, mock_env};
-use cosmwasm_std::{coin, Addr};
-
-use crate::admin::set_route;
-use crate::contract::instantiate;
-use crate::helpers::Scaled;
+use crate::{
+    admin::set_route,
+    contract::instantiate,
+    helpers::Scaled,
+    msg::{FeeRecipient, InstantiateMsg},
+    queries::{estimate_swap_result, SwapQuantity},
+    state::get_all_swap_routes,
+    testing::test_utils::{
+        are_fpdecimals_approximately_equal, human_to_dec, mock_deps_eth_inj, mock_realistic_deps_eth_atom, Decimals, MultiplierQueryBehavior,
+        TEST_USER_ADDR,
+    },
+    types::{FPCoin, SwapRoute},
+};
+use cosmwasm_std::{
+    coin,
+    testing::{message_info, mock_env},
+    Addr,
+};
 use injective_cosmwasm::{OwnedDepsExt, TEST_MARKET_ID_1, TEST_MARKET_ID_2};
 use injective_math::FPDecimal;
 
-use crate::msg::{FeeRecipient, InstantiateMsg};
-use crate::queries::{estimate_swap_result, SwapQuantity};
-use crate::state::get_all_swap_routes;
-use crate::testing::test_utils::{
-    are_fpdecimals_approximately_equal, human_to_dec, mock_deps_eth_inj, mock_realistic_deps_eth_atom, Decimals, MultiplierQueryBehavior,
-    TEST_USER_ADDR,
-};
-use crate::types::{FPCoin, SwapRoute};
+use std::ops::Neg;
+use std::str::FromStr;
 
 /*
     Tests focusing on queries with all values were taken from this spreadsheet:

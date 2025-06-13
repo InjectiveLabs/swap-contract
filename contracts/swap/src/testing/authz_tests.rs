@@ -13,8 +13,7 @@ use injective_std::{
     types::{cosmos::authz::v1beta1::MsgExec, cosmwasm::wasm::v1::MsgExecuteContract},
 };
 use injective_test_tube::{Account, Authz, Bank, Exchange, InjectiveTestApp, Module, Wasm};
-use injective_testing::test_tube::bank::send;
-use injective_testing::test_tube::exchange::add_denom_notional_and_decimal;
+use injective_testing::test_tube::{bank::send, exchange::add_denom_notional_and_decimal};
 use prost::Message;
 
 #[test]

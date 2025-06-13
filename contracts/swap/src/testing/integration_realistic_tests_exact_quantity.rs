@@ -1,21 +1,22 @@
+use crate::{
+    helpers::Scaled,
+    msg::{ExecuteMsg, QueryMsg},
+    testing::test_utils::{
+        are_fpdecimals_approximately_equal, assert_fee_is_as_expected, create_ninja_inj_both_side_orders,
+        create_realistic_atom_usdt_sell_orders_from_spreadsheet, create_realistic_eth_usdt_buy_orders_from_spreadsheet,
+        create_realistic_eth_usdt_sell_orders_from_spreadsheet, create_realistic_inj_usdt_buy_orders_from_spreadsheet,
+        create_realistic_inj_usdt_sell_orders_from_spreadsheet, create_realistic_limit_order, create_realistic_usdt_usdc_both_side_orders,
+        human_to_dec, init_rich_account, init_self_relaying_contract_and_get_address, initial_coin, launch_realistic_atom_usdt_spot_market,
+        launch_realistic_inj_usdt_spot_market, launch_realistic_ninja_inj_spot_market, launch_realistic_usdt_usdc_spot_market,
+        launch_realistic_weth_usdt_spot_market, must_init_account_with_funds_and_setting_denoms, query_all_bank_balances, query_bank_balance,
+        set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, ETH, INJ, INJ_2, NINJA, USDC, USDT,
+    },
+    types::{FPCoin, SwapEstimationResult},
+};
+
 use injective_math::FPDecimal;
 use injective_test_tube::{Account, Bank, Exchange, InjectiveTestApp, Module, Wasm};
 use std::ops::Neg;
-
-use crate::helpers::Scaled;
-
-use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::testing::test_utils::{
-    are_fpdecimals_approximately_equal, assert_fee_is_as_expected, create_ninja_inj_both_side_orders,
-    create_realistic_atom_usdt_sell_orders_from_spreadsheet, create_realistic_eth_usdt_buy_orders_from_spreadsheet,
-    create_realistic_eth_usdt_sell_orders_from_spreadsheet, create_realistic_inj_usdt_buy_orders_from_spreadsheet,
-    create_realistic_inj_usdt_sell_orders_from_spreadsheet, create_realistic_limit_order, create_realistic_usdt_usdc_both_side_orders, human_to_dec,
-    init_rich_account, init_self_relaying_contract_and_get_address, initial_coin, launch_realistic_atom_usdt_spot_market,
-    launch_realistic_inj_usdt_spot_market, launch_realistic_ninja_inj_spot_market, launch_realistic_usdt_usdc_spot_market,
-    launch_realistic_weth_usdt_spot_market, must_init_account_with_funds_and_setting_denoms, query_all_bank_balances, query_bank_balance,
-    set_route_and_assert_success, str_coin, Decimals, OrderSide, ATOM, ETH, INJ, INJ_2, NINJA, USDC, USDT,
-};
-use crate::types::{FPCoin, SwapEstimationResult};
 
 /*
    This test suite focuses on using using realistic values both for spot markets and for orders and
