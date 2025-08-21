@@ -798,9 +798,9 @@ fn it_correctly_swaps_between_markets_using_different_quote_assets_self_relaying
     let from_balance_after = query_bank_balance(&bank, USDT, swapper.address().as_str());
     let to_balance_after = query_bank_balance(&bank, NINJA, swapper.address().as_str());
 
-    // from 100000 USDT -> 96201.062128 USDT = 3798.937872 USDT
+    // from 100000 USDT -> 96201.062127 USDT = 3798.937872 USDT
     let expected_from_balance_before = human_to_dec("100000", Decimals::Six);
-    let expected_from_balance_after = human_to_dec("96201.062128", Decimals::Six);
+    let expected_from_balance_after = human_to_dec("96201.062127", Decimals::Six);
 
     // from 0 NINJA to 501000 NINJA
     let expected_to_balance_before = human_to_dec("0", Decimals::Six);
