@@ -14,12 +14,11 @@ use injective_testing::test_tube::utils::store_code;
 type V101InstantiateMsg = InstantiateMsg;
 
 #[test]
-#[cfg_attr(not(feature = "integration"), ignore)]
 fn test_migration() {
     let app = InjectiveTestApp::new();
     let wasm = Wasm::new(&app);
 
-    let wasm_byte_code = std::fs::read("../../contracts/swap/src/testing/test_artifacts/swap-contract-v101.wasm").unwrap();
+    let wasm_byte_code = std::fs::read("../../contracts/swap/src/testing/test_artifacts/swap_contract-v101.wasm").unwrap();
     let validator = app.get_first_validator_signing_account(INJ.to_string(), 1.2f64).unwrap();
 
     let owner = must_init_account_with_funds_and_setting_denoms(
@@ -66,14 +65,14 @@ fn test_migration() {
     assert_eq!(contract_info.creator, owner.address());
     assert_eq!(contract_info.label, "swap-contract");
 
-    let swap_v110_code_id = store_code(&wasm, &owner, "swap_contract".to_string());
+    let swap_v111_code_id = store_code(&wasm, &owner, "swap_contract".to_string());
 
     let _res: ExecuteResponse<MsgMigrateContractResponse> = app
         .execute(
             MsgMigrateContract {
                 sender: owner.address(),
                 contract: swap_v101_address.clone(),
-                code_id: swap_v110_code_id,
+                code_id: swap_v111_code_id,
                 msg: serde_json_wasm::to_vec(&MigrateMsg {}).unwrap(),
             },
             "/cosmwasm.wasm.v1.MsgMigrateContract",
@@ -93,7 +92,7 @@ fn test_migration() {
     let contract_info = res.contract_info.unwrap();
 
     assert_eq!(res.address, swap_v101_address);
-    assert_eq!(contract_info.code_id, swap_v110_code_id);
+    assert_eq!(contract_info.code_id, swap_v111_code_id);
     assert_eq!(contract_info.creator, owner.address());
     assert_eq!(contract_info.label, "swap-contract");
 

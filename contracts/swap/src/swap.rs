@@ -83,7 +83,7 @@ pub fn start_swap_flow(
             denom: source_denom.to_owned(),
         };
 
-        FPDecimal::from(coin_provided.amount) - estimation.result_quantity
+        FPDecimal::from(coin_provided.amount) - required_input
     } else {
         FPDecimal::ZERO
     };

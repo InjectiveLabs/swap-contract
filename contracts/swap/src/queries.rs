@@ -173,7 +173,7 @@ fn estimate_execution_buy_from_source(
 
     let funds_for_margin = match is_simulation {
         false => funds_in_contract, // in execution mode funds_in_contract already contain user funds so we don't want to count them double
-        true => funds_in_contract + available_swap_quote_funds,
+        true => funds_in_contract + input_quote_quantity,
     };
 
     if required_funds > funds_for_margin {
