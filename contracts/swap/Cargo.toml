@@ -2,7 +2,7 @@
 authors = [ "Markus Waas <markus@injectivelabs.org>" ]
 edition = "2021"
 name    = "swap-contract"
-version = "1.1.1"
+version = "1.1.2"
 
 exclude = [
  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
