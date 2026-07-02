@@ -149,6 +149,26 @@ fn verify_route_exists(deps: Deps<InjectiveQueryWrapper>, route: &SwapRoute) -> 
         }
     );
 
+    // A multi-hop route is only tradeable if each market in the chain actually shares a denom
+    // with the next one. The checks above only look at the very first and very last market, so a
+    // route with a broken middle hop (e.g. [A/B, C/D] where B != C and B != D) would previously
+    // pass `set_route` and only fail later, at swap time, when the exchange module rejects the
+    // order for a market/denom mismatch. Failing fast here gives the admin an immediate, specific
+    // error instead of a route that looks valid but can never execute.
+    for pair in denoms.windows(2) {
+        let (current, next) = (&pair[0], &pair[1]);
+        let shares_denom = current.quote_denom == next.quote_denom
+            || current.quote_denom == next.base_denom
+            || current.base_denom == next.quote_denom
+            || current.base_denom == next.base_denom;
+        ensure!(
+            shares_denom,
+            CustomError {
+                val: "Route is not continuous: two consecutive markets do not share a denom".to_string()
+            }
+        );
+    }
+
     Ok(())
 }
 

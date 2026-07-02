@@ -257,16 +257,20 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
     Ok(response)
 }
 
-pub fn parse_market_order_response(msg: Reply) -> StdResult<MsgCreateSpotMarketOrderResponse> {
-    let binding = msg.result.into_result().map_err(ContractError::SubMsgFailure).unwrap();
+pub fn parse_market_order_response(msg: Reply) -> Result<MsgCreateSpotMarketOrderResponse, ContractError> {
+    let reply_id = msg.id;
+    let binding = msg.result.into_result().map_err(ContractError::SubMsgFailure)?;
 
-    let first_message = binding.msg_responses.first();
-    let order_response = MsgCreateSpotMarketOrderResponse::decode(first_message.unwrap().value.as_slice())
-        .map_err(|err| ContractError::ReplyParseFailure {
-            id: msg.id,
+    let first_message = binding.msg_responses.first().ok_or_else(|| ContractError::ReplyParseFailure {
+        id: reply_id,
+        err: "sub-message result contained no msg_responses".to_string(),
+    })?;
+
+    let order_response =
+        MsgCreateSpotMarketOrderResponse::decode(first_message.value.as_slice()).map_err(|err| ContractError::ReplyParseFailure {
+            id: reply_id,
             err: err.to_string(),
-        })
-        .unwrap();
+        })?;
 
     Ok(order_response)
 }
