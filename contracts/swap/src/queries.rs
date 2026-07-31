@@ -22,12 +22,12 @@ pub fn estimate_swap_result(
     match swap_quantity {
         SwapQuantity::InputQuantity(quantity) => {
             if quantity.is_zero() || quantity.is_negative() {
-                return Err(StdError::generic_err("source_quantity must be positive"));
+                return Err(StdError::msg("source_quantity must be positive"));
             }
         }
         SwapQuantity::OutputQuantity(quantity) => {
             if quantity.is_zero() || quantity.is_negative() {
-                return Err(StdError::generic_err("target_quantity must be positive"));
+                return Err(StdError::msg("target_quantity must be positive"));
             }
         }
     }
@@ -101,7 +101,7 @@ pub fn estimate_single_swap_execution(
 
     let has_invalid_denom = balance_in.denom != market.quote_denom && balance_in.denom != market.base_denom;
     if has_invalid_denom {
-        return Err(StdError::generic_err("Invalid swap denom - neither base nor quote"));
+        return Err(StdError::msg("Invalid swap denom - neither base nor quote"));
     }
 
     let config = CONFIG.load(deps.storage)?;
@@ -177,7 +177,7 @@ fn estimate_execution_buy_from_source(
     };
 
     if required_funds > funds_for_margin {
-        return Err(StdError::generic_err(format!(
+        return Err(StdError::msg(format!(
             "Swap amount too high, required funds: {required_funds}, available funds: {funds_for_margin}",
         )));
     }
@@ -238,7 +238,7 @@ fn estimate_execution_buy_from_target(
     };
 
     if required_funds > funds_for_margin {
-        return Err(StdError::generic_err(format!(
+        return Err(StdError::msg(format!(
             "Swap amount too high, required funds: {required_funds}, available funds: {funds_for_margin}",
         )));
     }
@@ -411,7 +411,7 @@ pub fn get_minimum_liquidity_levels(
     }
 
     if sum < total {
-        return Err(StdError::generic_err("Not enough liquidity to fulfill order"));
+        return Err(StdError::msg("Not enough liquidity to fulfill order"));
     }
 
     Ok(orders)
@@ -500,7 +500,7 @@ mod tests {
             FPDecimal::must_from_str("0.01"),
         );
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), StdError::generic_err("Not enough liquidity to fulfill order"));
+        assert_eq!(result.unwrap_err().as_ref().to_string(), "Not enough liquidity to fulfill order");
     }
 
     #[test]

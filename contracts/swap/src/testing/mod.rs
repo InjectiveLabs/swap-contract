@@ -7,3 +7,4 @@ mod queries_tests;
 mod storage_tests;
 mod swap_tests;
 pub mod test_utils;
+mod types_tests;

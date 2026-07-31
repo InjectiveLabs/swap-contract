@@ -7,7 +7,7 @@ use crate::{
 use cosmwasm_std::{
     coin,
     testing::{MockApi, MockStorage},
-    to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint128,
+    to_json_binary, Addr, Coin, ContractResult, OwnedDeps, QuerierResult, SystemError, SystemResult, Uint256,
 };
 use injective_cosmwasm::{
     create_orderbook_response_handler, create_spot_multi_market_handler, get_default_subaccount_id_for_checked_address, inj_mock_deps,
@@ -32,7 +32,7 @@ use injective_testing::{
     test_tube::bank::send,
     test_tube::exchange::{add_denom_notional_and_decimal, get_spot_market_id},
     utils::dec_to_proto,
-    {test_tube::utils::store_code, utils::scale_price_quantity_spot_market},
+    utils::scale_price_quantity_spot_market,
 };
 use std::{collections::HashMap, str::FromStr};
 use test_tube_inj::cosmrs::proto::prost::Message;
@@ -620,7 +620,9 @@ pub fn create_realistic_limit_order(
 }
 
 pub fn init_self_relaying_contract_and_get_address(wasm: &Wasm<InjectiveTestApp>, owner: &SigningAccount, initial_balance: &[Coin]) -> String {
-    let code_id = store_code(wasm, owner, "swap_contract".to_string());
+    let release_wasm_path = format!("{}/../../artifacts/swap_contract.wasm", env!("CARGO_MANIFEST_DIR"));
+    let release_wasm = std::fs::read(release_wasm_path).expect("build the optimized release artifact before running TestTube tests");
+    let code_id = wasm.store_code(&release_wasm, None, owner).unwrap().data.code_id;
     wasm.instantiate(
         code_id,
         &InstantiateMsg {
@@ -672,15 +674,12 @@ pub fn must_init_account_with_funds_and_setting_denoms(
     validator: &SigningAccount,
     initial_funds: &[InitialCoin],
 ) -> SigningAccount {
-    let mut initial_funds_coin: Vec<Coin> = initial_funds
-        .iter()
-        .map(|ic| coin(ic.coin.amount.into(), ic.coin.denom.clone()))
-        .collect();
+    let mut initial_funds_coin: Vec<Coin> = initial_funds.iter().map(|ic| ic.coin.clone()).collect();
     let mut initial_funds_decimals = initial_funds.iter().map(|ic| ic.decimals).collect::<Vec<u32>>();
 
     // add 1000000000000000000000 inj to initial funds with adding to element if inj already in it
     if let Some(pos) = initial_funds_coin.iter().position(|c| c.denom == INJ) {
-        initial_funds_coin[pos].amount += Uint128::from(1_000_000_000_000_000_000_000u128);
+        initial_funds_coin[pos].amount += Uint256::from(1_000_000_000_000_000_000_000u128);
     } else {
         initial_funds_coin.push(coin(1_000_000_000_000_000_000_000u128, INJ.to_string()));
         initial_funds_decimals.push(18);

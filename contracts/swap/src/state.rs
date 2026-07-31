@@ -26,7 +26,7 @@ pub fn read_swap_route(storage: &dyn Storage, source_denom: &str, target_denom: 
     let key = route_key(source_denom, target_denom);
     SWAP_ROUTES
         .load(storage, key)
-        .map_err(|_| StdError::generic_err(format!("No swap route not found from {source_denom} to {target_denom}",)))
+        .map_err(|_| StdError::msg(format!("No swap route not found from {source_denom} to {target_denom}",)))
 }
 
 pub fn get_config(storage: &dyn Storage) -> StdResult<Config> {

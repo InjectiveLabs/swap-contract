@@ -7,7 +7,7 @@ use crate::{
     types::{CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapQuantityMode, SwapResults},
 };
 
-use cosmwasm_std::{BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg};
+use cosmwasm_std::{BankMsg, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg};
 use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address, InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper,
     OrderType, SpotOrder,
@@ -92,7 +92,11 @@ pub fn start_swap_flow(
         sender_address,
         swap_steps: steps,
         swap_quantity_mode,
-        refund: Coin::new(refund_amount, source_denom.to_owned()),
+        refund: FPCoin {
+            amount: refund_amount,
+            denom: source_denom.to_owned(),
+        }
+        .to_coin_floor()?,
         input_funds: coin_provided.to_owned(),
     };
 
@@ -227,7 +231,7 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
     // last step, finalize and send back funds to a caller
     let send_message = BankMsg::Send {
         to_address: swap.sender_address.to_string(),
-        amount: vec![new_balance.clone().into()],
+        amount: vec![new_balance.to_coin_floor()?],
     };
 
     let swap_results_json = serde_json_wasm::to_string(&swap_results).unwrap();
