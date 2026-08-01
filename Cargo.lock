@@ -2953,6 +2953,7 @@ dependencies = [
  "injective-std",
  "injective-test-tube",
  "injective-testing",
+ "primitive-types",
  "prost 0.13.5",
  "schemars 0.8.22",
  "serde",

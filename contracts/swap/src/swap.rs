@@ -7,7 +7,7 @@ use crate::{
     types::{CurrentSwapOperation, CurrentSwapStep, FPCoin, SwapEstimationAmount, SwapQuantityMode, SwapResults},
 };
 
-use cosmwasm_std::{BankMsg, DepsMut, Env, Event, MessageInfo, Reply, Response, StdResult, SubMsg};
+use cosmwasm_std::{BankMsg, Deps, DepsMut, Env, Event, MessageInfo, Reply, Response, StdError, StdResult, SubMsg};
 use injective_cosmwasm::{
     create_spot_market_order_msg, get_default_subaccount_id_for_checked_address, InjectiveMsgWrapper, InjectiveQuerier, InjectiveQueryWrapper,
     OrderType, SpotOrder,
@@ -127,6 +127,15 @@ pub fn execute_swap_step(
 
     let fee_recipient = &CONFIG.load(deps.storage)?.fee_recipient;
 
+    let input_spendable_before = query_contract_spendable_balance(&deps.as_ref(), &env, &current_balance.denom)?;
+    if current_balance.amount > input_spendable_before {
+        return Err(StdError::msg(format!(
+            "Authorized swap input exceeds spendable balance for {}: authorized {}, spendable {}",
+            current_balance.denom, current_balance.amount, input_spendable_before
+        )));
+    }
+    let minimum_input_spendable_after = input_spendable_before - current_balance.amount;
+
     let order = SpotOrder::new(
         estimation.worst_price,
         if estimation.is_buy_order {
@@ -152,6 +161,7 @@ pub fn execute_swap_step(
         current_balance,
         step_target_denom: estimation.result_denom,
         is_buy: estimation.is_buy_order,
+        minimum_input_spendable_after,
     };
     STEP_STATE.save(deps.storage, &current_step)?;
 
@@ -179,6 +189,13 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
     let mut swap_results = SWAP_RESULTS.load(deps.storage)?;
 
     let current_step = STEP_STATE.load(deps.storage).map_err(ContractError::Std)?;
+
+    let input_spendable_after = query_contract_spendable_balance(&deps.as_ref(), &env, &current_step.current_balance.denom)?;
+    ensure_support_funds_preserved(
+        &current_step.current_balance.denom,
+        current_step.minimum_input_spendable_after,
+        input_spendable_after,
+    )?;
 
     let new_quantity = if current_step.is_buy { quantity } else { quantity * average_price - fee };
 
@@ -224,14 +241,13 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
         SwapQuantityMode::ExactOutputQuantity(q) => q,
     };
 
-    if new_balance.amount < min_output_quantity {
-        return Err(ContractError::MinOutputAmountNotReached(min_output_quantity));
-    }
+    let output_coin = new_balance.to_coin_floor()?;
+    ensure_minimum_output(&output_coin, min_output_quantity)?;
 
     // last step, finalize and send back funds to a caller
     let send_message = BankMsg::Send {
         to_address: swap.sender_address.to_string(),
-        amount: vec![new_balance.to_coin_floor()?],
+        amount: vec![output_coin.clone()],
     };
 
     let swap_results_json = serde_json_wasm::to_string(&swap_results).unwrap();
@@ -240,7 +256,7 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
         .add_attribute("swap_input_amount", swap.input_funds.amount)
         .add_attribute("swap_input_denom", swap.input_funds.denom)
         .add_attribute("refund_amount", swap.refund.amount.to_owned())
-        .add_attribute("swap_final_amount", new_balance.amount.to_string())
+        .add_attribute("swap_final_amount", output_coin.amount)
         .add_attribute("swap_final_denom", new_balance.denom)
         .add_attribute("swap_results", swap_results_json);
 
@@ -259,6 +275,38 @@ pub fn handle_atomic_order_reply(deps: DepsMut<InjectiveQueryWrapper>, env: Env,
     }
 
     Ok(response)
+}
+
+fn query_contract_spendable_balance(deps: &Deps<InjectiveQueryWrapper>, env: &Env, denom: &str) -> StdResult<FPDecimal> {
+    let bank_balance: FPDecimal = deps.querier.query_balance(&env.contract.address, denom)?.amount.into();
+    let subaccount_id = get_default_subaccount_id_for_checked_address(&env.contract.address);
+    let denom = denom.to_owned();
+    let available_deposit = InjectiveQuerier::new(&deps.querier)
+        .query_subaccount_deposit(&subaccount_id, &denom)?
+        .deposits
+        .available_balance;
+
+    Ok(bank_balance + available_deposit)
+}
+
+pub(crate) fn ensure_support_funds_preserved(denom: &str, minimum_remaining: FPDecimal, actual_remaining: FPDecimal) -> Result<(), ContractError> {
+    if actual_remaining < minimum_remaining {
+        return Err(ContractError::SupportFundsConsumed {
+            denom: denom.to_owned(),
+            minimum_remaining,
+            actual_remaining,
+        });
+    }
+
+    Ok(())
+}
+
+pub(crate) fn ensure_minimum_output(output: &cosmwasm_std::Coin, minimum: FPDecimal) -> Result<(), ContractError> {
+    if FPDecimal::from(output.amount) < minimum {
+        return Err(ContractError::MinOutputAmountNotReached(minimum));
+    }
+
+    Ok(())
 }
 
 pub fn parse_market_order_response(msg: Reply) -> StdResult<MsgCreateSpotMarketOrderResponse> {

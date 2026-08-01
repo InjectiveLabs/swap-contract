@@ -29,6 +29,7 @@ injective-cosmwasm = { workspace = true }
 injective-math     = { workspace = true }
 injective-std      = { workspace = true }
 prost              = { workspace = true }
+primitive-types    = { workspace = true }
 schemars           = { workspace = true }
 serde              = { workspace = true }
 serde-json-wasm    = { workspace = true }

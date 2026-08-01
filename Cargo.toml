@@ -17,6 +17,7 @@ injective-std       = { version = "1.20.0" }
 injective-test-tube = { version = "1.20.0" }
 injective-testing   = { version = "1.20.0" }
 prost               = { version = "0.13.5" }
+primitive-types     = { version = "0.12.2", default-features = false }
 schemars            = { version = "0.8.16", features = [ "enumset" ] }
 serde               = { version = "1.0.193", default-features = false, features = [ "derive" ] }
 serde-json-wasm     = { version = "1.0.1" }

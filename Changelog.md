@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file.
 - Updated release builds to `cosmwasm/optimizer:0.17.0`, matching the RFQ release flow.
 - Updated `FPDecimal` coin conversion for CosmWasm 3 while preserving integer floor behavior.
 
+### Fixed
+
+- Preserved exact orderbook remainders until price and quantity tick rounding.
+- Prevented atomic swaps from spending pre-existing contract support funds.
+- Checked minimum output against the integer bank amount delivered to the caller.
+
 ## [1.1.0] - 2024-10-30
 
 ### Fixed

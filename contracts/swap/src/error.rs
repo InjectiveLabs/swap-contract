@@ -28,6 +28,13 @@ pub enum ContractError {
     #[error("Provided amount of {0} is below required amount of {1}")]
     InsufficientFundsProvided(FPDecimal, FPDecimal),
 
+    #[error("Atomic order consumed support funds for {denom}: minimum remaining {minimum_remaining}, actual remaining {actual_remaining}")]
+    SupportFundsConsumed {
+        denom: String,
+        minimum_remaining: FPDecimal,
+        actual_remaining: FPDecimal,
+    },
+
     #[error("Contract can't be migrated")]
     MigrationError {},
 }

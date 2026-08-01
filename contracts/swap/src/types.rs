@@ -69,6 +69,7 @@ pub struct CurrentSwapStep {
     pub current_balance: FPCoin,
     pub step_target_denom: String,
     pub is_buy: bool,
+    pub minimum_input_spendable_after: FPDecimal,
 }
 
 #[cw_serde]

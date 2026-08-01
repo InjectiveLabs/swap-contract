@@ -8,7 +8,9 @@ use crate::{
     types::{ConfigResponse, SwapQuantityMode},
 };
 
-use cosmwasm_std::{entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError};
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError};
 use cw2::{get_contract_version, set_contract_version};
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper};
 
