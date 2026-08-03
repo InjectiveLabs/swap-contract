@@ -8,12 +8,19 @@ use crate::{
     types::{ConfigResponse, SwapQuantityMode},
 };
 
-use cosmwasm_std::{entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError};
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError};
 use cw2::{get_contract_version, set_contract_version};
 use injective_cosmwasm::{InjectiveMsgWrapper, InjectiveQueryWrapper};
 
 pub const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const CODE_67_LEGACY_CONTRACT_NAME: &str = "crates.io:atomic-order-example";
+const CODE_67_LEGACY_CONTRACT_VERSION: &str = "0.1.0";
+const CODE_1962_CONTRACT_NAME: &str = "swap-contract";
+const CODE_1962_CONTRACT_VERSION: &str = "1.1.2";
 
 pub const ATOMIC_ORDER_REPLY_ID: u64 = 1u64;
 pub const DEPOSIT_REPLY_ID: u64 = 2u64;
@@ -116,21 +123,21 @@ pub fn query(deps: Deps<InjectiveQueryWrapper>, env: Env, msg: QueryMsg) -> Resu
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut<InjectiveQueryWrapper>, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    let contract_version = get_contract_version(deps.storage)?;
+    let previous_contract_version = get_contract_version(deps.storage)?;
 
-    match contract_version.contract.as_ref() {
-        "swap-contract" => match contract_version.version.as_ref() {
-            "1.0.1" => {
-                set_contract_version(deps.storage, CONTRACT_NAME.to_string(), CONTRACT_VERSION)?;
-            }
-            _ => return Err(ContractError::MigrationError {}),
-        },
+    let migration_source = match (previous_contract_version.contract.as_str(), previous_contract_version.version.as_str()) {
+        (CODE_67_LEGACY_CONTRACT_NAME, CODE_67_LEGACY_CONTRACT_VERSION) => "code_67",
+        (CODE_1962_CONTRACT_NAME, CODE_1962_CONTRACT_VERSION) => "code_1962",
         _ => return Err(ContractError::MigrationError {}),
-    }
+    };
+
+    get_config(deps.storage)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     Ok(Response::new()
-        .add_attribute("previous_contract_name", &contract_version.contract)
-        .add_attribute("previous_contract_version", &contract_version.version)
-        .add_attribute("new_contract_name", CONTRACT_NAME.to_string())
+        .add_attribute("migration_source", migration_source)
+        .add_attribute("previous_contract_name", previous_contract_version.contract)
+        .add_attribute("previous_contract_version", previous_contract_version.version)
+        .add_attribute("new_contract_name", CONTRACT_NAME)
         .add_attribute("new_contract_version", CONTRACT_VERSION))
 }

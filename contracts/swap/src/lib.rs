@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod contract;
 mod error;
+mod exact_math;
 pub mod helpers;
 pub mod msg;
 pub mod queries;

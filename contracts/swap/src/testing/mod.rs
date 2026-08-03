@@ -1,5 +1,7 @@
 mod authz_tests;
 mod config_tests;
+mod custody_tests;
+mod exact_math_tests;
 mod integration_realistic_tests_exact_quantity;
 mod integration_realistic_tests_min_quantity;
 mod migration_test;
@@ -7,3 +9,5 @@ mod queries_tests;
 mod storage_tests;
 mod swap_tests;
 pub mod test_utils;
+mod types_tests;
+mod weighted_average_rounding_regression;

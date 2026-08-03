@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Coin};
+use cosmwasm_std::{Addr, Coin, Decimal256, StdResult};
 use injective_cosmwasm::MarketId;
 use injective_math::FPDecimal;
 
@@ -15,9 +15,10 @@ pub struct FPCoin {
     pub denom: String,
 }
 
-impl From<FPCoin> for Coin {
-    fn from(value: FPCoin) -> Self {
-        Coin::new(value.amount, value.denom)
+impl FPCoin {
+    pub fn to_coin_floor(&self) -> StdResult<Coin> {
+        let amount = Decimal256::try_from(self.amount)?.to_uint_floor();
+        Ok(Coin::new(amount, self.denom.clone()))
     }
 }
 
@@ -68,6 +69,7 @@ pub struct CurrentSwapStep {
     pub current_balance: FPCoin,
     pub step_target_denom: String,
     pub is_buy: bool,
+    pub minimum_input_spendable_after: FPDecimal,
 }
 
 #[cw_serde]
